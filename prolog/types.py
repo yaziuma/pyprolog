@@ -3,22 +3,31 @@ from .math_interpreter import MathInterpreter
 from .logic_interpreter import LogicInterpreter
 from .expression import Visitor, PrimaryExpression, BinaryExpression
 from .merge_bindings import merge_bindings
+from prolog.logger import logger
 
+logger.debug("types.py loaded")
 
 class Variable:
     def __init__(self, name):
+        # logger.debug(f"Variable initialized: {name}") # Can be very verbose
         self.name = name
 
     def match(self, other):
+        logger.debug(f"Variable.match({self}) called with other: {other}")
         bindings = dict()
         if self != other:
             bindings[self] = other
+        logger.debug(f"Variable.match returning: {bindings}")
         return bindings
 
     def substitute(self, bindings):
+        logger.debug(f"Variable.substitute({self}) called with bindings: {bindings}")
         value = bindings.get(self, None)
         if value is not None:
-            return value.substitute(bindings)
+            result = value.substitute(bindings)
+            logger.debug(f"Variable.substitute returning (from value): {result}")
+            return result
+        logger.debug(f"Variable.substitute returning (self): {self}")
         return self
 
     def __str__(self):
@@ -30,6 +39,7 @@ class Variable:
 
 class Dot:
     def __init__(self, head, tail=None):
+        # logger.debug(f"Dot initialized with head: {head}, tail: {tail}") # Can be very verbose
         self._name = '.'
         self.head = head
         self.tail = tail
@@ -37,14 +47,19 @@ class Dot:
 
     @classmethod
     def from_list(cls, lst):
+        logger.debug(f"Dot.from_list called with: {lst}")
+        # Term is defined later in this file. This should be fine as it's used when the method is called.
+        empty_list_node = cls(Term("[]"), None)
+
         if not lst:
-            return cls([])
-        head = Dot(lst[0])
-        first_head = head
-        for elem in lst[1:]:
-            head.tail = Dot(elem)
-            head = head.tail
-        return first_head
+            logger.debug(f"Dot.from_list returning (empty list): {empty_list_node}")
+            return empty_list_node
+
+        current_tail = empty_list_node
+        for element in reversed(lst):
+            current_tail = cls(element, current_tail)
+        logger.debug(f"Dot.from_list returning: {current_tail}")
+        return current_tail
 
     @staticmethod
     def concat(dot1, dot2):
@@ -56,22 +71,32 @@ class Dot:
         return reduce(merge_bindings, [{}] + m)
 
     def match(self, other):
+        logger.debug(f"Dot.match({self}) called with other: {other}")
         if isinstance(other, Bar):
-            return other.match(self)
+            res_bar_match = other.match(self)
+            logger.debug(f"Dot.match (delegating to Bar.match) returning: {res_bar_match}")
+            return res_bar_match
 
         if not isinstance(other, Dot):
-            return {}
+            logger.debug(f"Dot.match (other is not Dot) returning: {{}}")
+            return {} # Should be None for no match, or {} for no bindings? Original was {}
 
         l1 = list(self)
         l2 = list(other)
         if len(l1) == len(l2):
-            return self._match_lsts(l1, l2)
+            res_match_lsts = self._match_lsts(l1, l2)
+            logger.debug(f"Dot.match (lengths equal) returning: {res_match_lsts}")
+            return res_match_lsts
+        logger.debug(f"Dot.match (lengths differ) returning: None")
         return None
 
     def substitute(self, bindings):
-        return Dot.from_list(
-            list(map((lambda arg: arg.substitute(bindings)), self))
-        )
+        logger.debug(f"Dot.substitute({self}) called with bindings: {bindings}")
+        # Convert self to list, substitute elements, then build new Dot from list
+        substituted_elements = [elem.substitute(bindings) for elem in list(self)]
+        result = Dot.from_list(substituted_elements)
+        logger.debug(f"Dot.substitute returning: {result}")
+        return result
 
     def query(self, runtime):
         yield from runtime.execute(self)
@@ -96,33 +121,75 @@ class Dot:
 
 class Bar:
     def __init__(self, head, tail):
+        # logger.debug(f"Bar initialized with head: {head}, tail: {tail}") # Can be very verbose
         self.head = head
         self.tail = tail
 
     def match(self, other):
+        logger.debug(f"Bar.match({self}) called with other: {other}")
         if not isinstance(other, Dot):
+            logger.debug(f"Bar.match (other is not Dot) returning: None")
             return None
 
-        other_left = list(other)[: len(list(self.head))]
-        other_right = list(other)[len(list(self.head)) :]
-        other_head = Dot.from_list(other_left)
-        other_tail = Dot.from_list(other_right)
-        head_match = self.head.match(other_head)
-        tail_match = self.tail.match(other_tail)
+        # This logic seems complex and might need careful review for correctness with new Dot.from_list
+        try:
+            # Attempt to get the length of self.head, assuming it's a list-like Dot
+            if isinstance(self.head, Dot):
+                len_self_head = len(list(self.head))
+            elif isinstance(self.head, Variable) or isinstance(self.head, Term):
+                # If H in [H|T] is a single Variable or Term, its "length" for prefix matching is 1.
+                # This part of Bar.match is tricky. The original code implied self.head is a list.
+                # If Bar is strictly for [PrefixList | TailVar], then self.head must be a Dot.
+                # If Bar can be [ElementVar | TailVar], then this logic needs to be simpler:
+                #   head_match = self.head.match(other.head)
+                #   tail_match = self.tail.match(other.tail)
+                # For now, stick to the idea that if self.head is not a Dot, this complex prefix match fails.
+                logger.warning(f"Bar.match: self.head ({self.head}, type {type(self.head)}) is not a Dot. " +
+                               "This match logic expects self.head to be a list prefix (Dot). " +
+                               "Treating as non-match for this complex prefix logic.")
+                return None
+            else: # Should not happen if parser constructs Bar correctly
+                logger.error(f"Bar.match: self.head ({self.head}, type {type(self.head)}) has unexpected type for prefix matching.")
+                return None
+        except TypeError:
+            # This might happen if self.head is a Dot but its elements are not iterable,
+            # or if list(self.head) fails for another reason.
+            logger.error(f"Bar.match: TypeError when trying to determine length of self.head ({self.head}). Cannot determine prefix length.")
+            return None
+
+        other_elements = list(other)
+        if len(other_elements) < len_self_head: # Not enough elements in other to match the prefix
+            logger.debug(f"Bar.match (other list too short) returning: None")
+            return None
+
+        other_left_elements = other_elements[:len_self_head]
+        other_right_elements = other_elements[len_self_head:]
+
+        # other_head should be a Dot representing the prefix from 'other'
+        # other_tail should be a Dot representing the rest of 'other'
+        # However, Dot.from_list expects a list of terms, not already Dot objects.
+        # If other_left_elements are already terms, this is fine.
+        other_head_dot = Dot.from_list(other_left_elements)
+        other_tail_dot = Dot.from_list(other_right_elements)
+
+        head_match = self.head.match(other_head_dot)
+        tail_match = self.tail.match(other_tail_dot)
 
         if head_match is not None and tail_match is not None:
-            return {**head_match, **tail_match}
+            merged = merge_bindings(head_match, tail_match) # Use merge_bindings
+            logger.debug(f"Bar.match (success) returning: {merged}")
+            return merged # Return merged bindings
 
+        logger.debug(f"Bar.match (failed) returning: None")
         return None
 
     def substitute(self, bindings):
-        # return Dot.from_list(list(map(
-        #     (lambda arg: arg.substitute(bindings)),
-        #     self
-        # )))
+        logger.debug(f"Bar.substitute({self}) called with bindings: {bindings}")
         new_head = self.head.substitute(bindings)
         new_tail = self.tail.substitute(bindings)
-        return Bar(new_head, new_tail)
+        result = Bar(new_head, new_tail)
+        logger.debug(f"Bar.substitute returning: {result}")
+        return result
 
     def query(self, runtime):
         yield from runtime.execute(self)
@@ -141,28 +208,51 @@ class Bar:
 
 class Term:
     def __init__(self, pred, *args):
+        # logger.debug(f"Term initialized with pred: {pred}, args: {args}") # Can be very verbose
         self.pred = pred
         self.args = list(args)
 
     def match(self, other):
+        logger.debug(f"Term.match({self}) called with other: {other}")
         if isinstance(other, Term):
             if self.pred != other.pred or len(self.args) != len(other.args):
+                logger.debug(f"Term.match (pred/arity mismatch) returning: None")
                 return None
 
-            m = list(
-                map(
-                    (lambda arg1, arg2: arg1.match(arg2)), self.args, other.args
-                )
-            )
+            m = []
+            for arg1, arg2 in zip(self.args, other.args):
+                match_result = arg1.match(arg2)
+                if match_result is None: # If any arg fails to match, the whole term fails
+                    logger.debug(f"Term.match (arg mismatch: {arg1} vs {arg2}) returning: None")
+                    return None
+                m.append(match_result)
+            
+            try:
+                final_bindings = reduce(merge_bindings, [{}] + m)
+                logger.debug(f"Term.match (success) returning: {final_bindings}")
+                return final_bindings
+            except TypeError: # merge_bindings might fail if a None was missed (shouldn't happen with check above)
+                logger.error(f"Term.match error during merge_bindings with matches: {m}")
+                return None
 
-            return reduce(merge_bindings, [{}] + m)
 
-        return other.match(self)
+        # If other is not a Term, delegate (e.g., if other is a Variable)
+        # This can lead to infinite recursion if not handled carefully (e.g. Var.match(Term) -> Term.match(Var))
+        # Variable.match does not delegate back to Term.match if other is Term.
+        if hasattr(other, 'match'):
+            res_other_match = other.match(self)
+            logger.debug(f"Term.match (delegating to other.match) returning: {res_other_match}")
+            return res_other_match
+        
+        logger.debug(f"Term.match (other has no match method) returning: None")
+        return None # No match if other is not Term and has no match method
 
     def substitute(self, bindings):
-        return Term(
-            self.pred, *map((lambda arg: arg.substitute(bindings)), self.args)
-        )
+        logger.debug(f"Term.substitute({self}) called with bindings: {bindings}")
+        substituted_args = [arg.substitute(bindings) for arg in self.args]
+        result = Term(self.pred, *substituted_args)
+        logger.debug(f"Term.substitute returning: {result}")
+        return result
 
     def query(self, runtime):
         yield from runtime.execute(self)
