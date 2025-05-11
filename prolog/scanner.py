@@ -1,7 +1,9 @@
 from .token import Token
 from .token_type import TokenType
 from .errors import ScannerError
+from prolog.logger import logger
 
+logger.debug("scanner.py loaded")
 
 def default_error_handler(line, message):
     print(f'Line[{line}] Error: {message}')
@@ -10,6 +12,7 @@ def default_error_handler(line, message):
 
 class Scanner:
     def __init__(self, source, report=default_error_handler):
+        logger.debug(f"Scanner initialized with source: {source[:50]}{'...' if len(source) > 50 else ''}")
         self._source = source
         self._tokens = []
         self._start = 0
@@ -38,6 +41,7 @@ class Scanner:
         lexeme = (
             self._source[self._start : self._current] if lex is None else lex
         )
+        # logger.debug(f"Adding token: type={token_type}, lexeme='{lexeme}', literal={literal}, line={self._line}") # Potentially too verbose
         self._tokens.append(Token(token_type, lexeme, literal, self._line))
 
     def _is_at_end(self):
@@ -219,10 +223,11 @@ class Scanner:
             self._report(self._line, f'Unexpected character: {c}')
 
     def tokenize(self):
+        logger.debug("Scanner.tokenize called")
         while self._is_at_end() is not True:
             self._start = self._current
             self._scan_token()
 
         self._add_token(TokenType.EOF)
-
+        logger.debug(f"Scanner.tokenize returning (first 5): {self._tokens[:5]}{'...' if len(self._tokens) > 5 else ''}")
         return self._tokens
