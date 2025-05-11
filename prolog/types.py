@@ -49,7 +49,8 @@ class Dot:
     def from_list(cls, lst):
         logger.debug(f"Dot.from_list called with: {lst}")
         # Term is defined later in this file. This should be fine as it's used when the method is called.
-        empty_list_node = cls(Term("[]"), None)
+        # empty_list_node = cls(Term("[]"), None) # Original: head is Term("[]")
+        empty_list_node = cls(Term("[]"), None) # Original: head is Term("[]")
 
         if not lst:
             logger.debug(f"Dot.from_list returning (empty list): {empty_list_node}")
@@ -265,6 +266,11 @@ class Term:
 
     def __repr__(self):
         return str(self)
+
+    def __eq__(self, other):
+        if not isinstance(other, Term):
+            return NotImplemented
+        return self.pred == other.pred and self.args == other.args
 
 
 class TermFunction(Term):
