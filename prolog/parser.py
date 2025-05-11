@@ -53,9 +53,13 @@ class Parser:
         return self._peek().token_type == token_type
 
     def _next_token_matches(self, token_type):
+        if self._current + 1 >= len(self._tokens):
+            return False # Next token does not exist, so it cannot match
+        
+        next_token = self._tokens[self._current + 1] # Effectively self._peek_next()
         if isinstance(token_type, list):
-            return self._peek_next().token_type in token_type
-        return self._peek_next().token_type == token_type
+            return next_token.token_type in token_type
+        return next_token.token_type == token_type
 
     def _is_type(self, token, token_type):
         return token.token_type == token_type
@@ -445,7 +449,7 @@ class Parser:
         if self._token_matches(TokenType.COLONMINUS):
             self._report(self._peek().line, 'Cannot use rule as a query')
 
-        self._advance() # Consume the operator that was not DOT or COLONMINUS (e.g. comma for conjunction)
+        # self._advance() # Consume the operator that was not DOT or COLONMINUS (e.g. comma for conjunction) # Problematic: caused IndexError for simple queries like "goal"
         args = [head_term]
         while not self._token_matches(TokenType.DOT):
             term_in_conj = self._parse_term()
