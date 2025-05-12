@@ -57,18 +57,18 @@ class Dot:
     @classmethod
     def from_list(cls, lst):
         logger.debug(f"Dot.from_list called with: {lst}")
-        # Term is defined later in this file. This should be fine as it's used when the method is called.
-        # empty_list_node = cls(Term("[]"), None) # Original: head is Term("[]")
-        empty_list_node = cls(Term("[]"), None) # Original: head is Term("[]")
-
+        # 空リストの特殊ケース
         if not lst:
-            logger.debug(f"Dot.from_list returning (empty list): {empty_list_node}")
-            return empty_list_node
-
-        current_tail = empty_list_node
+            # 空リストは Term("[]") を head に持ち、tail は None
+            result = cls(Term("[]"), None)
+            logger.debug(f"Dot.from_list returning (empty list): {result}")
+            return result
+        
+        # 非空リストの処理
+        current_tail = cls(Term("[]"), None)  # 空リストで終了
         for element in reversed(lst):
             current_tail = cls(element, current_tail)
-        logger.debug(f"Dot.from_list returning: {current_tail}")
+        logger.debug(f"Dot.from_list returning (non-empty list): {current_tail}")
         return current_tail
 
     @staticmethod
