@@ -79,7 +79,7 @@ class Dot:
             return res_bar_match
 
         if not isinstance(other, Dot):
-            logger.debug(f"Dot.match (other is not Dot) returning: {{}}")
+            logger.debug("Dot.match (other is not Dot) returning: {}")
             return {} # Should be None for no match, or {} for no bindings? Original was {}
 
         l1 = list(self)
@@ -88,7 +88,7 @@ class Dot:
             res_match_lsts = self._match_lsts(l1, l2)
             logger.debug(f"Dot.match (lengths equal) returning: {res_match_lsts}")
             return res_match_lsts
-        logger.debug(f"Dot.match (lengths differ) returning: None")
+        logger.debug("Dot.match (lengths differ) returning: None")
         return None
 
     def substitute(self, bindings):
@@ -129,7 +129,7 @@ class Bar:
     def match(self, other):
         logger.debug(f"Bar.match({self}) called with other: {other}")
         if not isinstance(other, Dot):
-            logger.debug(f"Bar.match (other is not Dot) returning: None")
+            logger.debug("Bar.match (other is not Dot) returning: None")
             return None
 
         # This logic seems complex and might need careful review for correctness with new Dot.from_list
@@ -160,7 +160,7 @@ class Bar:
 
         other_elements = list(other)
         if len(other_elements) < len_self_head: # Not enough elements in other to match the prefix
-            logger.debug(f"Bar.match (other list too short) returning: None")
+            logger.debug("Bar.match (other list too short) returning: None")
             return None
 
         other_left_elements = other_elements[:len_self_head]
@@ -181,7 +181,7 @@ class Bar:
             logger.debug(f"Bar.match (success) returning: {merged}")
             return merged # Return merged bindings
 
-        logger.debug(f"Bar.match (failed) returning: None")
+        logger.debug("Bar.match (failed) returning: None")
         return None
 
     def substitute(self, bindings):
@@ -217,7 +217,7 @@ class Term:
         logger.debug(f"Term.match({self}) called with other: {other}")
         if isinstance(other, Term):
             if self.pred != other.pred or len(self.args) != len(other.args):
-                logger.debug(f"Term.match (pred/arity mismatch) returning: None")
+                logger.debug("Term.match (pred/arity mismatch) returning: None")
                 return None
 
             m = []
@@ -245,7 +245,7 @@ class Term:
             logger.debug(f"Term.match (delegating to other.match) returning: {res_other_match}")
             return res_other_match
         
-        logger.debug(f"Term.match (other has no match method) returning: None")
+        logger.debug("Term.match (other has no match method) returning: None")
         return None # No match if other is not Term and has no match method
 
     def substitute(self, bindings):
