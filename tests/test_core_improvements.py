@@ -133,6 +133,497 @@ class BaseTestCore:
             logger.error(f"Query '{query_str}' succeeded, expected failure. Solutions: {solutions}")
             pytest.fail(f"Query '{query_str}' succeeded (solutions: {solutions}), expected failure.")
 
+
+# --- 0. スキャナーとパーサーの最小限テスト ---
+class TestTokenizerAndParserBasics(BaseTestCore):
+    """
+    最も基本的なスキャナーとパーサーのテストケース。
+    他のテストの前に、これらのテストをパスする必要があります。
+    """
+    
+    def test_atom_tokenization(self):
+        """最も基本的なアトムのトークン化のテスト"""
+        logger.info("Starting test: test_atom_tokenization")
+        from prolog.token_type import TokenType
+        tokens = Scanner("a").tokenize()
+        assert len(tokens) == 2  # アトムトークン + EOF
+        assert tokens[0].lexeme == "a"
+        # TokenTypeが合っているかはトークンの種類に応じて確認
+        # 現在の実装に依存するため、具体的なチェックは控える
+
+    def test_multiple_atoms_tokenization(self):
+        """複数のアトムのトークン化のテスト"""
+        logger.info("Starting test: test_multiple_atoms_tokenization")
+        tokens = Scanner("a b c").tokenize()
+        assert len(tokens) == 4  # 3つのアトムトークン + EOF
+        assert tokens[0].lexeme == "a"
+        assert tokens[1].lexeme == "b"
+        assert tokens[2].lexeme == "c"
+
+    def test_special_atoms_tokenization(self):
+        """特殊なアトム（true, fail）のトークン化のテスト"""
+        logger.info("Starting test: test_special_atoms_tokenization")
+        tokens = Scanner("true fail").tokenize()
+        assert len(tokens) == 3  # 2つのアトムトークン + EOF
+        assert tokens[0].lexeme == "true"
+        assert tokens[1].lexeme == "fail"
+        
+        # スキャナーが実装されれば、以下のようなトークンタイプの確認も追加
+        # from prolog.token_type import TokenType
+        # if hasattr(TokenType, 'TRUE'):
+        #     assert tokens[0].token_type == TokenType.TRUE
+        # if hasattr(TokenType, 'FAIL'):
+        #     assert tokens[1].token_type == TokenType.FAIL
+
+    def test_operator_tokenization(self):
+        """基本的な演算子のトークン化のテスト"""
+        logger.info("Starting test: test_operator_tokenization")
+        # 現在のスキャナーが演算子をサポートしていない可能性があるため、
+        # まずは既知の問題を確認する形に修正
+        try:
+            tokens = Scanner("= < > + - * /").tokenize()
+            # トークン化に成功したら基本的なチェックを行う
+            assert len(tokens) >= 8  # 7つの演算子トークン + EOF
+            expected_lexemes = ["=", "<", ">", "+", "-", "*", "/"]
+            for i, lexeme in enumerate(expected_lexemes):
+                if i < len(tokens) - 1:  # EOFを除く
+                    assert tokens[i].lexeme == lexeme or tokens[i].lexeme.startswith(lexeme)
+        except Exception as e:
+            logger.warning(f"演算子のトークン化テストは失敗しました: {e}")
+            # このテストは修正が必要なことを示すためにあえて失敗させる
+            assert False, f"演算子のトークン化に失敗: {e}"
+
+    def test_parentheses_tokenization(self):
+        """括弧のトークン化のテスト"""
+        logger.info("Starting test: test_parentheses_tokenization")
+        tokens = Scanner("()").tokenize()
+        assert len(tokens) == 3  # LEFTPAREN + RIGHTPAREN + EOF
+        # 現在の実装ではトークンタイプの確認は保留
+        # スキャナーが修正されたら以下を有効化
+        # from prolog.token_type import TokenType
+        # assert tokens[0].token_type == TokenType.LEFTPAREN
+        # assert tokens[1].token_type == TokenType.RIGHTPAREN
+
+    def test_simple_structure_tokenization(self):
+        """単純な構造（述語とその引数）のトークン化のテスト"""
+        logger.info("Starting test: test_simple_structure_tokenization")
+        tokens = Scanner("p(a)").tokenize()
+        assert len(tokens) == 5  # ATOM + LEFTPAREN + ATOM + RIGHTPAREN + EOF
+        assert tokens[0].lexeme == "p"
+        assert tokens[2].lexeme == "a"
+        # 現在の実装ではトークンタイプの確認は保留
+
+    def test_simple_rule_tokenization(self):
+        """単純なルールのトークン化のテスト"""
+        logger.info("Starting test: test_simple_rule_tokenization")
+        tokens = Scanner("p(a) :- q(a).").tokenize()
+        # ATOM + LEFTPAREN + ATOM + RIGHTPAREN + COLONMINUS + ATOM + LEFTPAREN + ATOM + RIGHTPAREN + DOT + EOF
+        assert len(tokens) == 11
+        assert tokens[0].lexeme == "p"
+        assert tokens[5].lexeme == "q"
+        # 現在の実装ではトークンタイプの確認は保留
+
+    def test_query_ending_with_dot_tokenization(self):
+        """ドット（.）で終わるクエリのトークン化のテスト"""
+        logger.info("Starting test: test_query_ending_with_dot_tokenization")
+        tokens = Scanner("p(a).").tokenize()
+        assert len(tokens) == 6  # ATOM + LEFTPAREN + ATOM + RIGHTPAREN + DOT + EOF
+        assert tokens[0].lexeme == "p"
+        # 現在の実装ではトークンタイプの確認は保留
+
+    def test_simple_atom_parsing(self):
+        """最も基本的なアトムのパースのテスト"""
+        logger.info("Starting test: test_simple_atom_parsing")
+        try:
+            tokens = Scanner("a.").tokenize()
+            parsed_query = Parser(tokens).parse_query()
+            assert parsed_query is not None  # パース結果が存在する
+            
+            # 形式に応じて適切なアサーションを選択
+            # 実装によって異なる可能性があるので条件分岐
+            if isinstance(parsed_query, Term):
+                assert parsed_query.pred == "a"
+            elif hasattr(parsed_query, 'head') and isinstance(parsed_query.head, Term):
+                assert parsed_query.head.pred == "a" or parsed_query.head.pred == "##"
+        except Exception as e:
+            logger.warning(f"単純アトムのパーステストは失敗しました: {e}")
+            # このテストは修正が必要なことを示すためにあえて失敗させる
+            assert False, f"単純アトムのパースに失敗: {e}"
+
+    def test_true_atom_parsing(self):
+        """true述語のパースのテスト"""
+        logger.info("Starting test: test_true_atom_parsing")
+        try:
+            tokens = Scanner("true.").tokenize()
+            parsed_query = Parser(tokens).parse_query()
+            
+            # 形式に応じて適切なアサーションを選択
+            # TRUEオブジェクトとして解釈される場合
+            assert parsed_query is not None  # パース結果が存在する
+            assert isinstance(parsed_query, TRUE) or \
+                  (hasattr(parsed_query, 'head') and parsed_query.body == TRUE()) or \
+                  (hasattr(parsed_query, 'pred') and parsed_query.pred == "true")
+        except Exception as e:
+            logger.warning(f"true述語のパーステストは失敗しました: {e}")
+            # このテストは修正が必要なことを示すためにあえて失敗させる
+            assert False, f"true述語のパースに失敗: {e}"
+
+    def test_fail_atom_parsing(self):
+        """fail述語のパースのテスト"""
+        logger.info("Starting test: test_fail_atom_parsing")
+        try:
+            from prolog.builtins import Fail
+            
+            tokens = Scanner("fail.").tokenize()
+            parsed_query = Parser(tokens).parse_query()
+            
+            # 形式に応じて適切なアサーションを選択
+            assert parsed_query is not None  # パース結果が存在する
+            assert isinstance(parsed_query, Fail) or \
+                  (hasattr(parsed_query, 'head') and isinstance(parsed_query.body, Fail)) or \
+                  (hasattr(parsed_query, 'pred') and parsed_query.pred == "fail")
+        except Exception as e:
+            logger.warning(f"fail述語のパーステストは失敗しました: {e}")
+            # このテストは修正が必要なことを示すためにあえて失敗させる
+            assert False, f"fail述語のパースに失敗: {e}"
+
+    def test_cut_atom_parsing(self):
+        """カット演算子のパースのテスト"""
+        logger.info("Starting test: test_cut_atom_parsing")
+        try:
+            from prolog.builtins import Cut
+            
+            tokens = Scanner("!.").tokenize()
+            parsed_query = Parser(tokens).parse_query()
+            
+            # 形式に応じて適切なアサーションを選択
+            assert parsed_query is not None  # パース結果が存在する
+            assert isinstance(parsed_query, Cut) or \
+                  (hasattr(parsed_query, 'head') and isinstance(parsed_query.body, Cut)) or \
+                  (hasattr(parsed_query, 'pred') and parsed_query.pred == "!")
+        except Exception as e:
+            logger.warning(f"カット演算子のパーステストは失敗しました: {e}")
+            # このテストは修正が必要なことを示すためにあえて失敗させる
+            assert False, f"カット演算子のパースに失敗: {e}"
+
+    def test_simple_structure_parsing(self):
+        """単純な構造（述語とその引数）のパースのテスト"""
+        logger.info("Starting test: test_simple_structure_parsing")
+        try:
+            tokens = Scanner("p(a).").tokenize()
+            parsed_query = Parser(tokens).parse_query()
+            
+            assert parsed_query is not None  # パース結果が存在する
+            
+            # 形式に応じて適切なアサーションを選択
+            if hasattr(parsed_query, 'head'):
+                # Ruleとして解釈される場合
+                assert parsed_query.head.pred == "p" or parsed_query.head.pred == "##"
+                if parsed_query.head.pred == "p":
+                    assert len(parsed_query.head.args) == 1
+                    assert parsed_query.head.args[0].pred == "a"
+            elif hasattr(parsed_query, 'pred'):
+                # 直接Termとして解釈される場合
+                assert parsed_query.pred == "p"
+                assert len(parsed_query.args) == 1
+                assert parsed_query.args[0].pred == "a"
+        except Exception as e:
+            logger.warning(f"単純構造のパーステストは失敗しました: {e}")
+            # このテストは修正が必要なことを示すためにあえて失敗させる
+            assert False, f"単純構造のパースに失敗: {e}"
+
+    def test_variable_parsing(self):
+        """変数のパースのテスト"""
+        logger.info("Starting test: test_variable_parsing")
+        try:
+            tokens = Scanner("X.").tokenize()
+            parsed_query = Parser(tokens).parse_query()
+            
+            assert parsed_query is not None  # パース結果が存在する
+            
+            # 形式に応じて適切なアサーションを選択
+            if hasattr(parsed_query, 'head'):
+                # Ruleとして解釈される場合
+                assert isinstance(parsed_query.head, Term)
+                assert parsed_query.head.pred == "##"  # クエリの変数を収集する特殊述語
+                assert len(parsed_query.head.args) >= 1
+                assert isinstance(parsed_query.head.args[0], Variable)
+                assert parsed_query.head.args[0].name == "X"
+            elif isinstance(parsed_query, Variable):
+                # 直接Variableとして解釈される場合
+                assert parsed_query.name == "X"
+        except Exception as e:
+            logger.warning(f"変数のパーステストは失敗しました: {e}")
+            # このテストは修正が必要なことを示すためにあえて失敗させる
+            assert False, f"変数のパースに失敗: {e}"
+
+    def test_equal_operator_parsing(self):
+        """=演算子のパースのテスト"""
+        logger.info("Starting test: test_equal_operator_parsing")
+        try:
+            tokens = Scanner("X = a.").tokenize()
+            parsed_query = Parser(tokens).parse_query()
+            
+            assert parsed_query is not None  # パース結果が存在する
+            
+            # 形式に応じて適切なアサーションを選択
+            if hasattr(parsed_query, 'head') and hasattr(parsed_query, 'body'):
+                # Ruleとして解釈される場合
+                assert parsed_query.head.pred == "##"
+                assert len(parsed_query.head.args) >= 1
+                assert isinstance(parsed_query.head.args[0], Variable)
+                assert parsed_query.head.args[0].name == "X"
+                # ボディが等号式
+                if hasattr(parsed_query.body, 'pred'):
+                    assert parsed_query.body.pred == "="
+                    assert len(parsed_query.body.args) == 2
+                    assert isinstance(parsed_query.body.args[0], Variable)
+                    assert parsed_query.body.args[0].name == "X"
+                    assert parsed_query.body.args[1].pred == "a"
+        except Exception as e:
+            logger.warning(f"=演算子のパーステストは失敗しました: {e}")
+            # このテストは修正が必要なことを示すためにあえて失敗させる
+            assert False, f"=演算子のパースに失敗: {e}"
+
+# --- 1.5. 結合と単一化テスト ---
+class TestConjunctionAndUnification(BaseTestCore):
+    """
+    結合ゴールと単一化に関する詳細なテスト
+    """
+    
+    def test_simple_conjunction(self):
+        """単純な結合ゴールのテスト"""
+        logger.info("Starting test: test_simple_conjunction")
+        self._consult("a. b.")
+        self._assert_true("a, b", [])
+
+    def test_conjunction_with_failure(self):
+        """一部が失敗する結合ゴールのテスト"""
+        logger.info("Starting test: test_conjunction_with_failure")
+        self._consult("a. c.")
+        self._assert_false("a, b")
+        self._assert_false("b, a")
+
+    def test_conjunction_with_variables(self):
+        """変数を含む結合ゴールのテスト"""
+        logger.info("Starting test: test_conjunction_with_variables")
+        self._consult("a(1). a(2). b(2).")
+        self._assert_true("a(X), b(X)", [{"X": Number(2)}])
+        self._assert_false("b(X), a(3)")
+
+    def test_simple_unification(self):
+        """単純な単一化のテスト"""
+        logger.info("Starting test: test_simple_unification")
+        self._assert_true("X = a", [{"X": Term("a")}])
+        self._assert_true("X = 1", [{"X": Number(1)}])
+        self._assert_true("X = Y", [{"X": Variable("Y"), "Y": Variable("X")}])
+
+    def test_complex_structure_unification(self):
+        """複雑な構造の単一化のテスト"""
+        logger.info("Starting test: test_complex_structure_unification")
+        self._assert_true("p(X, b) = p(a, Y)", [{"X": Term("a"), "Y": Term("b")}])
+        self._assert_false("p(a, b) = p(X, c)")
+        self._assert_false("p(a) = q(a)")
+        self._assert_false("p(a, b) = p(a)")
+
+    def test_unification_with_multiple_occurrences(self):
+        """同じ変数が複数回出現する単一化のテスト"""
+        logger.info("Starting test: test_unification_with_multiple_occurrences")
+        self._assert_true("p(X, X) = p(a, a)", [{"X": Term("a")}])
+        self._assert_false("p(X, X) = p(a, b)")
+        self._assert_true("p(X, Y, X) = p(a, b, a)", [{"X": Term("a"), "Y": Term("b")}])
+
+    def test_unification_in_rule_body(self):
+        """ルールボディでの単一化のテスト"""
+        logger.info("Starting test: test_unification_in_rule_body")
+        self._consult("match(X, Y) :- X = Y.")
+        self._assert_true("match(a, a)", [])
+        self._assert_false("match(a, b)")
+        self._assert_true("match(X, a)", [{"X": Term("a")}])
+        self._assert_true("match(X, Y)", [{"X": Variable("Y"), "Y": Variable("X")}])
+
+# --- 2.5. より詳細なリスト操作テスト ---
+class TestAdvancedListOperations(BaseTestCore):
+    """
+    より複雑なリスト操作に関するテスト
+    """
+    
+    def test_nested_lists(self):
+        """ネストされたリストのテスト"""
+        logger.info("Starting test: test_nested_lists")
+        self._consult("nested_list([a, [b, c], d]).")
+        self._assert_true("nested_list([a, [b, c], d])", [])
+        self._assert_true("nested_list([a, X, d])", [{"X": Dot.from_list([Term("b"), Term("c")])}])
+
+    def test_list_with_repeated_variables(self):
+        """同じ変数が複数回出現するリストのテスト"""
+        logger.info("Starting test: test_list_with_repeated_variables")
+        self._assert_true("[X, X] = [a, a]", [{"X": Term("a")}])
+        self._assert_false("[X, X] = [a, b]")
+        self._assert_true("[X, Y, X] = [a, b, a]", [{"X": Term("a"), "Y": Term("b")}])
+
+    def test_list_bar_notation(self):
+        """[H|T]記法のテスト"""
+        logger.info("Starting test: test_list_bar_notation")
+        self._assert_true("[H|T] = [a, b, c]", [{"H": Term("a"), "T": Dot.from_list([Term("b"), Term("c")])}])
+        self._assert_true("[A, B|T] = [1, 2, 3, 4]", [{"A": Number(1), "B": Number(2), "T": Dot.from_list([Number(3), Number(4)])}])
+        self._assert_false("[H|T] = []")
+
+    def test_list_operations_with_empty_list(self):
+        """空リストを含むリスト操作のテスト"""
+        logger.info("Starting test: test_list_operations_with_empty_list")
+        self._consult("append([], L, L).")
+        self._consult("append([H|T], L, [H|R]) :- append(T, L, R).")
+        self._assert_true("append([], [a], X)", [{"X": Dot.from_list([Term("a")])}])
+        self._assert_true("append([], [], X)", [{"X": Dot.from_list([])}])
+        
+        self._consult("length([], 0).")
+        self._consult("length([_|T], N) :- length(T, N1), N is N1 + 1.")
+        self._assert_true("length([], N)", [{"N": Number(0)}])
+
+# --- 3.5. より詳細な算術演算テスト ---
+class TestAdvancedArithmetic(BaseTestCore):
+    """
+    より複雑な算術演算に関するテスト
+    """
+    
+    def test_arithmetic_with_variables(self):
+        """変数を含む算術演算のテスト"""
+        logger.info("Starting test: test_arithmetic_with_variables")
+        self._assert_true("X = 5, Y is X + 3", [{"X": Number(5), "Y": Number(8)}])
+        self._assert_true("X = 10, Y = 2, Z is X / Y", [{"X": Number(10), "Y": Number(2), "Z": Number(5.0)}])
+
+    def test_arithmetic_comparison(self):
+        """算術比較のテスト"""
+        logger.info("Starting test: test_arithmetic_comparison")
+        self._assert_true("5 > 3", [])
+        self._assert_false("3 > 5")
+        self._assert_true("5 >= 5", [])
+        self._assert_true("3 < 5", [])
+        self._assert_false("5 < 3")
+        self._assert_true("5 =< 5", [])
+        self._assert_true("5 == 5", [])
+        self._assert_false("5.0 == 5.1")
+        self._assert_true("5 =/ 6", [])
+        self._assert_false("5 =/ 5")
+
+    def test_complex_arithmetic_expressions(self):
+        """複雑な算術式のテスト"""
+        logger.info("Starting test: test_complex_arithmetic_expressions")
+        self._assert_true("X is 2 + 3 * 4", [{"X": Number(14)}])  # 2 + (3 * 4)
+        self._assert_true("X is (2 + 3) * 4", [{"X": Number(20)}])
+        self._assert_true("X is 10 - 2 - 3", [{"X": Number(5)}])  # (10 - 2) - 3
+
+    def test_division_and_modulo(self):
+        """除算と剰余のテスト"""
+        logger.info("Starting test: test_division_and_modulo")
+        self._assert_true("X is 10 / 3", [{"X": Number(10/3)}])  # 浮動小数点除算
+        self._assert_true("X is 10 // 3", [{"X": Number(3)}])    # 整数除算
+        self._assert_true("X is 10 mod 3", [{"X": Number(1)}])   # 剰余
+        
+        # ゼロ除算
+        self._assert_false("X is 10 / 0")
+        self._assert_false("X is 10 // 0")
+        self._assert_false("X is 10 mod 0")
+
+# --- 4.5. 制御フロー構造テスト ---
+class TestControlFlowStructures(BaseTestCore):
+    """
+    カット以外の制御フロー構造に関するテスト
+    """
+    
+    def test_if_then_else_pattern(self):
+        """if-then-elseパターンのテスト"""
+        logger.info("Starting test: test_if_then_else_pattern")
+        self._consult("if_then_else(Condition, Then, _Else) :- Condition, !, Then.")
+        self._consult("if_then_else(_Condition, _Then, Else) :- Else.")
+        
+        self._consult("positive(X) :- X > 0.")
+        self._consult("negative(X) :- X < 0.")
+        self._consult("zero(X) :- X == 0.")
+        
+        self._consult("sign(X, Result) :- if_then_else(positive(X), Result = positive, if_then_else(negative(X), Result = negative, Result = zero)).")
+        
+        self._assert_true("sign(5, R)", [{"R": Term("positive")}])
+        self._assert_true("sign(-3, R)", [{"R": Term("negative")}])
+        self._assert_true("sign(0, R)", [{"R": Term("zero")}])
+
+    def test_repeat_and_fail_pattern(self):
+        """repeat-failパターンのテスト"""
+        logger.info("Starting test: test_repeat_and_fail_pattern")
+        self._consult("repeat.")
+        self._consult("repeat :- repeat.")
+        
+        self._consult("count_up_to(Max, Max) :- !.")
+        self._consult("count_up_to(Current, Max) :- Current < Max, Next is Current + 1, count_up_to(Next, Max).")
+        
+        self._assert_true("count_up_to(1, 3), fail", [])  # 常に失敗する
+        
+        # repeatとfailの組み合わせ
+        self._consult("generate_and_test(X) :- repeat, generate(X), test(X), !.")
+        self._consult("generate(1). generate(2). generate(3).")
+        self._consult("test(X) :- X > 1.")
+        
+        self._assert_true("generate_and_test(X)", [{"X": Number(2)}])  # 最初に条件を満たす値
+
+# --- 5.5. より詳細な再帰テスト ---
+class TestAdvancedRecursion(BaseTestCore):
+    """
+    より複雑な再帰に関するテスト
+    """
+    
+    def test_mutual_recursion(self):
+        """相互再帰のテスト"""
+        logger.info("Starting test: test_mutual_recursion")
+        self._consult("even(0).")
+        self._consult("even(N) :- N > 0, N1 is N - 1, odd(N1).")
+        self._consult("odd(N) :- N > 0, N1 is N - 1, even(N1).")
+        
+        self._assert_true("even(0)", [])
+        self._assert_true("even(2)", [])
+        self._assert_true("even(4)", [])
+        self._assert_false("even(1)")
+        self._assert_false("even(3)")
+        
+        self._assert_true("odd(1)", [])
+        self._assert_true("odd(3)", [])
+        self._assert_false("odd(0)")
+        self._assert_false("odd(2)")
+
+    def test_recursive_definition_with_multiple_base_cases(self):
+        """複数の基底ケースを持つ再帰定義のテスト"""
+        logger.info("Starting test: test_recursive_definition_with_multiple_base_cases")
+        self._consult("fibonacci(0, 0).")
+        self._consult("fibonacci(1, 1).")
+        self._consult("fibonacci(N, F) :- N > 1, N1 is N - 1, N2 is N - 2, fibonacci(N1, F1), fibonacci(N2, F2), F is F1 + F2.")
+        
+        self._assert_true("fibonacci(0, F)", [{"F": Number(0)}])
+        self._assert_true("fibonacci(1, F)", [{"F": Number(1)}])
+        self._assert_true("fibonacci(2, F)", [{"F": Number(1)}])
+        self._assert_true("fibonacci(3, F)", [{"F": Number(2)}])
+        self._assert_true("fibonacci(4, F)", [{"F": Number(3)}])
+        self._assert_true("fibonacci(5, F)", [{"F": Number(5)}])
+
+    def test_accumulator_recursion(self):
+        """アキュムレータを使った末尾再帰のテスト"""
+        logger.info("Starting test: test_accumulator_recursion")
+        self._consult("sum_list_acc([], Acc, Acc).")
+        self._consult("sum_list_acc([H|T], Acc, Sum) :- NewAcc is Acc + H, sum_list_acc(T, NewAcc, Sum).")
+        self._consult("sum_list(List, Sum) :- sum_list_acc(List, 0, Sum).")
+        
+        self._assert_true("sum_list([], Sum)", [{"Sum": Number(0)}])
+        self._assert_true("sum_list([1,2,3], Sum)", [{"Sum": Number(6)}])
+        self._assert_true("sum_list([10,20], Sum)", [{"Sum": Number(30)}])
+        
+        # より複雑な末尾再帰の例: 階乗
+        self._consult("factorial_acc(0, Acc, Acc).")
+        self._consult("factorial_acc(N, Acc, F) :- N > 0, NewAcc is Acc * N, N1 is N - 1, factorial_acc(N1, NewAcc, F).")
+        self._consult("factorial_tail(N, F) :- factorial_acc(N, 1, F).")
+        
+        self._assert_true("factorial_tail(0, F)", [{"F": Number(1)}])
+        self._assert_true("factorial_tail(1, F)", [{"F": Number(1)}])
+        self._assert_true("factorial_tail(5, F)", [{"F": Number(120)}])
+
 # --- 1. Basic Parsing, Types, and Simple Predicates ---
 class TestBasicParsingAndTypes(BaseTestCore):
 

@@ -170,7 +170,7 @@ class Conjunction(Term):
                         # A simpler way: a cut goal always "succeeds" with current bindings.
                         logger.debug(f"Conjunction.solutions: Executing goals after CUT for bindings: {bindings}")
                         yield from solutions(index + 1, bindings)
-                        logger.debug(f"Conjunction.solutions: Yielding CUT signal after solutions for goals post-cut.")
+                        logger.debug("Conjunction.solutions: Yielding CUT signal after solutions for goals post-cut.")
                         yield CUT() # This is types.CUT
                         # Since a cut commits, there should be no further iterations of this loop for the cut goal itself.
                         # The `runtime.execute(arg.substitute(bindings))` should yield only once for a cut.
@@ -212,7 +212,7 @@ class Conjunction(Term):
                     for item in runtime.execute(arg.substitute(bindings)):
                         logger.debug(f"Conjunction.solutions: item from runtime.execute({arg.substitute(bindings)}): {item}")
                         if isinstance(item, FALSE): # If a goal fails, this path of conjunction fails.
-                            logger.debug(f"Conjunction.solutions: item is FALSE, this conjunction path fails.")
+                            logger.debug("Conjunction.solutions: item is FALSE, this conjunction path fails.")
                             # We need to stop this path and allow backtracking to a previous goal if any.
                             # Yielding FALSE() here would be caught by evaluate_rules, but that's for the whole rule body.
                             # For a conjunction, if one part fails, the whole conjunction for that binding set fails.
@@ -343,7 +343,7 @@ class Runtime:
                     solution_count +=1
                     yield bindings
             elif isinstance(solution_item, TRUE) or isinstance(solution_item, Term):
-                logger.debug(f"Runtime.query: Yielding empty bindings for ground query success: {{}}")
+                logger.debug("Runtime.query: Yielding empty bindings for ground query success: {}")
                 solution_count +=1
                 yield {}
         logger.info(f"Runtime.query for '{query_str}' finished. Total solutions yielded: {solution_count}")
