@@ -60,7 +60,8 @@ class Dot:
         # 空リストの特殊ケース
         if not lst:
             # 空リストは Term("[]") を head に持ち、tail は None
-            result = cls(Term("[]"), None)
+            empty_term = Term("[]")
+            result = cls(empty_term, None)
             logger.debug(f"Dot.from_list returning (empty list): {result}")
             return result
         
@@ -123,7 +124,51 @@ class Dot:
         return element
 
     def __str__(self):
-        return str(list(self))
+        if self.head and isinstance(self.head, Term) and str(self.head) == "[]" and self.tail is None:
+            return "[]"
+        # For non-empty lists or lists not matching the empty list pattern, convert to Python list and then to string.
+        # This relies on __iter__ and __next__ correctly yielding elements.
+        elements = []
+        current = self
+        while current is not None and hasattr(current, 'head') and hasattr(current, 'tail'):
+            if isinstance(current.head, Term) and current.head.pred == "[]" and current.tail is None : # End of list marker
+                 if not elements: # This was an empty list from the start, e.g. Dot(Term("[]"), None)
+                    return "[]"
+                 break
+            elements.append(str(current.head))
+            if not isinstance(current.tail, Dot): # Tail is a variable or other term
+                elements.append("|")
+                elements.append(str(current.tail))
+                break
+            current = current.tail
+            if current is not None and not hasattr(current, 'head'): # Should not happen with proper Dot lists
+                elements.append("|") # Indicate improper list end if tail is not Dot or None
+                elements.append(str(current))
+                break
+        
+        if not elements: # Should be caught by the first check if it's a canonical empty list
+            if self.head and isinstance(self.head, Term) and self.head.pred == "[]" and self.tail is None:
+                 return "[]"
+            # Fallback for unusual Dot structures that don't iterate well or aren't canonical lists
+            if self.head is not None and self.tail is not None:
+                return f"[{self.head}|{self.tail}]" # Generic representation for non-list-like Dot
+            elif self.head is not None:
+                return f"[{self.head}|.]" # Indicate incomplete list if tail is missing
+            else:
+                return "[?]" # Unknown Dot structure
+
+        # Construct string representation
+        # If the loop ended with '|' then the last element is the tail variable/term
+        s = "["
+        for i, el_str in enumerate(elements):
+            if el_str == "|":
+                s = s.rstrip(", ") + " | "
+            elif i > 0 and elements[i-1] != "|":
+                s += ", " + el_str
+            else: # First element or element after |
+                s += el_str
+        s += "]"
+        return s
 
     def __repr__(self):
         return str(self)
