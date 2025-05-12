@@ -45,7 +45,6 @@ class Variable:
     def __repr__(self):
         return str(self)
 
-
 class Dot:
     def __init__(self, head, tail=None):
         # logger.debug(f"Dot initialized with head: {head}, tail: {tail}") # Can be very verbose
@@ -103,10 +102,26 @@ class Dot:
 
     def substitute(self, bindings):
         logger.debug(f"Dot.substitute({self}) called with bindings: {bindings}")
-        # Convert self to list, substitute elements, then build new Dot from list
-        substituted_elements = [elem.substitute(bindings) for elem in list(self)]
-        result = Dot.from_list(substituted_elements)
-        logger.debug(f"Dot.substitute returning: {result}")
+        
+        # 空リストの特殊ケース処理
+        if isinstance(self.head, Term) and self.head.pred == "[]" and self.tail is None:
+            # 空リストはそのまま返す - 置換の必要なし
+            logger.debug(f"Dot.substitute: empty list detected, returning unchanged")
+            return self
+        
+        # 値が代入されている場合の処理
+        value = bindings.get(self, None)
+        if value is not None:
+            result = value.substitute(bindings)
+            logger.debug(f"Dot.substitute: bound value found, returning: {result}")
+            return result
+        
+        # 非空リストの通常の処理
+        substituted_head = self.head.substitute(bindings)
+        substituted_tail = None if self.tail is None else self.tail.substitute(bindings)
+        
+        result = Dot(substituted_head, substituted_tail)
+        logger.debug(f"Dot.substitute: returning with substituted head/tail: {result}")
         return result
 
     def query(self, runtime):
@@ -117,7 +132,10 @@ class Dot:
         return self
 
     def __next__(self):
-        if self._current_element is None:
+        if self._current_element is None or \
+           (isinstance(self._current_element.head, Term) and \
+            self._current_element.head.pred == "[]" and \
+            self._current_element.tail is None):
             raise StopIteration
         element = self._current_element.head
         self._current_element = self._current_element.tail
@@ -126,53 +144,94 @@ class Dot:
     def __str__(self):
         if self.head and isinstance(self.head, Term) and str(self.head) == "[]" and self.tail is None:
             return "[]"
-        # For non-empty lists or lists not matching the empty list pattern, convert to Python list and then to string.
-        # This relies on __iter__ and __next__ correctly yielding elements.
         elements = []
         current = self
-        while current is not None and hasattr(current, 'head') and hasattr(current, 'tail'):
-            if isinstance(current.head, Term) and current.head.pred == "[]" and current.tail is None : # End of list marker
-                 if not elements: # This was an empty list from the start, e.g. Dot(Term("[]"), None)
-                    return "[]"
-                 break
-            elements.append(str(current.head))
-            if not isinstance(current.tail, Dot): # Tail is a variable or other term
-                elements.append("|")
-                elements.append(str(current.tail))
-                break
-            current = current.tail
-            if current is not None and not hasattr(current, 'head'): # Should not happen with proper Dot lists
-                elements.append("|") # Indicate improper list end if tail is not Dot or None
-                elements.append(str(current))
-                break
-        
-        if not elements: # Should be caught by the first check if it's a canonical empty list
-            if self.head and isinstance(self.head, Term) and self.head.pred == "[]" and self.tail is None:
-                 return "[]"
-            # Fallback for unusual Dot structures that don't iterate well or aren't canonical lists
-            if self.head is not None and self.tail is not None:
-                return f"[{self.head}|{self.tail}]" # Generic representation for non-list-like Dot
-            elif self.head is not None:
-                return f"[{self.head}|.]" # Indicate incomplete list if tail is missing
-            else:
-                return "[?]" # Unknown Dot structure
+        # The iteration logic here must align with __iter__/__next__
+        # If list(self) is now correct (e.g. list(Dot(Term("[]"),None)) == []), then this can be simplified.
+        py_list = list(self) # Relies on __iter__ and __next__ being correct
+        if not py_list: # Handles truly empty list
+            # This case should be hit if self is Dot(Term("[]"), None) and list(self) is []
+            # However, if self.head is Term("[]") and self.tail is None, the first check already returns "[]"
+            # This part might be redundant if the first check and list(self) are consistent.
+            # Let's assume the first check `if self.head ... return "[]"` is for the canonical empty list object.
+             pass # Covered by the first check or if py_list is used.
 
-        # Construct string representation
-        # If the loop ended with '|' then the last element is the tail variable/term
+        # If the list has a non-Dot tail (e.g. [a,b|T])
+        # list(self) would only give [a,b]. We need to find the tail if it's not the empty list marker.
+        
+        # Revised __str__ using a manual walk like before, as list(self) might not capture an open tail.
+        elements_str = []
+        current_node = self
+        while current_node is not None and hasattr(current_node, 'head') and hasattr(current_node, 'tail'):
+            if isinstance(current_node.head, Term) and current_node.head.pred == "[]" and current_node.tail is None:
+                # This is the empty list marker, signifies end of proper list part
+                if not elements_str: # Original list was empty
+                    return "[]"
+                break 
+            elements_str.append(str(current_node.head))
+            if not isinstance(current_node.tail, Dot): # Tail is a variable or other non-Dot term
+                elements_str.append("|")
+                elements_str.append(str(current_node.tail))
+                break
+            current_node = current_node.tail
+            # If current_node becomes non-Dot (e.g. variable tail) but wasn't caught by `isinstance(current_node.tail, Dot)`
+            # this means the list was improper. The `hasattr` checks should mostly cover this.
+            if current_node is not None and not (hasattr(current_node, 'head') and hasattr(current_node, 'tail')):
+                 # This case implies an improper list structure where tail is not None, not Dot,
+                 # and not caught by the `isinstance(current_node.tail, Dot)` check.
+                 # This should ideally not happen if lists are constructed correctly.
+                 # For robustness, append it as a tail.
+                 elements_str.append("|")
+                 elements_str.append(str(current_node))
+                 break
+        
+        if not elements_str:
+             # This can happen if self was Dot(Term("[]"), None) and the loop didn't run.
+             if isinstance(self.head, Term) and self.head.pred == "[]" and self.tail is None:
+                 return "[]"
+             # Or if it's some other non-list-like Dot structure
+             if self.head is not None and self.tail is not None:
+                 return f"[{str(self.head)}|{str(self.tail)}]"
+             elif self.head is not None:
+                 return f"[{str(self.head)}|.]" # Should not happen with proper lists
+             else:
+                 return "[?]"
+
+
         s = "["
-        for i, el_str in enumerate(elements):
-            if el_str == "|":
+        for i, el_str_val in enumerate(elements_str):
+            if el_str_val == "|":
                 s = s.rstrip(", ") + " | "
-            elif i > 0 and elements[i-1] != "|":
-                s += ", " + el_str
+            elif i > 0 and elements_str[i-1] != "|":
+                s += ", " + el_str_val
             else: # First element or element after |
-                s += el_str
+                s += el_str_val
         s += "]"
         return s
 
     def __repr__(self):
         return str(self)
 
+# Corrected __next__ for Dot class, to be placed inside the class definition
+# This is a conceptual note; the actual code is part of the Dot class above.
+# def __next__(self):
+#     if self._current_element is None or \
+#        (isinstance(self._current_element.head, Term) and \
+#         self._current_element.head.pred == "[]" and \
+#         self._current_element.tail is None):
+#         raise StopIteration
+#     element = self._current_element.head
+#     self._current_element = self._current_element.tail
+#     return element
+# The __next__ method inside the Dot class needs to be updated to this logic.
+# The current __next__ in the Dot class (as of the last successful write) is:
+#    def __next__(self):
+#        if self._current_element is None:
+#            raise StopIteration
+#        element = self._current_element.head
+#        self._current_element = self._current_element.tail
+#        return element
+# This needs to be replaced with the version that correctly stops for Term("[]")
 
 class Bar:
     def __init__(self, head, tail):
@@ -186,44 +245,38 @@ class Bar:
             logger.debug("Bar.match (other is not Dot) returning: None")
             return None
 
-        # This logic seems complex and might need careful review for correctness with new Dot.from_list
         try:
-            # Attempt to get the length of self.head, assuming it's a list-like Dot
             if isinstance(self.head, Dot):
-                len_self_head = len(list(self.head))
+                len_self_head = 0
+                # Correctly get length of a Dot list by iterating it
+                for _ in self.head: # Relies on Dot being iterable
+                    len_self_head += 1
             elif isinstance(self.head, Variable) or isinstance(self.head, Term):
-                # If H in [H|T] is a single Variable or Term, its "length" for prefix matching is 1.
-                # This part of Bar.match is tricky. The original code implied self.head is a list.
-                # If Bar is strictly for [PrefixList | TailVar], then self.head must be a Dot.
-                # If Bar can be [ElementVar | TailVar], then this logic needs to be simpler:
-                #   head_match = self.head.match(other.head)
-                #   tail_match = self.tail.match(other.tail)
-                # For now, stick to the idea that if self.head is not a Dot, this complex prefix match fails.
                 logger.warning(f"Bar.match: self.head ({self.head}, type {type(self.head)}) is not a Dot. " +
                                "This match logic expects self.head to be a list prefix (Dot). " +
                                "Treating as non-match for this complex prefix logic.")
                 return None
-            else: # Should not happen if parser constructs Bar correctly
+            else: 
                 logger.error(f"Bar.match: self.head ({self.head}, type {type(self.head)}) has unexpected type for prefix matching.")
                 return None
-        except TypeError:
-            # This might happen if self.head is a Dot but its elements are not iterable,
-            # or if list(self.head) fails for another reason.
-            logger.error(f"Bar.match: TypeError when trying to determine length of self.head ({self.head}). Cannot determine prefix length.")
+        except TypeError as e: # This will catch if self.head (if Dot) is not iterable
+            logger.error(f"Bar.match: TypeError when trying to determine length of self.head ({self.head}). Error: {e}. Cannot determine prefix length.")
             return None
 
-        other_elements = list(other)
-        if len(other_elements) < len_self_head: # Not enough elements in other to match the prefix
+        other_elements = []
+        try:
+            other_elements = list(other) # Relies on other (Dot) being iterable
+        except TypeError as e:
+            logger.error(f"Bar.match: TypeError when trying to convert 'other' to list. Error: {e}")
+            return None
+
+        if len(other_elements) < len_self_head: 
             logger.debug("Bar.match (other list too short) returning: None")
             return None
 
         other_left_elements = other_elements[:len_self_head]
         other_right_elements = other_elements[len_self_head:]
 
-        # other_head should be a Dot representing the prefix from 'other'
-        # other_tail should be a Dot representing the rest of 'other'
-        # However, Dot.from_list expects a list of terms, not already Dot objects.
-        # If other_left_elements are already terms, this is fine.
         other_head_dot = Dot.from_list(other_left_elements)
         other_tail_dot = Dot.from_list(other_right_elements)
 
@@ -231,9 +284,9 @@ class Bar:
         tail_match = self.tail.match(other_tail_dot)
 
         if head_match is not None and tail_match is not None:
-            merged = merge_bindings(head_match, tail_match) # Use merge_bindings
+            merged = merge_bindings(head_match, tail_match) 
             logger.debug(f"Bar.match (success) returning: {merged}")
-            return merged # Return merged bindings
+            return merged 
 
         logger.debug("Bar.match (failed) returning: None")
         return None
@@ -251,7 +304,18 @@ class Bar:
 
     def __str__(self):
         output = '['
-        output += ', '.join(map(str, self.head))
+        if isinstance(self.head, Dot):
+            head_str = str(self.head) 
+            if head_str == "[]":
+                output += head_str 
+            elif head_str.startswith('[') and head_str.endswith(']'):
+                output += head_str[1:-1] 
+            else:
+                logger.warning(f"Bar.__str__: Unexpected str(self.head) format for Dot: {head_str}")
+                output += head_str
+        else:
+            output += str(self.head)
+
         if self.tail:
             output += f' | {self.tail}'
         output += ']'
@@ -259,7 +323,6 @@ class Bar:
 
     def __repr__(self):
         return str(self)
-
 
 class Term:
     def __init__(self, pred, *args):
@@ -277,7 +340,7 @@ class Term:
             m = []
             for arg1, arg2 in zip(self.args, other.args):
                 match_result = arg1.match(arg2)
-                if match_result is None: # If any arg fails to match, the whole term fails
+                if match_result is None: 
                     logger.debug(f"Term.match (arg mismatch: {arg1} vs {arg2}) returning: None")
                     return None
                 m.append(match_result)
@@ -286,21 +349,17 @@ class Term:
                 final_bindings = reduce(merge_bindings, [{}] + m)
                 logger.debug(f"Term.match (success) returning: {final_bindings}")
                 return final_bindings
-            except TypeError: # merge_bindings might fail if a None was missed (shouldn't happen with check above)
+            except TypeError: 
                 logger.error(f"Term.match error during merge_bindings with matches: {m}")
                 return None
 
-
-        # If other is not a Term, delegate (e.g., if other is a Variable)
-        # This can lead to infinite recursion if not handled carefully (e.g. Var.match(Term) -> Term.match(Var))
-        # Variable.match does not delegate back to Term.match if other is Term.
         if hasattr(other, 'match'):
             res_other_match = other.match(self)
             logger.debug(f"Term.match (delegating to other.match) returning: {res_other_match}")
             return res_other_match
         
         logger.debug("Term.match (other has no match method) returning: None")
-        return None # No match if other is not Term and has no match method
+        return None
 
     def substitute(self, bindings):
         logger.debug(f"Term.substitute({self}) called with bindings: {bindings}")
@@ -325,7 +384,6 @@ class Term:
         if not isinstance(other, Term):
             return NotImplemented
         return self.pred == other.pred and self.args == other.args
-
 
 class TermFunction(Term):
     def __init__(self, func, predicate, *args):
@@ -354,7 +412,6 @@ class TermFunction(Term):
             return reduce(merge_bindings, [{}] + m)
 
         return other.match(self)
-
 
 class Logic:
     def __init__(self, expression):
@@ -386,7 +443,6 @@ class Logic:
 
     def __repr__(self):
         return str(self)
-
 
 class Arithmetic(Variable):
     def __init__(self, name, expression):
@@ -437,7 +493,6 @@ class Arithmetic(Variable):
     def __repr__(self):
         return str(self)
 
-
 class Number(Term):
     def __init__(self, pred):
         super().__init__(pred)
@@ -484,7 +539,6 @@ class Number(Term):
             return TRUE()
         return FALSE()
 
-
 class TRUE(Term):
     def __init__(self):
         super().__init__(TRUE)
@@ -494,7 +548,6 @@ class TRUE(Term):
 
     def query(self, runtime):
         yield self
-
 
 class FALSE(Term):
     def __init__(self):
@@ -506,7 +559,6 @@ class FALSE(Term):
     def query(self, runtime):
         yield self
 
-
 class CUT(Term):
     def __init__(self):
         super().__init__(CUT)
@@ -516,7 +568,6 @@ class CUT(Term):
 
     def query(self, runtime):
         yield self
-
 
 class ExpressionBinder(Visitor):
     """Binds variables.
@@ -547,7 +598,6 @@ class ExpressionBinder(Visitor):
                     return PrimaryExpression(v)
 
         return expr
-
 
 math_interpreter = MathInterpreter()
 logic_interpreter = LogicInterpreter()
