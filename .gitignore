@@ -142,3 +142,4 @@ cython_debug/
 
 # uv
 uv.lock
+/output_src_diff.txt
