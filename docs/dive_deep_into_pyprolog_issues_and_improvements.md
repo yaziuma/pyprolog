@@ -472,9 +472,10 @@ def _parse_list(self):
     # ... 残りのリスト処理
 ```
 
-### 第2段階：リスト表現の修正
+### 第2段階：リスト表現の修正 (作業中 - テスト失敗)
 
 空リストの内部表現を修正することは、多くのテスト失敗を解決するために不可欠です。
+`prolog/types.py` の `Dot.from_list` は修正されましたが、`tests/test_core_improvements.py::TestListProcessing` のテストが `IndexError` で失敗しています。これはパーサー(`prolog/parser.py`)側の問題である可能性が高いです。引き続き調査と修正が必要です。
 
 ```python
 # types.py の Dot.from_list メソッド修正
