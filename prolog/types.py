@@ -22,8 +22,17 @@ class Variable:
 
     def substitute(self, bindings):
         logger.debug(f"Variable.substitute({self}) called with bindings: {bindings}")
+        # Defensive Null check for bindings
+        if bindings is None:
+            logger.warning(f"Variable.substitute: bindings is None for {self}")
+            return self
+        
         value = bindings.get(self, None)
         if value is not None:
+            # Prevent infinite recursion if a variable is bound to itself
+            if value == self:
+                logger.debug(f"Variable.substitute: {self} is bound to itself. Returning self.")
+                return self
             result = value.substitute(bindings)
             logger.debug(f"Variable.substitute returning (from value): {result}")
             return result

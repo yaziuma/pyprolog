@@ -11,7 +11,7 @@
 以下のコマンドで、プロジェクト全体のソースコードに対してリンティングを実行します。
 
 ```bash
-uv run ruff check .
+uvx ruff check .
 ```
 
 ### 2.2. フォーマット
@@ -19,7 +19,7 @@ uv run ruff check .
 以下のコマンドで、プロジェクト全体のソースコードをフォーマットします。
 
 ```bash
-uv run ruff format .
+uvx ruff format .
 ```
 
 ## 3. テストの実行
@@ -29,26 +29,26 @@ uv run ruff format .
 以下のコマンドで、`tests` ディレクトリ配下のすべてのテストを実行します。
 
 ```bash
-uv run pytest
+uvx pytest
 ```
 
 特定のテストファイルを実行する場合は、以下のように指定します。
 
 ```bash
-uv run pytest tests/test_core_improvements.py
+uvx pytest tests/test_core_improvements.py
 ```
 
 特定のテストケース（クラス）やテストメソッドを実行する場合は、以下のように指定します。
 
 ```bash
-uv run pytest tests/test_core_improvements.py::TestCoreImprovements
-uv run pytest tests/test_core_improvements.py::TestCoreImprovements::test_parse_empty_list
+uvx pytest tests/test_core_improvements.py::TestCoreImprovements
+uvx pytest tests/test_core_improvements.py::TestCoreImprovements::test_parse_empty_list
 ```
 
 キーワードでテストをフィルタリングすることも可能です。
 
 ```bash
-uv run pytest -k "parse_empty_list"
+uvx pytest -k "parse_empty_list"
 ```
 
 ## 4. 改修からテストまでの一般的な流れ
@@ -61,15 +61,15 @@ uv run pytest -k "parse_empty_list"
 2.  **リンティングとフォーマット:**
 
     ```bash
-    uv run ruff format .
-    uv run ruff check .
+    uvx ruff format .
+    uvx ruff check .
     ```
 
     エラーや警告が表示された場合は修正します。
 
 3.  **テストの実行:**
     ```bash
-    uv run pytest
+    uvx pytest
     ```
     すべてのテストが成功することを確認します。失敗したテストがある場合は、コードを修正し再度テストを実行します。
 

@@ -31,6 +31,9 @@ class Scanner:
             'retract': TokenType.RETRACT,
             'asserta': TokenType.ASSERTA,
             'assertz': TokenType.ASSERTZ,
+            'true': TokenType.TRUE,
+            'mod': TokenType.MOD,
+            'div': TokenType.DIV,
         }
         return keywords
 
@@ -200,6 +203,10 @@ class Scanner:
             self._add_token(TokenType.MINUS)
         elif c == '=' and self._is_next('='):
             self._add_token(TokenType.EQUALEQUAL)
+        elif c == '=' and self._is_next('/'):
+            self._add_token(TokenType.EQUALSLASH)
+        elif c == '=':  # 単独の = 演算子
+            self._add_token(TokenType.EQUAL)
         elif c == '=' and self._is_next('/'):
             self._add_token(TokenType.EQUALSLASH)
         elif c == '=' and self._is_next('<'):

@@ -34,4 +34,8 @@ class TokenType(Enum):
     LEFTBRACKET = (auto(),)
     RIGHTBRACKET = (auto(),)
     BAR = (auto(),)
+    TRUE = (auto(),)    # true アトム用
+    EQUAL = (auto(),)   # = 演算子用
+    MOD = (auto(),)     # mod 演算子用
+    DIV = (auto(),)     # // または div 演算子用
     EOF = auto()

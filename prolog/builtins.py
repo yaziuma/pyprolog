@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from .merge_bindings import merge_bindings
+from prolog.types import TRUE # Added import for TRUE
 
 
 class BuiltinsBase(ABC):
@@ -39,16 +40,33 @@ class Fail:
 
 class Cut:
     def __init__(self):
-        self.name = 'cut'
+        # The parser creates this for '!' token.
+        # The name 'cut' might be for internal representation or if it were callable by name.
+        # For '!', the predicate name is effectively '!'.
+        self.name = '!' # Changed from 'cut' to '!' to match typical Prolog representation
 
     def match(self, other):
-        return {}
+        # A cut should generally match if the other thing is also a cut.
+        # However, its primary role is procedural, not unification in the typical sense.
+        # Returning {} (empty bindings, meaning success with no new bindings) is common.
+        if isinstance(other, Cut):
+            return {}
+        return None # Fails to match anything else
 
     def substitute(self, bindings):
+        # Cut is a procedural construct, its identity doesn't change with bindings.
         return self
 
+    def query(self, runtime, bindings=None):
+        # When a Cut is encountered in a query, it succeeds once and then
+        # prunes choice points. The "succeeds once" part means it yields TRUE.
+        # The pruning is handled by the interpreter when it sees the CUT signal.
+        if bindings is None:
+            bindings = {}
+        yield TRUE() # Cut itself evaluates to true.
+
     def __str__(self):
-        return str(self.name)
+        return self.name # Should be '!'
 
     def __repr__(self):
         return str(self)

@@ -64,8 +64,8 @@ class Conjunction(Term):
         return False
 
     def _is_cut(self, arg):
-        # Check against the BuiltinCut from .builtins, not types.CUT which is a result marker
-        if isinstance(arg, BuiltinCut): # Corrected: was Cut, now BuiltinCut
+        # Checks if the argument is an instance of prolog.builtins.Cut
+        if isinstance(arg, BuiltinCut): 
             return True
         return False
 
