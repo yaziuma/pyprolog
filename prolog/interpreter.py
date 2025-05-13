@@ -385,6 +385,7 @@ class Runtime:
 
         # '=' 演算子の特別処理
         if isinstance(goal_term, Term) and goal_term.pred == '=' and len(goal_term.args) == 2:
+            logger.debug(f"Runtime.evaluate_rules: Special case for '=' operator with goal_term: {goal_term}")
             lhs, rhs = goal_term.args
             match_result = lhs.match(rhs) 
             if match_result is not None:
@@ -395,6 +396,7 @@ class Runtime:
                         val_term = match_result[key_var]
                         if isinstance(val_term, Variable): 
                             if val_term != key_var : 
+                                logger.debug(f"双方向マッチング可能な場合: {key_var} = {val_term}")
                                 bidirectional_bindings[val_term] = key_var
                     
                     term_with_bindings = Term("##special_unify##")
@@ -405,6 +407,8 @@ class Runtime:
                     special_solution.bindings = match_result
                     yield special_solution
             return 
+        else:
+            logger.debug(f"デバッグ用、解消したら削除：Runtime.evaluate_rules: Not an '=' operator. query_rule_obj='{query_rule_obj}', goal_term='{goal_term}'")
 
         for db_rule in self.all_rules(query_rule_obj):
             logger.debug(f"Runtime.evaluate_rules: Trying DB rule: {db_rule}")
