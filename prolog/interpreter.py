@@ -31,7 +31,6 @@ class Rule:
             return f'{self.head}.'
         return f'{self.head} :- {self.body}.'
 
-
     def __repr__(self):
         return str(self)
 
@@ -252,14 +251,8 @@ class Runtime:
             query_vars = find_variables(parsed_query)
         elif isinstance(parsed_query, Rule): # e.g. query_is_rule(X) :- body(X).
                                          # or ##(X) :- p(X). (parserが作るクエリ形式)
-            # Ruleの場合、そのheadとbodyの両方から変数を集める必要があるかもしれない。
-            # 特に、parserが作る Rule(Term("##", Vars), BodyConjunction) の形式では、
-            # Varsがクエリのトップレベル変数を保持している。
-            # しかし、より一般的な find_variables を parsed_query 全体に適用する方が堅牢かもしれない。
             query_vars = find_variables(parsed_query)
 
-
-        # query_varsリスト内の重複を削除し、元の順序を保持
         seen_vars = set()
         unique_query_vars = []
         for var in query_vars:
@@ -271,84 +264,54 @@ class Runtime:
         logger.debug(f"Runtime.query: Found variables in query: {[var.name for var in query_vars if var is not None]}")
         
         solution_count = 0
-        for solution_item in self.execute(parsed_query): # self.executeは通常、具体化されたヘッド項を返す
+        for solution_item in self.execute(parsed_query): 
             logger.debug(f"Runtime.query: solution_item from execute: {solution_item}, type: {type(solution_item)}")
             if isinstance(solution_item, FALSE) or solution_item is None:
                 logger.debug("Runtime.query: solution_item is FALSE or None, skipping.")
                 continue
-            if isinstance(solution_item, CUT): # types.CUT
+            if isinstance(solution_item, CUT): 
                 logger.warning("Runtime.query: CUT signal reached top-level query. This should ideally be handled internally.")
-                # 通常、CUTは evaluate_rules で処理され、ここまで到達しないはず
-                break # CUTは通常、親の選択ポイントを削除するので、クエリレベルでは解の生成を停止
+                break 
 
             current_bindings = {}
             if query_vars:
-                # solution_item (具体化されたヘッド) と元の parsed_query (のヘッド部分) を比較してバインディングを抽出
-                # parsed_queryがTermの場合、それが直接のゴール
-                # parsed_queryがRuleの場合、parsed_query.headが元のクエリの構造を持つことが多い（特に##ヘッドの場合）
-                
                 original_query_structure = parsed_query
                 if isinstance(parsed_query, Rule) and parsed_query.head.pred == "##":
-                    # ##(V1, V2) :- goal(V1, V2). のような場合、
-                    # solution_item は goal(val1, val2) のような形ではなく、##(val1, val2) の形で返ってくる。
-                    # この場合、solution_item.args と query_vars (##の引数だったもの) を対応させる。
                     original_query_structure = parsed_query.head
-
-
-                # solution_item (具体化されたゴール) と original_query_structure (変数が含まれる元のゴール) をマッチング
-                # ここでは、solution_item が具体化されたバージョンであると仮定し、
-                # query_vars に含まれる各変数について、対応する値を見つける。
-                # これは、solution_item を再度 original_query_structure とマッチさせることで実現できる。
-                # ただし、solution_item は既に具体化されているため、
-                # original_query_structure.match(solution_item) を行うと、
-                # original_query_structure内の変数がsolution_itemの対応する部分に束縛される。
                 
-                # もし solution_item が ##(val1, val2) の形で、query_vars が [V1, V2] なら、
-                # V1=val1, V2=val2 のような束縛を得たい。
-                
-                # 以前のロジック: solution_item.pred == "##" の場合
                 if isinstance(solution_item, Term) and solution_item.pred == "##":
                     if len(query_vars) == len(solution_item.args):
                         for i, var_obj in enumerate(query_vars):
-                             # query_varsの順序とsolution_item.argsの順序が対応すると仮定
                             current_bindings[var_obj] = solution_item.args[i]
                     else:
                         logger.error(f"Runtime.query: Mismatch in query_vars ({[v.name for v in query_vars]}) and solution_item.args ({solution_item.args}) for ## term")
                 elif isinstance(solution_item, Term) and isinstance(original_query_structure, Term):
-                    # 一般的なケース: solution_item は p(a,b) で original_query_structure は p(X,Y)
-                    # original_query_structure.match(solution_item) を使って束縛を得る
                     match_result_bindings = original_query_structure.match(solution_item)
                     if match_result_bindings is not None:
-                        # query_vars に含まれる変数のみを抽出
                         for q_var in query_vars:
                             if q_var in match_result_bindings:
                                 current_bindings[q_var] = match_result_bindings[q_var]
                     else:
                         logger.warning(f"Runtime.query: Could not match original query structure {original_query_structure} with solution {solution_item}")
 
-
-                if current_bindings or not query_vars: # 変数がないクエリでも空の束縛は解とみなす
+                if current_bindings or not query_vars: 
                     logger.debug(f"Runtime.query: Yielding bindings: {current_bindings}")
                     solution_count +=1
                     yield current_bindings
-                # else:
-                    # クエリに変数はあるが、この解からは束縛が得られなかった場合。
-                    # これは通常、解がないことを意味するか、束縛抽出ロジックの問題。
-                    # logger.warning(f"Runtime.query: No bindings extracted for solution: {solution_item} with query_vars: {[v.name for v in query_vars]}")
-                    # この場合、空の解 {} を返すべきか、何も返さないべきか。
-                    # Prologでは通常、変数が束縛されない解は表示されない。
-                    # しかし、テストケースが {} を期待している場合がある。
-                    # ここでは、束縛がなければ解として数えないようにする。
-                    # ただし、`sum_list_basic([], Sum)` で `[{}]` が返る問題は、
-                    # `query_vars` が空だったことが原因。`query_vars` が正しく設定されれば、
-                    # `current_bindings` が `{Sum: 0}` となるはず。
-
-            elif isinstance(solution_item, TRUE) or isinstance(solution_item, Term): # 変数なしクエリで成功した場合
-                logger.debug("Runtime.query: Yielding empty bindings for ground query success: {}")
+            
+            elif isinstance(solution_item, TRUE): # prolog.types.TRUE の場合
+                logger.debug("Runtime.query: TRUE result, yielding empty bindings {}")
+                solution_count += 1
+                yield {}
+            elif isinstance(solution_item, dict): # dictオブジェクトが直接返された場合 (TRUE.queryからの結果など)
+                logger.debug(f"Runtime.query: Dict solution received: {solution_item}")
+                solution_count += 1
+                yield solution_item
+            elif isinstance(solution_item, Term): # Term の場合 (変数なしクエリで成功)
+                logger.debug("Runtime.query: Term result for ground query, yielding empty bindings {}")
                 solution_count +=1
-                yield {} # 空の辞書を解として返す
+                yield {}
         logger.info(f"Runtime.query for '{query_str}' finished. Total solutions yielded: {solution_count}")
-
 
     def register_function(self, func, predicate, arity):
         logger.debug(f"Runtime.register_function: func={func}, predicate='{predicate}', arity={arity}")
@@ -449,19 +412,9 @@ class Runtime:
                             return
                         
                         if not isinstance(body_solution_item, FALSE):
-                            # body_solution_item は、具体化された body の一部または全体。
-                            # substituted_rule_head と body_solution_item から最終的な束縛をマージする必要がある。
-                            # body_solution_item が具体化された body 全体の場合、
-                            # substituted_rule_body.match(body_solution_item) で body 内の変数の束縛を得る。
                             bindings_from_body = substituted_rule_body.match(body_solution_item)
                             if bindings_from_body is None: bindings_from_body = {}
-
-                            # match_bindings (headとgoalのマッチ) と bindings_from_body (bodyの実行結果) をマージ
-                            # ただし、変数のスコープに注意。
-                            # substituted_rule_head は既に match_bindings で部分的に具体化されている。
-                            # ここで必要なのは、body_solution_item に含まれる情報で substituted_rule_head をさらに具体化すること。
                             
-                            # substituted_rule_head を body_solution_item (の束縛) でさらに具体化
                             final_solution_head = substituted_rule_head.substitute(bindings_from_body)
                             
                             logger.debug(f"Runtime.evaluate_rules: Yielding successful head: {final_solution_head}")
@@ -477,8 +430,8 @@ class Runtime:
     
         # TRUE と Fail オブジェクトの特別な処理
         if isinstance(query_obj, TRUE): # prolog.types.TRUE
-            logger.debug("Runtime.execute: query_obj is TRUE, yielding empty bindings")
-            yield {}
+            logger.debug("Runtime.execute: query_obj is TRUE, calling TRUE.query()")
+            yield from query_obj.query(self)  # TRUE.queryメソッドを呼び出す
             return
         
         if isinstance(query_obj, Fail): # prolog.builtins.Fail
@@ -499,35 +452,21 @@ class Runtime:
 
         else: 
             if isinstance(query_obj, Rule):
-                # parsed_query が Rule(Term("##", Vars), BodyConjunction) の場合、
-                # goal_to_evaluate は Term("##", Vars) ではなく、BodyConjunction を評価し、
-                # その結果を Term("##", Vars) に適用して返す必要がある。
-                # evaluate_rules は、与えられた goal_term (ここでは query_obj.head) とDBのルールヘッドをマッチさせる。
-                # そして、DBルールのボディを実行し、その結果をDBルールヘッドに適用して返す。
-                # クエリ Rule(H, B) の場合、B を実行し、その結果を H に適用して返す。
-                
-                # query_obj が Rule(H, B) の場合、B を実行し、その結果の束縛を H に適用する。
-                # H が ##(Vars) の場合、最終的に ##(BoundVars) が返る。
                 logger.debug(f"Runtime.execute: query_obj is Rule. Head: {query_obj.head}, Body: {query_obj.body}")
-                # query_obj.body を実行し、その各解 (束縛のセット) を query_obj.head に適用する
-                for body_solution_bindings_or_term in query_obj.body.query(self): # body.query は解の項または束縛を返す
+                for body_solution_bindings_or_term in query_obj.body.query(self): 
                     if isinstance(body_solution_bindings_or_term, FALSE):
                         continue
-                    if isinstance(body_solution_bindings_or_term, CUT): # types.CUT
+                    if isinstance(body_solution_bindings_or_term, CUT): 
                         yield CUT()
                         return
 
-                    # body_solution_bindings_or_term は、具体化された body の項であると期待される。
-                    # (Conjunction.query は substitute(bindings) された項を返す)
-                    # この具体化された body 項と、元の query_obj.body (変数を含む) をマッチさせて束縛を得る。
                     bindings_from_body = query_obj.body.match(body_solution_bindings_or_term)
                     if bindings_from_body is None: bindings_from_body = {}
                     
-                    # 得られた束縛を query_obj.head に適用する
                     yield query_obj.head.substitute(bindings_from_body)
 
-            else: # query_obj is a simple Term (e.g. a fact `p(a)` used as a query, or a subgoal term)
+            else: 
                 logger.debug(f"Runtime.execute: query_obj is Term: {query_obj}. Goal to evaluate is same.")
                 goal_to_evaluate = query_obj
-                yield from self.evaluate_rules(query_obj, goal_to_evaluate) # query_obj はここでは単なる Term
+                yield from self.evaluate_rules(query_obj, goal_to_evaluate) 
         logger.debug(f"Runtime.execute for query_obj: {query_obj} finished.")
