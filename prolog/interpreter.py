@@ -307,49 +307,66 @@ class Runtime:
         solution_count = 0
         for solution_item in self.execute(parsed_query): 
             logger.debug(f"Runtime.query: solution_item from execute: {solution_item}, type: {type(solution_item)}")
+            
             if isinstance(solution_item, FALSE) or solution_item is None:
                 logger.debug("Runtime.query: solution_item is FALSE or None, skipping.")
                 continue
-            if isinstance(solution_item, CUT): 
+            if isinstance(solution_item, CUT):
                 logger.warning("Runtime.query: CUT signal reached top-level query. This should ideally be handled internally.")
-                break 
+                break
 
             current_bindings = {}
+            # 単一化の特殊ソリューションからバインディングを抽出
+            if isinstance(solution_item, Term) and solution_item.pred == "=" and hasattr(solution_item, "bindings"):
+                for var, val in solution_item.bindings.items():
+                    if var in query_vars: # query_vars に含まれる変数のみを束縛対象とする
+                        current_bindings[var] = val
+                logger.debug(f"Runtime.query: Yielding bindings from unification: {current_bindings}")
+                solution_count += 1
+                yield current_bindings
+                continue # 次のソリューションアイテムへ
+
             if query_vars:
                 original_query_structure = parsed_query
                 if isinstance(parsed_query, Rule) and parsed_query.head.pred == "##":
-                    original_query_structure = parsed_query.head
-                
-                if isinstance(solution_item, Term) and solution_item.pred == "##":
+                    original_query_structure = parsed_query.head # クエリが ##(Vars) :- Body の場合、##(Vars) を使う
+
+                if isinstance(solution_item, Term) and solution_item.pred == "##": # ##(Vars) 形式の解
                     if len(query_vars) == len(solution_item.args):
                         for i, var_obj in enumerate(query_vars):
                             current_bindings[var_obj] = solution_item.args[i]
                     else:
                         logger.error(f"Runtime.query: Mismatch in query_vars ({[v.name for v in query_vars]}) and solution_item.args ({solution_item.args}) for ## term")
+                
+                # 通常の項のマッチング (単一化以外のケース)
                 elif isinstance(solution_item, Term) and isinstance(original_query_structure, Term):
                     match_result_bindings = original_query_structure.match(solution_item)
                     if match_result_bindings is not None:
-                        for q_var in query_vars:
+                        for q_var in query_vars: # query_vars に含まれる変数のみを束縛対象とする
                             if q_var in match_result_bindings:
                                 current_bindings[q_var] = match_result_bindings[q_var]
                     else:
+                        # マッチしなかった場合でも、solution_item が TRUE なら空の束縛を返すことがある
+                        # ただし、ここでは query_vars があるので、何らかの束縛が期待される
                         logger.warning(f"Runtime.query: Could not match original query structure {original_query_structure} with solution {solution_item}")
-
-                if current_bindings or not query_vars: 
+                
+                # 束縛が見つかったか、あるいは元々変数がなかった場合（後者は通常下のelif TRUEで処理されるが念のため）
+                if current_bindings or not query_vars: # not query_vars は ground query の成功を示す
                     logger.debug(f"Runtime.query: Yielding bindings: {current_bindings}")
                     solution_count +=1
                     yield current_bindings
             
-            elif isinstance(solution_item, TRUE): # prolog.types.TRUE の場合
+            elif isinstance(solution_item, TRUE): # prolog.types.TRUE の場合 (変数なしクエリの成功など)
                 logger.debug("Runtime.query: TRUE result, yielding empty bindings {}")
                 solution_count += 1
-                yield {}
-            elif isinstance(solution_item, dict): # dictオブジェクトが直接返された場合 (TRUE.queryからの結果など)
+                yield {} # 空の辞書を返す
+            elif isinstance(solution_item, dict): # dictオブジェクトが直接返された場合
                 logger.debug(f"Runtime.query: Dict solution received: {solution_item}")
                 solution_count += 1
                 yield solution_item
-            elif isinstance(solution_item, Term): # Term の場合 (変数なしクエリで成功)
-                logger.debug("Runtime.query: Term result for ground query, yielding empty bindings {}")
+            # 変数なしクエリで具体的な項が返ってきた場合も成功とみなし、空の束縛を返す
+            elif isinstance(solution_item, Term) and not query_vars:
+                logger.debug("Runtime.query: Term result for ground query (no vars), yielding empty bindings {}")
                 solution_count +=1
                 yield {}
         logger.info(f"Runtime.query for '{query_str}' finished. Total solutions yielded: {solution_count}")
@@ -425,15 +442,11 @@ class Runtime:
             lhs, rhs = goal_term.args
             match_result = lhs.match(rhs)
             if match_result is not None:
-                # 単一化に成功した場合、TRUEを返す（バインディングを保持）
-                # ここで TRUE() を yield するか、あるいは match_result を使って何かをするかは
-                # Prolog の '=' の振る舞いに依存します。
-                # 一般的には、成功した束縛を伴う TRUE のようなものを期待します。
-                # しかし、このコンテキストでは、goal_term 自体が解決されたことを示すために
-                # goal_term.substitute(match_result) を yield するか、
-                # あるいは単に TRUE() を yield することが考えられます。
-                # 仕様書では TRUE() を返すとなっているため、それに従います。
-                yield TRUE() # バインディングは暗黙的に解決済みとして扱われる
+                # 単一化に成功した場合、TRUEを返す代わりに適用されたバインディングを含む
+                # 特殊なソリューションオブジェクトを返す
+                special_solution = Term("=", lhs.substitute(match_result), rhs.substitute(match_result))
+                special_solution.bindings = match_result  # バインディング情報を保持
+                yield special_solution
             return  # 単一化の処理が完了したら他のルールを試さない
 
         for db_rule in self.all_rules(query_rule_obj):
