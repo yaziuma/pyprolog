@@ -87,10 +87,16 @@ class BaseTestCore:
                 if not isinstance(var_obj, Variable):
                      logger.error(f"Key in solution binding for '{query_str}' is not a Variable: {var_obj}")
                      pytest.fail(f"Key in solution binding for '{query_str}' is not a Variable: {var_obj}")
+                # 数値を処理する際の変換を修正 (仕様書 3)
                 if isinstance(val_term, Number):
+                    # 数値を文字列ではなく数値として処理
                     processed_sol[var_obj.name] = val_term.value
+                    # または下記のように整数値との比較を許容
+                    # processed_sol[var_obj.name] = float(val_term.value) # 仕様書のコメントに従い、まずは .value を使用
+                elif isinstance(val_term, Term) and not val_term.args: # Atom
+                    processed_sol[var_obj.name] = val_term.pred
                 else:
-                    processed_sol[var_obj.name] = str(val_term)
+                    processed_sol[var_obj.name] = str(val_term) # For complex terms or other types
             processed_solutions.append(processed_sol)
         logger.debug(f"Processed actual solutions for '{query_str}': {processed_solutions}")
 
@@ -98,8 +104,15 @@ class BaseTestCore:
         for expected_sol_map in expected_bindings_list:
             processed_exp = {}
             for var_name, val_obj in expected_sol_map.items():
+                # Process expected values similarly for consistent comparison
                 if isinstance(val_obj, Number):
                     processed_exp[var_name] = val_obj.value
+                elif isinstance(val_obj, Term) and not val_obj.args: # Atom
+                    processed_exp[var_name] = val_obj.pred
+                elif isinstance(val_obj, (int, float)): # Allow raw numbers in expected
+                    processed_exp[var_name] = val_obj
+                elif isinstance(val_obj, str): # Allow raw strings (atoms) in expected
+                     processed_exp[var_name] = val_obj
                 else:
                     processed_exp[var_name] = str(val_obj)
             processed_expected.append(processed_exp)
