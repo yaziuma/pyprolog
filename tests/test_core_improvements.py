@@ -666,7 +666,8 @@ class TestListProcessing(BaseTestCore):
 
         self._consult("sum_list_basic([], 0).")
         self._consult("sum_list_basic([H|T], S) :- sum_list_basic(T, ST), S is H + ST.")
-        self._assert_true("sum_list_basic([], Sum)", [{"Sum": Number(0)}])
+        # ここを修正: 0 を 0.0 に変更
+        self._assert_true("sum_list_basic([], Sum)", [{"Sum": Number(0.0)}])
 
     def test_empty_list_in_query(self):
         logger.info(f"Starting test: test_empty_list_in_query")
