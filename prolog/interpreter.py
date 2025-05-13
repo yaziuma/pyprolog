@@ -261,9 +261,10 @@ class Runtime:
 
             # Handle "##special_unify##" for Var=Var
             if isinstance(solution_item, Term) and solution_item.pred == "##special_unify##" and hasattr(solution_item, "bindings"):
-                logger.debug(f"Runtime.query: Processing special unification result with bindings: {solution_item.bindings}")
+                logger.debug(f"Runtime.query: Processing special unification result. Bindings BEFORE yield: {solution_item.bindings}")
                 solution_count += 1
                 yield solution_item.bindings # Yield the full bidirectional bindings
+                logger.debug(f"Runtime.query: Bindings AFTER yield for ##special_unify##: {solution_item.bindings}")
                 continue
 
             # Handle "=" for Var=Const, Const=Var, Const=Const (from previous fix)
@@ -380,95 +381,128 @@ class Runtime:
             return rules + [query]
         return rules
 
-    def evaluate_rules(self, query_rule_obj, goal_term): 
+    def evaluate_rules(self, query_rule_obj, goal_term):
         logger.debug(f"Runtime.evaluate_rules: query_rule_obj={query_rule_obj}, goal_term={goal_term}")
 
         # '=' 演算子の特別処理
-        if isinstance(goal_term, Term) and goal_term.pred == '=' and len(goal_term.args) == 2:
-            logger.debug(f"Runtime.evaluate_rules: Special case for '=' operator with goal_term: {goal_term}")
-            lhs, rhs = goal_term.args
-            match_result = lhs.match(rhs) 
-            if match_result is not None:
-                if isinstance(lhs, Variable) and isinstance(rhs, Variable):
-                    bidirectional_bindings = match_result.copy()
-                    if len(match_result) == 1: 
-                        key_var = list(match_result.keys())[0]
-                        val_term = match_result[key_var]
-                        if isinstance(val_term, Variable): 
-                            if val_term != key_var : 
-                                logger.debug(f"双方向マッチング可能な場合: {key_var} = {val_term}")
-                                bidirectional_bindings[val_term] = key_var
-                    
-                    term_with_bindings = Term("##special_unify##")
-                    term_with_bindings.bindings = bidirectional_bindings
-                    yield term_with_bindings
-                else:
-                    special_solution = Term("=", lhs.substitute(match_result), rhs.substitute(match_result))
-                    special_solution.bindings = match_result
-                    yield special_solution
-            return 
-        else:
-            logger.debug(f"デバッグ用、解消したら削除：Runtime.evaluate_rules: Not an '=' operator. query_rule_obj='{query_rule_obj}', goal_term='{goal_term}'")
+        is_special_equals = False
+        if isinstance(goal_term, Term):
+            logger.debug(f"Runtime.evaluate_rules: goal_term is a Term instance.")
+            if hasattr(goal_term, 'pred') and goal_term.pred == '=':
+                logger.debug(f"Runtime.evaluate_rules: goal_term.pred is '='.")
+                if hasattr(goal_term, 'args') and len(goal_term.args) == 2:
+                    logger.debug(f"Runtime.evaluate_rules: goal_term has 2 arguments. Entering '=' special case logic for goal: {goal_term}")
+                    is_special_equals = True
+                    lhs, rhs = goal_term.args
+                    match_result = lhs.match(rhs)
+                    if match_result is not None:
+                        logger.debug(f"Runtime.evaluate_rules: '=': lhs.match(rhs) successful. lhs='{lhs}', rhs='{rhs}', match_result='{match_result}'")
+                        if isinstance(lhs, Variable) and isinstance(rhs, Variable):
+                            logger.debug(f"Runtime.evaluate_rules: '=': Var=Var case. lhs='{lhs}', rhs='{rhs}', initial match_result='{match_result}'")
+                            bidirectional_bindings = match_result.copy()
+                            logger.debug(f"Runtime.evaluate_rules: '=': Initial bidirectional_bindings (copied from match_result): '{bidirectional_bindings}'")
+                            if lhs in bidirectional_bindings and bidirectional_bindings[lhs] == rhs:
+                                logger.debug(f"Runtime.evaluate_rules: '=': Condition 1 met: lhs ('{lhs}') in bindings and maps to rhs ('{rhs}'). Setting rhs -> lhs.")
+                                bidirectional_bindings[rhs] = lhs
+                            elif rhs in bidirectional_bindings and bidirectional_bindings[rhs] == lhs:
+                                logger.debug(f"Runtime.evaluate_rules: '=': Condition 2 met: rhs ('{rhs}') in bindings and maps to lhs ('{lhs}'). Setting lhs -> rhs.")
+                                bidirectional_bindings[lhs] = rhs
+                            else:
+                                logger.debug(f"Runtime.evaluate_rules: '=': Conditions 1 & 2 not met. Defaulting to set both directions: {lhs} -> {rhs} and {rhs} -> {lhs}.")
+                                bidirectional_bindings[lhs] = rhs
+                                bidirectional_bindings[rhs] = lhs
+                            logger.debug(f"Runtime.evaluate_rules: '=': Final bidirectional_bindings for Var=Var: '{bidirectional_bindings}' (original match_result: '{match_result}')")
+                            term_with_bindings = Term("##special_unify##")
+                            term_with_bindings.bindings = bidirectional_bindings
+                            yield term_with_bindings
+                        else: # Var=Const, Const=Var, Const=Const
+                            logger.debug(f"Runtime.evaluate_rules: '=': Var/Const or Const/Const case. lhs='{lhs}', rhs='{rhs}', match_result='{match_result}'")
+                            special_solution = Term("=", lhs.substitute(match_result), rhs.substitute(match_result))
+                            special_solution.bindings = match_result
+                            yield special_solution
+                    else: # match_result is None
+                        logger.debug(f"Runtime.evaluate_rules: '=': lhs.match(rhs) FAILED. lhs='{lhs}', rhs='{rhs}'. No solution from this '=' path.")
+                    # '=' special case was attempted (either yielded or failed match). Stop further processing for this goal.
+                    return
+                else: # Arity not 2 or no args
+                    logger.debug(f"Runtime.evaluate_rules: goal_term.pred is '=', but arity is not 2 (or args missing). Actual arity: {len(goal_term.args) if hasattr(goal_term, 'args') else 'N/A'}. Not treating as special '='.")
+            else: # Pred not '='
+                logger.debug(f"Runtime.evaluate_rules: goal_term is Term, but pred is not '=' (pred='{goal_term.pred if hasattr(goal_term, 'pred') else 'N/A'}'). Not treating as special '='.")
+        else: # Not a Term
+            logger.debug(f"Runtime.evaluate_rules: goal_term is NOT a Term (type: '{type(goal_term)}'). Not treating as special '='.")
 
-        for db_rule in self.all_rules(query_rule_obj):
-            logger.debug(f"Runtime.evaluate_rules: Trying DB rule: {db_rule}")
+        # If is_special_equals was true, we should have returned from inside the block.
+        # If we are here, it means it was not a special equals, or it didn't meet all criteria to be handled as such.
+        if not is_special_equals:
+            logger.debug(f"Runtime.evaluate_rules: Proceeding to general rule matching for goal_term='{goal_term}'.")
+            for db_rule in self.all_rules(query_rule_obj):
+                logger.debug(f"Runtime.evaluate_rules: Trying DB rule: {db_rule}")
+                match_bindings = db_rule.head.match(goal_term)
+                logger.debug(f"Runtime.evaluate_rules: Match attempt of {db_rule.head} with {goal_term} -> bindings: {match_bindings}")
 
-            match_bindings = db_rule.head.match(goal_term)
-            logger.debug(f"Runtime.evaluate_rules: Match attempt of {db_rule.head} with {goal_term} -> bindings: {match_bindings}")
+                if match_bindings is not None:
+                    logger.debug(f"Runtime.evaluate_rules: Match success. DB rule head: {db_rule.head}, Goal: {goal_term}")
+                    substituted_rule_head = db_rule.head.substitute(match_bindings)
+                    substituted_rule_body = db_rule.body.substitute(match_bindings)
+                    logger.debug(f"Runtime.evaluate_rules: Substituted DB rule head: {substituted_rule_head}, body: {substituted_rule_body}")
 
-            if match_bindings is not None:
-                logger.debug(f"Runtime.evaluate_rules: Match success. DB rule head: {db_rule.head}, Goal: {goal_term}")
-                substituted_rule_head = db_rule.head.substitute(match_bindings)
-                substituted_rule_body = db_rule.body.substitute(match_bindings)
-                logger.debug(f"Runtime.evaluate_rules: Substituted DB rule head: {substituted_rule_head}, body: {substituted_rule_body}")
+                    if isinstance(substituted_rule_body, Term) and substituted_rule_body.pred == '=':
+                        lhs_body, rhs_body = substituted_rule_body.args # Renamed to avoid conflict
+                        body_match_result = lhs_body.match(rhs_body)
+                        if body_match_result is not None:
+                            final_head = substituted_rule_head.substitute(body_match_result)
+                            yield final_head
+                        # If body was '=', whether it matched or not, we stop processing this db_rule's body.
+                        # If it matched, we yielded. If not, we just stop for this body.
+                        # The original code had a 'return' here, which would exit evaluate_rules entirely.
+                        # This seems more correct: try the next db_rule if this one's '=' body fails.
+                        # However, to match the previous structure's implicit return after '=' body,
+                        # we might need to reconsider. For now, let's assume we continue to next db_rule if '=' body fails.
+                        # If the '=' body succeeded and yielded, the 'return' in the outer scope for '=' special case
+                        # would have been hit. This path is for *rules* whose *body* is an '='.
+                        # Let's assume if a rule's body is '=', and it's processed, we are done with that rule.
+                        # If it yields, great. If not, we don't try other ways to satisfy this rule.
+                        # This implies a 'continue' or careful structuring if we want to try other db_rules.
+                        # The original 'return' here was likely to stop after processing a rule with an '=' body.
+                        # Let's keep it to mimic that behavior for now.
+                        return
 
-                if isinstance(substituted_rule_body, Term) and substituted_rule_body.pred == '=':
-                    lhs_body, rhs_body = substituted_rule_body.args # Renamed to avoid conflict
-                    body_match_result = lhs_body.match(rhs_body)
-                    if body_match_result is not None:
-                        final_head = substituted_rule_head.substitute(body_match_result)
-                        yield final_head
-                    return 
 
-                if isinstance(substituted_rule_body, Arithmetic):
-                    logger.debug(f"Runtime.evaluate_rules: Body is Arithmetic: {substituted_rule_body}")
-                    if hasattr(substituted_rule_body, 'var') and isinstance(substituted_rule_body.var, Variable):
-                        var_to_bind = substituted_rule_body.var
-                        value = substituted_rule_body.evaluate()
-                        
-                        final_head_for_arith = substituted_rule_head.substitute({var_to_bind: value})
-                        logger.debug(f"Runtime.evaluate_rules: Arithmetic body evaluated. Yielding: {final_head_for_arith}")
-                        yield final_head_for_arith
+                    if isinstance(substituted_rule_body, Arithmetic):
+                        logger.debug(f"Runtime.evaluate_rules: Body is Arithmetic: {substituted_rule_body}")
+                        if hasattr(substituted_rule_body, 'var') and isinstance(substituted_rule_body.var, Variable):
+                            var_to_bind = substituted_rule_body.var
+                            value = substituted_rule_body.evaluate()
+                            final_head_for_arith = substituted_rule_head.substitute({var_to_bind: value})
+                            logger.debug(f"Runtime.evaluate_rules: Arithmetic body evaluated. Yielding: {final_head_for_arith}")
+                            yield final_head_for_arith
+                        else:
+                            logger.warning(f"Runtime.evaluate_rules: Arithmetic body {substituted_rule_body} does not have expected 'var' attribute.")
                     else:
-                        logger.warning(f"Runtime.evaluate_rules: Arithmetic body {substituted_rule_body} does not have expected 'var' attribute.")
+                        logger.debug(f"Runtime.evaluate_rules: Body is not Arithmetic or '='. Calling body.query for: {substituted_rule_body}")
+                        for body_solution_item in substituted_rule_body.query(self):
+                            logger.debug(f"Runtime.evaluate_rules: Item from body.query: {body_solution_item}")
+                            if isinstance(body_solution_item, CUT):
+                                logger.debug("Runtime.evaluate_rules: CUT signal received from body.query. Yielding CUT and returning.")
+                                yield body_solution_item
+                                return # Propagate CUT
 
-                else: 
-                    logger.debug(f"Runtime.evaluate_rules: Body is not Arithmetic. Calling body.query for: {substituted_rule_body}")
-                    for body_solution_item in substituted_rule_body.query(self):
-                        logger.debug(f"Runtime.evaluate_rules: Item from body.query: {body_solution_item}")
-                        if isinstance(body_solution_item, CUT): 
-                            logger.debug("Runtime.evaluate_rules: CUT signal received from body.query. Yielding CUT and returning.")
-                            yield body_solution_item
-                            return
-                        
-                        if not isinstance(body_solution_item, FALSE):
-                            bindings_from_body = substituted_rule_body.match(body_solution_item)
-                            if bindings_from_body is None: bindings_from_body = {}
-                            
-                            final_solution_head = substituted_rule_head.substitute(bindings_from_body)
-                            
-                            logger.debug(f"Runtime.evaluate_rules: Yielding successful head: {final_solution_head}")
-                            yield final_solution_head
-                        elif isinstance(body_solution_item, FALSE):
-                            logger.debug("Runtime.evaluate_rules: Body solution was FALSE. Trying next body solution or backtracking.")
-            else:
-                logger.debug(f"Runtime.evaluate_rules: Match failed for DB rule {db_rule.head} with goal {goal_term}")
-        logger.debug(f"Runtime.evaluate_rules: All DB rules tried for goal_term={goal_term}. Finished.")
+                            if not isinstance(body_solution_item, FALSE):
+                                bindings_from_body = substituted_rule_body.match(body_solution_item)
+                                if bindings_from_body is None: bindings_from_body = {}
+                                final_solution_head = substituted_rule_head.substitute(bindings_from_body)
+                                logger.debug(f"Runtime.evaluate_rules: Yielding successful head: {final_solution_head}")
+                                yield final_solution_head
+                            elif isinstance(body_solution_item, FALSE):
+                                logger.debug("Runtime.evaluate_rules: Body solution was FALSE. Trying next body solution or backtracking.")
+                else: # match_bindings is None
+                    logger.debug(f"Runtime.evaluate_rules: Match failed for DB rule {db_rule.head} with goal {goal_term}")
+            logger.debug(f"Runtime.evaluate_rules: All DB rules tried for goal_term={goal_term}. Finished general rule matching.")
 
-    def execute(self, query_obj): 
+    def execute(self, query_obj):
         logger.debug(f"Runtime.execute called with query_obj: {query_obj}")
-    
-        if isinstance(query_obj, TRUE): 
+
+        if isinstance(query_obj, TRUE):
             logger.debug("Runtime.execute: query_obj is TRUE, calling TRUE.query()")
             yield from query_obj.query(self)  
             return
