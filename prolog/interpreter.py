@@ -92,6 +92,8 @@ class Conjunction(Term):
                 elif self._is_fail(arg): 
                     logger.debug(f"Conjunction.solutions: arg is FAIL {arg}, yielding FALSE")
                     yield FALSE()
+                    # Failオブジェクトに対してquery()を呼び出す必要はない
+                    return  # この結合パスには解がない - 失敗したため
                 elif self._is_builtin(arg): 
                     logger.debug(f"Conjunction.solutions: arg is IO builtin {arg}, executing its query")
                     _ = list(arg.query(runtime, bindings))  
@@ -472,6 +474,17 @@ class Runtime:
 
     def execute(self, query_obj): 
         logger.debug(f"Runtime.execute called with query_obj: {query_obj}")
+    
+        # TRUE と Fail オブジェクトの特別な処理
+        if isinstance(query_obj, TRUE): # prolog.types.TRUE
+            logger.debug("Runtime.execute: query_obj is TRUE, yielding empty bindings")
+            yield {}
+            return
+        
+        if isinstance(query_obj, Fail): # prolog.builtins.Fail
+            logger.debug("Runtime.execute: query_obj is Fail, yielding nothing (failure)")
+            return  # 何もyieldせずにリターン = 失敗
+            
         goal_to_evaluate = query_obj
         if isinstance(query_obj, Arithmetic):
             logger.debug(f"Runtime.execute: query_obj is Arithmetic: {query_obj}")

@@ -541,13 +541,16 @@ class Number(Term):
 
 class TRUE(Term):
     def __init__(self):
-        super().__init__(TRUE)
+        # トークンのlexemeに合わせて"true"を述語名として使用
+        super().__init__("true")
 
     def substitute(self, bindings):
         return self
 
     def query(self, runtime):
-        yield self
+        # TRUEは常に空のバインディングで成功する
+        logger.debug("TRUE.query called, yielding empty bindings {}")
+        yield {}
 
 class FALSE(Term):
     def __init__(self):

@@ -37,6 +37,13 @@ class Fail:
     def __repr__(self):
         return str(self)
 
+    def query(self, runtime):
+        # 失敗時には何も結果を返さない（解がゼロ）
+        # logger.debug(f"Fail.query called") # logger is not defined here
+        if False:  # この条件は常にfalse
+            yield  # この行は実行されない（ジェネレータにするための文法的な要素）
+        # 何もyieldせずに即時リターン = 失敗を意味する
+
 
 class Cut:
     def __init__(self):
