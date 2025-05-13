@@ -497,6 +497,10 @@ class Number(Term):
     def __init__(self, pred):
         super().__init__(pred)
 
+    @property
+    def value(self):
+        return self.pred
+    
     def multiply(self, number):
         return Number(self.pred * number.pred)
 
