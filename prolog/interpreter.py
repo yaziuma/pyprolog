@@ -73,43 +73,28 @@ class Conjunction(Term):
         def solutions(index, bindings):
             logger.debug(f"Conjunction.solutions: index={index}, bindings={bindings}, total_args={len(self.args)}")
             if index >= len(self.args):
-                # ベースケース: 全てのゴールが成功
-                # ここで self.substitute(bindings) を yield するのは、
-                # 結合全体の置換結果を返すため。
-                # しかし、Prolog の結合の成功は通常、最終的な束縛のセットで示される。
-                # Runtime.query が最終的な束縛を構築するため、ここでは単に成功を示すか、
-                # 最後のゴールの結果を伝播させる。
-                # ここでは、仕様書には直接の指示がないため、既存の動作を維持しつつ、
-                # 束縛のコピーと適用の修正に注力する。
-                # 最終的な結果は Runtime.query で処理されるため、
-                # ここでは成功した束縛を伴う何らかのシグナル (例えば TRUE() や具体的な項) を返す。
-                # 既存のコードは res_sub (置換された結合) を返している。
                 res_sub = self.substitute(bindings)
                 logger.debug(f"Conjunction.solutions: base case, yielding substituted conjunction: {res_sub}")
-                yield res_sub # または yield TRUE() や yield bindings など、設計による
+                yield res_sub 
             else:
                 arg = self.args[index]
                 logger.debug(f"Conjunction.solutions: processing arg[{index}] = {arg}")
 
-                # バックトラックと変数束縛を正しく管理するために、束縛のコピーを作成 (仕様書 4)
-                current_goal_bindings = bindings.copy() # このゴール評価用の束縛
+                current_goal_bindings = bindings.copy() 
 
                 if self._is_cut(arg): 
                     logger.debug(f"Conjunction.solutions: arg is CUT {arg}")
-                    # CUT の場合、現在の束縛で後続のゴールを評価
-                    # CUT の実行自体が runtime.execute で処理される
-                    for _ in runtime.execute(arg.substitute(current_goal_bindings)): # CUT の実行
+                    for _ in runtime.execute(arg.substitute(current_goal_bindings)): 
                         logger.debug(f"Conjunction.solutions: Executing goals after CUT for bindings: {current_goal_bindings}")
-                        yield from solutions(index + 1, current_goal_bindings) # CUT後のゴールへ
+                        yield from solutions(index + 1, current_goal_bindings) 
                         logger.debug("Conjunction.solutions: Yielding CUT signal after solutions for goals post-cut.")
-                        yield CUT() # CUTシグナルを伝播
+                        yield CUT() 
                         return 
 
                 elif self._is_fail(arg): 
                     logger.debug(f"Conjunction.solutions: arg is FAIL {arg}, yielding FALSE")
                     yield FALSE()
-                    # Failオブジェクトに対してquery()を呼び出す必要はない
-                    return  # この結合パスには解がない - 失敗したため
+                    return  
                 elif self._is_builtin(arg): 
                     logger.debug(f"Conjunction.solutions: arg is IO builtin {arg}, executing its query")
                     _ = list(arg.query(runtime, bindings))  
@@ -133,60 +118,48 @@ class Conjunction(Term):
                     logger.debug(f"Conjunction.solutions: arg is Logic {arg}, evaluating")
                     eval_result = arg.substitute(bindings).evaluate()
                     logger.debug(f"Conjunction.solutions: Logic evaluated to {eval_result}, yielding it.")
-                    if eval_result: # If logic expression is true
+                    if eval_result: 
                         yield from solutions(index + 1, bindings)
-                    else: # If logic expression is false, this path fails
+                    else: 
                         logger.debug(f"Conjunction.solutions: Logic expression {arg} evaluated to False. Path fails.")
                         return
                 else: 
                     logger.debug(f"Conjunction.solutions: arg is general term {arg}, calling runtime.execute")
-                    # arg を評価する前に、現在の束縛 (current_goal_bindings) で置換する
                     substituted_arg = arg.substitute(current_goal_bindings)
                     logger.debug(f"Conjunction.solutions: Substituted arg for execution: {substituted_arg}")
 
-                    for item in runtime.execute(substituted_arg): # substituted_arg を実行
+                    for item in runtime.execute(substituted_arg): 
                         logger.debug(f"Conjunction.solutions: item from runtime.execute({substituted_arg}): {item}")
                         if isinstance(item, FALSE): 
                             logger.debug("Conjunction.solutions: item is FALSE, this conjunction path fails for this item.")
-                            continue # この解は失敗、次の解を試す (バックトラック)
+                            continue 
 
                         if isinstance(item, CUT): 
                             logger.error("Conjunction.solutions: Unexpected CUT signal received from runtime.execute on a general term that is not a !.")
-                            # CUT が execute から返ってきた場合、それを伝播させる
                             yield item 
-                            return # この Conjunction の評価を終了
+                            return 
 
-                        # item は解決された項 (例: p(a) )
-                        # arg は元のゴール (例: p(X) )
-                        # substituted_arg は束縛適用後のゴール (例: p(X) または p(Y) if X was bound to Y)
-                        # ここで match するのは、元の arg と item
-                        # そして、その結果を current_goal_bindings とマージする
-                        match_result_for_arg = arg.match(item) # arg と item のマッチング
+                        match_result_for_arg = arg.match(item) 
                         if match_result_for_arg is None:
-                            # substituted_arg と item のマッチも試す (より具体的なケース)
                             match_result_for_arg = substituted_arg.match(item)
 
                         if match_result_for_arg is not None:
-                            # 各ゴールの評価後に束縛の適用を確保 (仕様書 4)
-                            # 新しい束縛と、このゴール評価開始時の束縛 (current_goal_bindings) をマージ
                             unified_bindings = merge_bindings(match_result_for_arg, current_goal_bindings)
                             logger.debug(f"Conjunction.solutions: unified bindings for arg '{arg}' (or '{substituted_arg}') and item '{item}': {unified_bindings} (from match: {match_result_for_arg}, original_for_goal: {current_goal_bindings})")
                             
                             if unified_bindings is not None:
                                 logger.debug(f"Conjunction.solutions: proceeding to next arg with unified bindings: {unified_bindings}")
-                                # 次のゴールに進む前に、統合された束縛を使用 (仕様書 4)
                                 yield from solutions(index + 1, unified_bindings)
                             else:
                                 logger.debug(f"Conjunction.solutions: unification (merge_bindings) failed after successful match for {arg}/{substituted_arg} and {item}. Trying next item.")
                         else:
                             logger.debug(f"Conjunction.solutions: match failed for {arg}/{substituted_arg} and {item}. Trying next item.")
                     
-                    # このゴール (arg) に対する全ての解を試し終わったら、このパスは終了
                     logger.debug(f"Conjunction.solutions: runtime.execute for {substituted_arg} (from arg {arg}) exhausted for bindings {current_goal_bindings}.")
-                    return # この return が重要。現在の arg で解が見つからなければバックトラック
+                    return 
 
         logger.debug("Conjunction.query: starting solutions generator with initial empty bindings")
-        yield from solutions(0, {}) # 初期束縛は空
+        yield from solutions(0, {}) 
 
     def substitute(self, bindings):
         return Conjunction(
@@ -252,55 +225,24 @@ class Runtime:
         parsed_query = Parser(tokens).parse_query()
         logger.debug(f"Runtime.query: parsed_query: {parsed_query}, type: {type(parsed_query)}")
 
-        # 変数収集方法の修正
         query_vars = []
         
-        # 直接クエリを探索して変数を見つける関数
-        def find_variables(term):
+        def find_variables(term, found_vars_list): # Pass list to append to
             if isinstance(term, Variable):
-                if term.name != '_':  # アンダースコア変数は除外
-                    # 重複を避けるためにリストに追加する前に確認
-                    if term not in query_vars:
-                         return [term]
-                return []
-            elif isinstance(term, Term): # TermにはConjunctionも含まれる
-                vars_list = []
-                for arg in term.args:
-                    found_in_arg = find_variables(arg)
-                    for v in found_in_arg:
-                        if v not in vars_list: # Conjunction内で重複を避ける
-                           vars_list.append(v)
-                return vars_list
-            elif isinstance(term, Rule): # Ruleオブジェクトの場合 (通常はparsed_queryがこれ)
-                vars_list = []
-                # Ruleのheadから変数を探す
+                if term.name != '_' and term not in found_vars_list:
+                     found_vars_list.append(term)
+            elif isinstance(term, Term): 
+                for arg_item in term.args: # Renamed arg to arg_item to avoid conflict
+                    find_variables(arg_item, found_vars_list)
+            elif isinstance(term, Rule): 
                 if hasattr(term, 'head') and term.head is not None:
-                    head_vars = find_variables(term.head)
-                    for v_h in head_vars:
-                        if v_h not in vars_list: vars_list.append(v_h)
-                # Ruleのbodyから変数を探す (Conjunctionの場合も考慮)
+                    find_variables(term.head, found_vars_list)
                 if hasattr(term, 'body') and term.body is not None:
-                    body_vars = find_variables(term.body) # term.bodyがConjunctionならそのargsが探索される
-                    for v_b in body_vars:
-                        if v_b not in vars_list: vars_list.append(v_b)
-                return vars_list
-            return []
+                    find_variables(term.body, found_vars_list)
         
-        # クエリから変数を収集
-        # parsed_query は Term (単一ゴール) または Rule (##(Vars):- Body の形)
-        if isinstance(parsed_query, Term): # e.g. p(X). or p(X,Y).
-            query_vars = find_variables(parsed_query)
-        elif isinstance(parsed_query, Rule): # e.g. query_is_rule(X) :- body(X).
-                                         # or ##(X) :- p(X). (parserが作るクエリ形式)
-            query_vars = find_variables(parsed_query)
-
-        seen_vars = set()
-        unique_query_vars = []
-        for var in query_vars:
-            if var.name not in seen_vars:
-                unique_query_vars.append(var)
-                seen_vars.add(var.name)
-        query_vars = unique_query_vars
+        temp_query_vars = []
+        find_variables(parsed_query, temp_query_vars)
+        query_vars = temp_query_vars # Assign after full traversal
 
         logger.debug(f"Runtime.query: Found variables in query: {[var.name for var in query_vars if var is not None]}")
         
@@ -316,55 +258,59 @@ class Runtime:
                 break
 
             current_bindings = {}
-            # 単一化の特殊ソリューションからバインディングを抽出
+
+            # Handle "##special_unify##" for Var=Var
+            if isinstance(solution_item, Term) and solution_item.pred == "##special_unify##" and hasattr(solution_item, "bindings"):
+                logger.debug(f"Runtime.query: Processing special unification result with bindings: {solution_item.bindings}")
+                solution_count += 1
+                yield solution_item.bindings # Yield the full bidirectional bindings
+                continue
+
+            # Handle "=" for Var=Const, Const=Var, Const=Const (from previous fix)
             if isinstance(solution_item, Term) and solution_item.pred == "=" and hasattr(solution_item, "bindings"):
                 for var, val in solution_item.bindings.items():
-                    if var in query_vars: # query_vars に含まれる変数のみを束縛対象とする
+                    if var in query_vars:
                         current_bindings[var] = val
-                logger.debug(f"Runtime.query: Yielding bindings from unification: {current_bindings}")
-                solution_count += 1
-                yield current_bindings
-                continue # 次のソリューションアイテムへ
-
+                if current_bindings or not query_vars: 
+                    logger.debug(f"Runtime.query: Yielding bindings from unification type '=': {current_bindings}")
+                    solution_count += 1
+                    yield current_bindings
+                continue
+            
             if query_vars:
                 original_query_structure = parsed_query
                 if isinstance(parsed_query, Rule) and parsed_query.head.pred == "##":
-                    original_query_structure = parsed_query.head # クエリが ##(Vars) :- Body の場合、##(Vars) を使う
+                    original_query_structure = parsed_query.head 
 
-                if isinstance(solution_item, Term) and solution_item.pred == "##": # ##(Vars) 形式の解
+                if isinstance(solution_item, Term) and solution_item.pred == "##": 
                     if len(query_vars) == len(solution_item.args):
                         for i, var_obj in enumerate(query_vars):
                             current_bindings[var_obj] = solution_item.args[i]
                     else:
                         logger.error(f"Runtime.query: Mismatch in query_vars ({[v.name for v in query_vars]}) and solution_item.args ({solution_item.args}) for ## term")
                 
-                # 通常の項のマッチング (単一化以外のケース)
                 elif isinstance(solution_item, Term) and isinstance(original_query_structure, Term):
                     match_result_bindings = original_query_structure.match(solution_item)
                     if match_result_bindings is not None:
-                        for q_var in query_vars: # query_vars に含まれる変数のみを束縛対象とする
+                        for q_var in query_vars: 
                             if q_var in match_result_bindings:
                                 current_bindings[q_var] = match_result_bindings[q_var]
                     else:
-                        # マッチしなかった場合でも、solution_item が TRUE なら空の束縛を返すことがある
-                        # ただし、ここでは query_vars があるので、何らかの束縛が期待される
                         logger.warning(f"Runtime.query: Could not match original query structure {original_query_structure} with solution {solution_item}")
                 
-                # 束縛が見つかったか、あるいは元々変数がなかった場合（後者は通常下のelif TRUEで処理されるが念のため）
-                if current_bindings or not query_vars: # not query_vars は ground query の成功を示す
+                if current_bindings or not query_vars: 
                     logger.debug(f"Runtime.query: Yielding bindings: {current_bindings}")
                     solution_count +=1
                     yield current_bindings
             
-            elif isinstance(solution_item, TRUE): # prolog.types.TRUE の場合 (変数なしクエリの成功など)
+            elif isinstance(solution_item, TRUE): 
                 logger.debug("Runtime.query: TRUE result, yielding empty bindings {}")
                 solution_count += 1
-                yield {} # 空の辞書を返す
-            elif isinstance(solution_item, dict): # dictオブジェクトが直接返された場合
+                yield {} 
+            elif isinstance(solution_item, dict): 
                 logger.debug(f"Runtime.query: Dict solution received: {solution_item}")
                 solution_count += 1
                 yield solution_item
-            # 変数なしクエリで具体的な項が返ってきた場合も成功とみなし、空の束縛を返す
             elif isinstance(solution_item, Term) and not query_vars:
                 logger.debug("Runtime.query: Term result for ground query (no vars), yielding empty bindings {}")
                 solution_count +=1
@@ -437,17 +383,28 @@ class Runtime:
     def evaluate_rules(self, query_rule_obj, goal_term): 
         logger.debug(f"Runtime.evaluate_rules: query_rule_obj={query_rule_obj}, goal_term={goal_term}")
 
-        # '=' 演算子の特別処理 (仕様書 2)
+        # '=' 演算子の特別処理
         if isinstance(goal_term, Term) and goal_term.pred == '=' and len(goal_term.args) == 2:
             lhs, rhs = goal_term.args
-            match_result = lhs.match(rhs)
+            match_result = lhs.match(rhs) 
             if match_result is not None:
-                # 単一化に成功した場合、TRUEを返す代わりに適用されたバインディングを含む
-                # 特殊なソリューションオブジェクトを返す
-                special_solution = Term("=", lhs.substitute(match_result), rhs.substitute(match_result))
-                special_solution.bindings = match_result  # バインディング情報を保持
-                yield special_solution
-            return  # 単一化の処理が完了したら他のルールを試さない
+                if isinstance(lhs, Variable) and isinstance(rhs, Variable):
+                    bidirectional_bindings = match_result.copy()
+                    if len(match_result) == 1: 
+                        key_var = list(match_result.keys())[0]
+                        val_term = match_result[key_var]
+                        if isinstance(val_term, Variable): 
+                            if val_term != key_var : 
+                                bidirectional_bindings[val_term] = key_var
+                    
+                    term_with_bindings = Term("##special_unify##")
+                    term_with_bindings.bindings = bidirectional_bindings
+                    yield term_with_bindings
+                else:
+                    special_solution = Term("=", lhs.substitute(match_result), rhs.substitute(match_result))
+                    special_solution.bindings = match_result
+                    yield special_solution
+            return 
 
         for db_rule in self.all_rules(query_rule_obj):
             logger.debug(f"Runtime.evaluate_rules: Trying DB rule: {db_rule}")
@@ -461,38 +418,13 @@ class Runtime:
                 substituted_rule_body = db_rule.body.substitute(match_bindings)
                 logger.debug(f"Runtime.evaluate_rules: Substituted DB rule head: {substituted_rule_head}, body: {substituted_rule_body}")
 
-                # ルールのボディで '=' が使われるケースの特別処理 (仕様書 5)
                 if isinstance(substituted_rule_body, Term) and substituted_rule_body.pred == '=':
-                    lhs, rhs = substituted_rule_body.args
-                    # ここでの match_result は、ボディの '=' が成功した場合の束縛
-                    body_match_result = lhs.match(rhs)
+                    lhs_body, rhs_body = substituted_rule_body.args # Renamed to avoid conflict
+                    body_match_result = lhs_body.match(rhs_body)
                     if body_match_result is not None:
-                        # 単一化が成功したら、その束縛をヘッドに適用して返す
-                        # 元の match_bindings (ヘッドとゴールのマッチ) と body_match_result (ボディの=のマッチ)
-                        # をマージする必要があるかもしれません。
-                        # しかし、仕様書では match_result (おそらく body_match_result を指す) のみを使用しています。
-                        # これは、ボディの '=' がヘッドの変数を束縛する場合を想定している可能性があります。
-                        # 例: p(X) :- X = a.  goal p(Y) -> Y=a
-                        # ここでは、仕様書通り body_match_result を使用します。
-                        # 注意: この match_result は、元の goal_term と rule.head のマッチング (match_bindings)
-                        # によって既に束縛された変数をさらに束縛する可能性があります。
-                        # 既存の束縛と矛盾しないようにマージするのがより堅牢ですが、
-                        # 仕様書は substituted_rule_head.substitute(match_result) となっています。
-                        # ここでの match_result は body_match_result を指すと解釈します。
                         final_head = substituted_rule_head.substitute(body_match_result)
-                        # さらに、元の goal_term とのマッチングで得られた束縛 (match_bindings) も考慮に入れるべきです。
-                        # 例えば、goal が p(A) で、ルールが p(X) :- X = b. の場合、
-                        # match_bindings は {X: A}。body_match_result は {X: b} (もしXが未束縛なら)。
-                        # この場合、A=b となるべきです。
-                        # より正確には、マージされた束縛を適用すべきです。
-                        # merged_bindings_for_head = merge_bindings(match_bindings, body_match_result)
-                        # if merged_bindings_for_head is not None:
-                        #    yield substituted_rule_head.substitute(merged_bindings_for_head)
-                        # しかし、仕様書は単純な substitute(match_result) です。
-                        # ここでは、仕様書に従い、body_match_result のみで置換します。
-                        # これが意図した動作であると仮定します。
                         yield final_head
-                    return # ボディが '=' の場合は、その評価で終了
+                    return 
 
                 if isinstance(substituted_rule_body, Arithmetic):
                     logger.debug(f"Runtime.evaluate_rules: Body is Arithmetic: {substituted_rule_body}")
@@ -532,15 +464,14 @@ class Runtime:
     def execute(self, query_obj): 
         logger.debug(f"Runtime.execute called with query_obj: {query_obj}")
     
-        # TRUE と Fail オブジェクトの特別な処理
-        if isinstance(query_obj, TRUE): # prolog.types.TRUE
+        if isinstance(query_obj, TRUE): 
             logger.debug("Runtime.execute: query_obj is TRUE, calling TRUE.query()")
-            yield from query_obj.query(self)  # TRUE.queryメソッドを呼び出す
+            yield from query_obj.query(self)  
             return
         
-        if isinstance(query_obj, Fail): # prolog.builtins.Fail
+        if isinstance(query_obj, Fail): 
             logger.debug("Runtime.execute: query_obj is Fail, yielding nothing (failure)")
-            return  # 何もyieldせずにリターン = 失敗
+            return  
             
         goal_to_evaluate = query_obj
         if isinstance(query_obj, Arithmetic):
