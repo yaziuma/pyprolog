@@ -91,15 +91,21 @@ class BaseTestCore:
                 if not isinstance(var_obj, Variable):
                      logger.error(f"Key in solution binding for '{query_str}' is not a Variable: {var_obj}")
                      pytest.fail(f"Key in solution binding for '{query_str}' is not a Variable: {var_obj}")
-                processed_sol[var_obj.name] = str(val_term) 
+                if isinstance(val_term, Number):
+                    processed_sol[var_obj.name] = val_term.value
+                else:
+                    processed_sol[var_obj.name] = str(val_term)
             processed_solutions.append(processed_sol)
         logger.debug(f"Processed actual solutions for '{query_str}': {processed_solutions}")
 
         processed_expected = []
         for expected_sol_map in expected_bindings_list:
             processed_exp = {}
-            for var_name, val_obj in expected_sol_map.items(): 
-                processed_exp[var_name] = str(val_obj) 
+            for var_name, val_obj in expected_sol_map.items():
+                if isinstance(val_obj, Number):
+                    processed_exp[var_name] = val_obj.value
+                else:
+                    processed_exp[var_name] = str(val_obj)
             processed_expected.append(processed_exp)
         logger.debug(f"Processed expected bindings for '{query_str}': {processed_expected}")
         
