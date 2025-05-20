@@ -414,7 +414,7 @@ class Runtime:
                     # logger.debug(f"Runtime.evaluate_rules: '=' match successful: {match_result}")
                     if isinstance(lhs, Variable) and isinstance(rhs, Variable):
                         # logger.debug(f"Runtime.evaluate_rules: '=' Var=Var case: {lhs} = {rhs}")
-                        bidirectional_bindings = match_result.copy() 
+                        bidirectional_bindings = {}
                         bidirectional_bindings[lhs] = rhs
                         bidirectional_bindings[rhs] = lhs
                         # logger.debug(f"Runtime.evaluate_rules: '=' Var=Var bidirectional bindings: {bidirectional_bindings}")
@@ -429,7 +429,7 @@ class Runtime:
                 else:
                     # logger.debug(f"Runtime.evaluate_rules: '=' match failed for: {lhs} = {rhs}")
                     pass 
-                return 
+                return
         
         # logger.debug(f"Runtime.evaluate_rules: Proceeding to general rule matching for goal_term='{goal_term}'.")
         all_rules = self.all_rules(query_rule_obj) 
