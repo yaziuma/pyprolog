@@ -520,23 +520,38 @@ class Runtime:
                     else:
                         logger.warning(f"Runtime.evaluate_rules: Arithmetic body {substituted_rule_body} does not have expected 'var' attribute.")
                 else:
-                    logger.debug(f"Runtime.evaluate_rules: Body is not Arithmetic or '='. Calling body.query for: {substituted_rule_body}")
-                    for body_solution_item in substituted_rule_body.query(self):
-                        logger.debug(f"Runtime.evaluate_rules: Item from body.query: {body_solution_item}")
+                    logger.debug(f"Runtime.evaluate_rules: Body is not Arithmetic or '='. Calling self.execute for body: {substituted_rule_body}")
+                    for body_solution_item in self.execute(substituted_rule_body): # Changed from body.query
+                        logger.debug(f"Runtime.evaluate_rules: Item from body execution: {body_solution_item}")
                         if isinstance(body_solution_item, CUT):
-                            logger.debug("Runtime.evaluate_rules: CUT signal received from body.query. Yielding CUT and returning.")
+                            logger.debug("Runtime.evaluate_rules: CUT signal received from body execution. Yielding CUT and returning.")
                             yield body_solution_item
                             return # Propagate CUT
 
-                        if not isinstance(body_solution_item, FALSE):
+                        if isinstance(body_solution_item, FALSE):
+                            logger.debug("Runtime.evaluate_rules: Body solution was FALSE. Trying next body solution or backtracking.")
+                            continue # Explicitly continue to next body_solution_item
+
+                        # If body_solution_item is ##special_unify##, yield it directly for Runtime.query
+                        if isinstance(body_solution_item, Term) and body_solution_item.pred == "##special_unify##":
+                            logger.debug(f"Runtime.evaluate_rules: Body yielded ##special_unify##. Propagating: {body_solution_item}")
+                            yield body_solution_item
+                        else:
+                            # For other successful body solutions, substitute the head and yield.
+                            # Need to get bindings from the body solution relative to the rule's body.
                             bindings_from_body = substituted_rule_body.match(body_solution_item)
                             if bindings_from_body is None:
-                                bindings_from_body = {}
+                                if isinstance(body_solution_item, dict): # Check if body_solution_item is a dict first
+                                    bindings_from_body = body_solution_item
+                                # Then check if it has a .bindings attribute (e.g., for Term objects)
+                                elif hasattr(body_solution_item, 'bindings') and isinstance(body_solution_item.bindings, dict):
+                                    bindings_from_body = body_solution_item.bindings
+                                else:
+                                    bindings_from_body = {}
+                            
                             final_solution_head = substituted_rule_head.substitute(bindings_from_body)
-                            logger.debug(f"Runtime.evaluate_rules: Yielding successful head: {final_solution_head}")
+                            logger.debug(f"Runtime.evaluate_rules: Yielding successful head: {final_solution_head} based on body solution {body_solution_item} and bindings {bindings_from_body}")
                             yield final_solution_head
-                        elif isinstance(body_solution_item, FALSE):
-                            logger.debug("Runtime.evaluate_rules: Body solution was FALSE. Trying next body solution or backtracking.")
             else: # match_bindings is None
                 logger.debug(f"Runtime.evaluate_rules: Match failed for DB rule {db_rule.head} with goal {goal_term}")
         logger.debug(f"Runtime.evaluate_rules: All DB rules tried for goal_term={goal_term}. Finished general rule matching.")
