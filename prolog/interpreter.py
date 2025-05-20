@@ -1,4 +1,5 @@
 import io
+from typing import cast
 from .types import (
     TermFunction,
     Variable,
@@ -260,16 +261,20 @@ class Runtime:
             current_bindings = {}
 
             # Handle "##special_unify##" for Var=Var
-            if isinstance(solution_item, Term) and solution_item.pred == "##special_unify##" and hasattr(solution_item, "bindings"):
-                logger.debug(f"Runtime.query: Processing special unification result. Bindings BEFORE yield: {solution_item.bindings}")
+            if isinstance(solution_item, Term) and solution_item.pred == "##special_unify##" and isinstance(solution_item.bindings, dict):
+                # Cast for Pylance, though isinstance should be enough
+                bindings_dict = cast(dict, solution_item.bindings)
+                logger.debug(f"Runtime.query: Processing special unification result. Bindings BEFORE yield: {bindings_dict}")
                 solution_count += 1
-                yield solution_item.bindings # Yield the full bidirectional bindings
-                logger.debug(f"Runtime.query: Bindings AFTER yield for ##special_unify##: {solution_item.bindings}")
+                yield bindings_dict # Yield the full bidirectional bindings
+                logger.debug(f"Runtime.query: Bindings AFTER yield for ##special_unify##: {bindings_dict}")
                 continue
 
             # Handle "=" for Var=Const, Const=Var, Const=Const (from previous fix)
-            if isinstance(solution_item, Term) and solution_item.pred == "=" and hasattr(solution_item, "bindings"):
-                for var, val in solution_item.bindings.items():
+            if isinstance(solution_item, Term) and solution_item.pred == "=" and isinstance(solution_item.bindings, dict):
+                # Cast for Pylance
+                bindings_dict = cast(dict, solution_item.bindings)
+                for var, val in bindings_dict.items(): # Use the cast variable
                     if var in query_vars:
                         current_bindings[var] = val
                 if current_bindings or not query_vars: 
@@ -385,55 +390,46 @@ class Runtime:
         logger.debug(f"Runtime.evaluate_rules: query_rule_obj={query_rule_obj}, goal_term={goal_term}")
 
         # '=' 演算子の特別処理
-        is_special_equals = False
-        if isinstance(goal_term, Term):
-            logger.debug(f"Runtime.evaluate_rules: goal_term is a Term instance.")
-            if hasattr(goal_term, 'pred') and goal_term.pred == '=':
-                logger.debug(f"Runtime.evaluate_rules: goal_term.pred is '='.")
-                if hasattr(goal_term, 'args') and len(goal_term.args) == 2:
-                    logger.debug(f"Runtime.evaluate_rules: goal_term has 2 arguments. Entering '=' special case logic for goal: {goal_term}")
-                    is_special_equals = True
-                    lhs, rhs = goal_term.args
-                    match_result = lhs.match(rhs)
-                    if match_result is not None:
-                        logger.debug(f"Runtime.evaluate_rules: '=': lhs.match(rhs) successful. lhs='{lhs}', rhs='{rhs}', match_result='{match_result}'")
-                        if isinstance(lhs, Variable) and isinstance(rhs, Variable):
-                            logger.debug(f"Runtime.evaluate_rules: '=': Var=Var case. lhs='{lhs}', rhs='{rhs}', initial match_result='{match_result}'")
-                            bidirectional_bindings = match_result.copy()
-                            logger.debug(f"Runtime.evaluate_rules: '=': Initial bidirectional_bindings (copied from match_result): '{bidirectional_bindings}'")
-                            if lhs in bidirectional_bindings and bidirectional_bindings[lhs] == rhs:
-                                logger.debug(f"Runtime.evaluate_rules: '=': Condition 1 met: lhs ('{lhs}') in bindings and maps to rhs ('{rhs}'). Setting rhs -> lhs.")
-                                bidirectional_bindings[rhs] = lhs
-                            elif rhs in bidirectional_bindings and bidirectional_bindings[rhs] == lhs:
-                                logger.debug(f"Runtime.evaluate_rules: '=': Condition 2 met: rhs ('{rhs}') in bindings and maps to lhs ('{lhs}'). Setting lhs -> rhs.")
-                                bidirectional_bindings[lhs] = rhs
-                            else:
-                                logger.debug(f"Runtime.evaluate_rules: '=': Conditions 1 & 2 not met. Defaulting to set both directions: {lhs} -> {rhs} and {rhs} -> {lhs}.")
-                                bidirectional_bindings[lhs] = rhs
-                                bidirectional_bindings[rhs] = lhs
-                            logger.debug(f"Runtime.evaluate_rules: '=': Final bidirectional_bindings for Var=Var: '{bidirectional_bindings}' (original match_result: '{match_result}')")
-                            term_with_bindings = Term("##special_unify##")
-                            term_with_bindings.bindings = bidirectional_bindings
-                            yield term_with_bindings
-                        else: # Var=Const, Const=Var, Const=Const
-                            logger.debug(f"Runtime.evaluate_rules: '=': Var/Const or Const/Const case. lhs='{lhs}', rhs='{rhs}', match_result='{match_result}'")
-                            special_solution = Term("=", lhs.substitute(match_result), rhs.substitute(match_result))
-                            special_solution.bindings = match_result
-                            yield special_solution
-                    else: # match_result is None
-                        logger.debug(f"Runtime.evaluate_rules: '=': lhs.match(rhs) FAILED. lhs='{lhs}', rhs='{rhs}'. No solution from this '=' path.")
-                    # '=' special case was attempted (either yielded or failed match). Stop further processing for this goal.
-                    return
-                else: # Arity not 2 or no args
-                    logger.debug(f"Runtime.evaluate_rules: goal_term.pred is '=', but arity is not 2 (or args missing). Actual arity: {len(goal_term.args) if hasattr(goal_term, 'args') else 'N/A'}. Not treating as special '='.")
-            else: # Pred not '='
-                logger.debug(f"Runtime.evaluate_rules: goal_term is Term, but pred is not '=' (pred='{goal_term.pred if hasattr(goal_term, 'pred') else 'N/A'}'). Not treating as special '='.")
-        else: # Not a Term
-            logger.debug(f"Runtime.evaluate_rules: goal_term is NOT a Term (type: '{type(goal_term)}'). Not treating as special '='.")
-
-        # If is_special_equals was true, we should have returned from inside the block.
-        # If we are here, it means it was not a special equals, or it didn't meet all criteria to be handled as such.
-        if not is_special_equals:
+        if isinstance(goal_term, Term) and goal_term.pred == '=':
+            if hasattr(goal_term, 'args') and len(goal_term.args) == 2:
+                lhs, rhs = goal_term.args
+                logger.debug(f"Runtime.evaluate_rules: Special handling for '=': {lhs} = {rhs}")
+                match_result = lhs.match(rhs)
+                
+                if match_result is not None:
+                    logger.debug(f"Runtime.evaluate_rules: '=' match successful: {match_result}")
+                    if isinstance(lhs, Variable) and isinstance(rhs, Variable):
+                        # 変数間の単一化は特殊処理
+                        logger.debug(f"Runtime.evaluate_rules: '=' Var=Var case: {lhs} = {rhs}")
+                        bidirectional_bindings = match_result.copy() # match_result should already be bidirectional from Variable.match
+                        
+                        # Ensure both directions are explicitly in this binding set for ##special_unify##
+                        # Variable.match now ensures X:Y and Y:X if both are Variables.
+                        # So, match_result itself should be correct.
+                        # For clarity and safety, we can re-assert, though it might be redundant
+                        # if Variable.match is correctly implemented.
+                        bidirectional_bindings[lhs] = rhs
+                        bidirectional_bindings[rhs] = lhs
+                        
+                        logger.debug(f"Runtime.evaluate_rules: '=' Var=Var bidirectional bindings: {bidirectional_bindings}")
+                        term_with_bindings = Term("##special_unify##")
+                        term_with_bindings.bindings = bidirectional_bindings
+                        yield term_with_bindings
+                    else:
+                        # Var=Const または Const=Const の場合
+                        logger.debug(f"Runtime.evaluate_rules: '=' Var/Const or Const/Const case: {lhs} = {rhs}")
+                        # The original behavior for non Var-Var cases:
+                        special_solution = Term("=", lhs.substitute(match_result), rhs.substitute(match_result))
+                        special_solution.bindings = match_result
+                        yield special_solution
+                else:
+                    # Match failed for '='
+                    logger.debug(f"Runtime.evaluate_rules: '=' match failed for: {lhs} = {rhs}")
+                    pass # Do not yield, effectively failing this path for '='
+                return # Crucial: after '=' handling (success or fail), return from evaluate_rules for this goal.
+        
+        # If we reach here, it was not a specially handled '=' goal, proceed with general rule matching.
+        # Note: The 'if not is_special_equals:' check is removed as the logic is now self-contained for '='.
             logger.debug(f"Runtime.evaluate_rules: Proceeding to general rule matching for goal_term='{goal_term}'.")
             for db_rule in self.all_rules(query_rule_obj):
                 logger.debug(f"Runtime.evaluate_rules: Trying DB rule: {db_rule}")
@@ -489,7 +485,8 @@ class Runtime:
 
                             if not isinstance(body_solution_item, FALSE):
                                 bindings_from_body = substituted_rule_body.match(body_solution_item)
-                                if bindings_from_body is None: bindings_from_body = {}
+                                if bindings_from_body is None:
+                                    bindings_from_body = {}
                                 final_solution_head = substituted_rule_head.substitute(bindings_from_body)
                                 logger.debug(f"Runtime.evaluate_rules: Yielding successful head: {final_solution_head}")
                                 yield final_solution_head
@@ -534,7 +531,8 @@ class Runtime:
                         return
 
                     bindings_from_body = query_obj.body.match(body_solution_bindings_or_term)
-                    if bindings_from_body is None: bindings_from_body = {}
+                    if bindings_from_body is None:
+                        bindings_from_body = {}
                     
                     yield query_obj.head.substitute(bindings_from_body)
 

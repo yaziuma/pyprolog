@@ -235,7 +235,7 @@ class Parser:
         logger.debug(f"Parser._parse_list after consuming '[': next token: {self._peek()}, index: {self._current}")
 
         if self._token_matches(TokenType.RIGHTBRACKET):
-            logger.debug(f"Parser._parse_list: detected empty list pattern")
+            logger.debug("Parser._parse_list: detected empty list pattern")
             self._advance()  # consume ']'
             result = Dot.from_list([])
             logger.debug(f"Parser._parse_list: parsed empty list with Dot.from_list([]): {result}, type: {type(result)}")
@@ -362,7 +362,8 @@ class Parser:
             current_predicate_name = token.lexeme 
 
             if not self._token_matches(TokenType.LEFTPAREN): 
-                if self._is_type(token, TokenType.NL): lhs_term = Nl()
+                if self._is_type(token, TokenType.NL):
+                    lhs_term = Nl()
                 elif self._is_type(token, TokenType.TAB): lhs_term = Tab()
                 else: lhs_term = Term(current_predicate_name)
             else: 
@@ -495,7 +496,7 @@ class Parser:
                 
             term_in_conj = self._parse_term()
             if term_in_conj is None:
-                logger.error(f"Parser._parse_query: Failed to parse term in conjunction")
+                logger.error("Parser._parse_query: Failed to parse term in conjunction")
                 return None
             args.append(term_in_conj)
 
