@@ -6,7 +6,7 @@ class Variable:
         self.name = name
 
     def match(self, other):
-        logger.debug(f"Variable.match({self}) called with other: {other}")
+        # logger.debug(f"Variable.match({self}) called with other: {other}")
         bindings = dict()
         if self != other:
             bindings[self] = other
@@ -15,7 +15,7 @@ class Variable:
             if isinstance(other, Variable):
                 bindings[other] = self
                 
-        logger.debug(f"Variable.match returning: {bindings}")
+        # logger.debug(f"Variable.match returning: {bindings}")
         return bindings
 
     def substitute(self, bindings, visited=None):
@@ -30,11 +30,11 @@ class Variable:
         Returns:
             置換された値、または自分自身
         """
-        logger.debug(f"Variable.substitute({self}) called with bindings: {bindings}")
+        # logger.debug(f"Variable.substitute({self}) called with bindings: {bindings}")
         
         # 防御的チェック
         if bindings is None:
-            logger.warning(f"Variable.substitute: bindings is None for {self}")
+            # logger.warning(f"Variable.substitute: bindings is None for {self}")
             return self
         
         # 循環検出用の初期化
@@ -43,7 +43,7 @@ class Variable:
         
         # 循環検出: この変数が既に訪問済みなら、それ以上置換せず自身を返す
         if self in visited:
-            logger.debug(f"Variable.substitute: Circular reference detected for {self}, returning self")
+            # logger.debug(f"Variable.substitute: Circular reference detected for {self}, returning self")
             return self
             
         # 変数を訪問済みとしてマーク
@@ -54,26 +54,26 @@ class Variable:
         if value is not None:
             # 自己参照の場合は自身を返す
             if value == self:
-                logger.debug(f"Variable.substitute: Self-reference detected for {self}, returning self")
+                # logger.debug(f"Variable.substitute: Self-reference detected for {self}, returning self")
                 return self
                 
             # 値が変数の場合、再帰的に置換する（循環検出付き）
             if isinstance(value, Variable):
                 result = value.substitute(bindings, visited)
-                logger.debug(f"Variable.substitute returning (from recursive value): {result}")
+                # logger.debug(f"Variable.substitute returning (from recursive value): {result}")
                 return result
             else:
                 # 値が変数でない場合、その値自体に置換メソッドがあれば呼び出す
                 if hasattr(value, 'substitute'):
                     result = value.substitute(bindings)
-                    logger.debug(f"Variable.substitute returning (from value.substitute): {result}")
+                    # logger.debug(f"Variable.substitute returning (from value.substitute): {result}")
                     return result
                 else:
-                    logger.debug(f"Variable.substitute returning (from value directly): {value}")
+                    # logger.debug(f"Variable.substitute returning (from value directly): {value}")
                     return value
         
         # バインディングがない場合は自身を返す
-        logger.debug(f"Variable.substitute returning (self): {self}")
+        # logger.debug(f"Variable.substitute returning (self): {self}")
         return self
 
     def __str__(self):
