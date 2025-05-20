@@ -448,13 +448,14 @@ class Runtime:
                     # Handle facts (rules with TRUE body)
                     if isinstance(db_rule.body, TRUE):
                         logger.debug(f"Runtime.evaluate_rules: Rule {db_rule} is a fact.")
-                        # Yield the goal term instantiated by the successful match.
-                        # This allows the caller (Conjunction or Runtime.query) to get the bindings.
-                        yielded_solution = goal_term.substitute(match_bindings)
-                        logger.debug(f"Runtime.evaluate_rules: Yielded fact solution: {yielded_solution}")
-                        yield yielded_solution
-                        # After yielding a solution for a fact, continue to the next rule in the DB,
-                        # as there might be other matching facts or rules.
+                        if not match_bindings:  # 空のバインディングの場合
+                            logger.debug(f"Runtime.evaluate_rules: Fact with empty bindings, yielding TRUE()")
+                            yield TRUE()
+                        else:
+                            # ゴールの中の変数に値を代入した結果を返す
+                            yielded_solution = goal_term.substitute(match_bindings)
+                            logger.debug(f"Runtime.evaluate_rules: Yielded fact solution: {yielded_solution}")
+                            yield yielded_solution
                         continue 
 
                     # If it's not a fact, then it's a rule with a body that needs further processing.
@@ -484,7 +485,6 @@ class Runtime:
                         # The original 'return' here was likely to stop after processing a rule with an '=' body.
                         # Let's keep it to mimic that behavior for now.
                         return
-
 
                     if isinstance(substituted_rule_body, Arithmetic):
                         logger.debug(f"Runtime.evaluate_rules: Body is Arithmetic: {substituted_rule_body}")
