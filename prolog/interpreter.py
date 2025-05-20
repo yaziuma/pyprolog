@@ -274,13 +274,15 @@ class Runtime:
 
             current_bindings = {}
 
-            # Handle "##special_unify##" for Var=Var
-            if isinstance(solution_item, Term) and solution_item.pred == "##special_unify##" and isinstance(solution_item.bindings, dict):
+            # Handle "##special_unify##" or "##special_unify_propagated##"
+            if isinstance(solution_item, Term) and \
+               (solution_item.pred == "##special_unify##" or solution_item.pred == "##special_unify_propagated##") and \
+               hasattr(solution_item, 'bindings') and isinstance(solution_item.bindings, dict): # Check hasattr for safety
                 bindings_dict = cast(dict, solution_item.bindings)
-                # logger.debug(f"Runtime.query: Processing special unification result. Bindings BEFORE yield: {bindings_dict}")
+                logger.debug(f"Runtime.query: Processing special unification result ({solution_item.pred}). Bindings BEFORE yield: {bindings_dict}")
                 solution_count += 1
                 yield bindings_dict 
-                # logger.debug(f"Runtime.query: Bindings AFTER yield for ##special_unify##: {bindings_dict}")
+                logger.debug(f"Runtime.query: Bindings AFTER yield for {solution_item.pred}: {bindings_dict}")
                 continue
 
             # Handle "=" for Var=Const, Const=Var, Const=Const
@@ -476,7 +478,10 @@ class Runtime:
                 else:
                     # logger.debug(f"Runtime.evaluate_rules: Body is not Arithmetic or '='. Calling self.execute for body: {substituted_rule_body}")
                     for body_solution_item in self.execute(substituted_rule_body): 
-                        # logger.debug(f"Runtime.evaluate_rules: Item from body execution: {body_solution_item}")
+                        logger.debug(f"Runtime.evaluate_rules: [Loop] body_solution_item: {body_solution_item}, type: {type(body_solution_item)}")
+                        if isinstance(body_solution_item, Term) and hasattr(body_solution_item, 'bindings') and body_solution_item.bindings is not None: # Added isinstance check
+                            logger.debug(f"Runtime.evaluate_rules: [Loop] body_solution_item.bindings: {body_solution_item.bindings}")
+                        
                         if isinstance(body_solution_item, CUT):
                             # logger.debug("Runtime.evaluate_rules: CUT signal received from body execution. Yielding CUT and returning.")
                             yield body_solution_item
@@ -486,9 +491,70 @@ class Runtime:
                             # logger.debug("Runtime.evaluate_rules: Body solution was FALSE. Trying next body solution or backtracking.")
                             continue 
 
-                        if isinstance(body_solution_item, Term) and body_solution_item.pred == "##special_unify##":
-                            # logger.debug(f"Runtime.evaluate_rules: Body yielded ##special_unify##. Propagating: {body_solution_item}")
-                            yield body_solution_item
+                        if isinstance(body_solution_item, Term) and body_solution_item.pred == "##special_unify##" and hasattr(body_solution_item, 'bindings'):
+                            logger.debug(f"Runtime.evaluate_rules: Body yielded ##special_unify##. substituted_rule_head: {substituted_rule_head}, special_bindings: {body_solution_item.bindings}")
+                            
+                            # Create a new Term that is a copy of the substituted_rule_head,
+                            # but carries the special predicate and the original special bindings.
+                            # This allows Runtime.query to identify it and use the correct bindings.
+                            propagated_special_term = substituted_rule_head.substitute(body_solution_item.bindings) # Apply bindings to head
+                            
+                            # Ensure propagated_special_term is a Term object if it's not already (e.g. if substitute returns a Variable)
+                            # This should not happen if head is a Term.
+                            if not isinstance(propagated_special_term, Term):
+                                # This case needs careful handling. If head substitution results in a non-Term,
+                                # how do we attach pred and bindings? For now, assume head is always a Term.
+                                logger.error(f"Substituted head is not a Term: {propagated_special_term}")
+                                # Fallback or raise error might be needed. For now, try to proceed.
+                                # This might occur if head was just a Variable, which is not typical for a rule head.
+                                # Let's assume substituted_rule_head is always a Term.
+
+                            # Create a new Term instance if substitute doesn't return one with the right structure,
+                            # or modify in place if safe.
+                            # For simplicity, let's assume substitute returns a new Term or we can modify it.
+                            # We need to be careful if substitute returns the *same* object or a Variable.
+                            # A robust way is to create a new Term if `propagated_special_term` is not already suitable.
+                            
+                            # If `substituted_rule_head.substitute` returns a Term, we can try to set its pred and bindings.
+                            # However, `Term.substitute` returns a *new* Term.
+                            
+                            # Let's create a new Term that wraps the structure of `propagated_special_term`
+                            # but has the special predicate and bindings.
+                            # This is getting complex. A simpler way might be to yield a tuple (term, bindings)
+                            # or a custom Solution object.
+                            # Given the current structure, modifying the yielded term is the path of least resistance.
+
+                            # The `propagated_special_term` is the result of `substituted_rule_head.substitute(...)`.
+                            # We want to attach the `body_solution_item.bindings` to this result.
+                            # And mark it so `Runtime.query` knows these are the *actual* bindings to use.
+                            
+                            # Create a new Term to carry this information
+                            # The arguments of this new Term will be the arguments of the `propagated_special_term`
+                            # The predicate will be "##special_unify_propagated##"
+                            # The bindings will be `body_solution_item.bindings`
+                            
+                            # If propagated_special_term is already a Term (which it should be if substituted_rule_head was)
+                            if isinstance(propagated_special_term, Term):
+                                final_yield_item = Term("##special_unify_propagated##", *propagated_special_term.args)
+                                final_yield_item.bindings = body_solution_item.bindings
+                            else:
+                                # This case is problematic: if `match(X,Y)` head becomes `X` after substitution.
+                                # For now, assume `propagated_special_term` is a Term.
+                                # If `substituted_rule_head` was `match(X,Y)` and bindings were `{X:a, Y:a}`,
+                                # `propagated_special_term` would be `match(a,a)`.
+                                # We want to yield something like `Term("##special_unify_propagated##", Term("a"), Term("a"))`
+                                # with `bindings = {X:Y, Y:X}` (the original special bindings).
+                                # This seems correct. The structure of the head is preserved in the args.
+                                logger.error(f"Propagated special term is not a Term: {propagated_special_term}. This should not happen for rule heads.")
+                                # Fallback: yield the original special unify term, but this loses the head structure.
+                                # yield body_solution_item 
+                                # This is not ideal. Let's stick to the assumption that propagated_special_term is a Term.
+                                final_yield_item = Term("##special_unify_propagated##") # Placeholder for error
+                                final_yield_item.bindings = body_solution_item.bindings
+
+
+                            logger.debug(f"Runtime.evaluate_rules: Propagating as {final_yield_item} with original special bindings {final_yield_item.bindings}")
+                            yield final_yield_item
                         else:
                             bindings_from_body = substituted_rule_body.match(body_solution_item)
                             if bindings_from_body is None:
@@ -535,6 +601,10 @@ class Runtime:
             if isinstance(query_obj, Rule):
                 # logger.debug(f"Runtime.execute: query_obj is Rule. Head: {query_obj.head}, Body: {query_obj.body}")
                 for body_solution_bindings_or_term in query_obj.body.query(self): 
+                    logger.debug(f"Runtime.execute (Rule): body_solution: {body_solution_bindings_or_term}")
+                    if isinstance(body_solution_bindings_or_term, Term) and hasattr(body_solution_bindings_or_term, 'bindings') and body_solution_bindings_or_term.bindings is not None:
+                        logger.debug(f"Runtime.execute (Rule): body_solution.bindings: {body_solution_bindings_or_term.bindings}")
+
                     if isinstance(body_solution_bindings_or_term, FALSE):
                         continue
                     if isinstance(body_solution_bindings_or_term, CUT): 
@@ -542,14 +612,44 @@ class Runtime:
                         return
 
                     bindings_from_body = {}
-                    if isinstance(body_solution_bindings_or_term, Term) and body_solution_bindings_or_term.pred == "##special_unify##" and hasattr(body_solution_bindings_or_term, 'bindings'):
+                    # If the body solution itself is a ##special_unify## or ##special_unify_propagated##,
+                    # its bindings are the ones we care about for substituting the head.
+                    if isinstance(body_solution_bindings_or_term, Term) and \
+                       (body_solution_bindings_or_term.pred == "##special_unify##" or body_solution_bindings_or_term.pred == "##special_unify_propagated##") and \
+                       hasattr(body_solution_bindings_or_term, 'bindings') and isinstance(body_solution_bindings_or_term.bindings, dict): # Ensure bindings is a dict
                         bindings_from_body = body_solution_bindings_or_term.bindings
+                        
+                        substituted_head = query_obj.head.substitute(bindings_from_body)
+                        # If the original body solution was special, mark the substituted_head as special too, carrying the same bindings.
+                        # This ensures that Runtime.query can extract the correct {X:Y, Y:X} bindings.
+                        if isinstance(substituted_head, Term): # Ensure substituted_head is a Term before setting attributes
+                            substituted_head.pred = body_solution_bindings_or_term.pred # Carry over the special predicate
+                            substituted_head.bindings = body_solution_bindings_or_term.bindings # Carry over the special bindings
+                            logger.debug(f"Runtime.execute (Rule): substituted_head (from special): {substituted_head} with bindings {substituted_head.bindings}")
+                            yield substituted_head
+                        else:
+                            # This case should ideally not happen if query_obj.head is a Term.
+                            # If it does, we might need to wrap it or handle it differently.
+                            logger.error(f"Runtime.execute (Rule): Substituted head is not a Term: {substituted_head}. Yielding original special term.")
+                            yield body_solution_bindings_or_term # Fallback, might not be what Runtime.query expects
+                    
+                    elif isinstance(body_solution_bindings_or_term, dict): # If body solution is already a dict of bindings
+                        bindings_from_body = body_solution_bindings_or_term
+                        substituted_head = query_obj.head.substitute(bindings_from_body)
+                        logger.debug(f"Runtime.execute (Rule): substituted_head (from dict bindings): {substituted_head}, from bindings: {bindings_from_body}")
+                        yield substituted_head
+
                     else:
+                        # Standard case: match body with solution to get bindings
+                        # This path might be hit if body_solution_bindings_or_term is a simple Term (e.g. a fact)
+                        # or if it's a Conjunction result.
                         match_result = query_obj.body.match(body_solution_bindings_or_term)
                         if match_result is not None:
                             bindings_from_body = match_result
-                    
-                    yield query_obj.head.substitute(bindings_from_body)
+                        
+                        substituted_head = query_obj.head.substitute(bindings_from_body)
+                        logger.debug(f"Runtime.execute (Rule): substituted_head (normal): {substituted_head}, from bindings: {bindings_from_body}")
+                        yield substituted_head
 
             else: 
                 # logger.debug(f"Runtime.execute: query_obj is Term: {query_obj}. Goal to evaluate is same.")
