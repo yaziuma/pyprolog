@@ -1,4 +1,5 @@
 from functools import reduce
+from typing import Optional, Dict, Any # Add Optional, Dict, Any
 from .math_interpreter import MathInterpreter
 from .logic_interpreter import LogicInterpreter
 from .expression import Visitor, PrimaryExpression, BinaryExpression
@@ -306,7 +307,7 @@ class Term:
         # logger.debug(f"Term initialized with pred: {pred}, args: {args}") # Can be very verbose
         self.pred = pred
         self.args = list(args)
-        self.bindings = None # Add bindings attribute
+        self.bindings: Optional[Dict[Any, Any]] = None # Add type hint for bindings
 
     def match(self, other):
         logger.debug(f"Term.match({self}) called with other: {other}")
