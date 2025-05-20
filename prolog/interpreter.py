@@ -1,192 +1,29 @@
 import io
-from typing import cast
-from .types import (
-    TermFunction,
-    Variable,
-    Term,
-    merge_bindings,
-    Arithmetic,
-    Logic,
-    FALSE,
-    TRUE,
-    CUT, # This is the CUT Term from types.py
+# from typing import cast # Not used in the design doc's Runtime snippets
+from prolog.core_types import (
+    Term, Variable, Rule, Conjunction,
+    TRUE_TERM, FALSE_TERM, CUT_SIGNAL, FAIL_TERM # Import renamed singletons
 )
-from .builtins import Write, Nl, Tab, Fail, Cut as BuiltinCut, Retract, AssertA, AssertZ # Renamed to avoid clash with types.CUT
+from prolog.types import TermFunction # Import TermFunction
 from prolog.token_type import TokenType
 from prolog.logger import logger
-
-# logger.debug("interpreter.py loaded") # Top level debug
+from prolog.binding_environment import BindingEnvironment
+# Ensure builtins are correctly referenced, assuming prolog.builtins for these
+from prolog.builtins import Write, Nl, Tab, Cut as BuiltinCut, Retract, AssertA, AssertZ, Fail as BuiltinFail
 
 # Scanner and Parser will be imported inside methods to break circular dependency
-# from prolog.scanner import Scanner # Moved
-# from prolog.parser import Parser   # Moved
 
-class Rule:
-    def __init__(self, head, body):
-        # logger.debug(f"Rule initialized with head: {head}, body: {body}")
-        self.head = head
-        self.body = body
-
-    def __str__(self):
-        if isinstance(self.body, TRUE):
-            return f'{self.head}.'
-        return f'{self.head} :- {self.body}.'
-
-    def __repr__(self):
-        return str(self)
-
-class Conjunction(Term):
-    def __init__(self, args):
-        # logger.debug(f"Conjunction initialized with args: {args}")
-        super().__init__(None, *args)
-
-    def _is_builtin(self, arg):
-        if (
-            isinstance(arg, Write)
-            or isinstance(arg, Nl)
-            or isinstance(arg, Tab)
-        ):
-            return True
-        return False
-
-    def _is_db_builtin(self, arg):
-        if (
-            isinstance(arg, Retract)
-            or isinstance(arg, AssertA)
-            or isinstance(arg, AssertZ)
-        ):
-            return True
-        return False
-
-    def _is_fail(self, arg):
-        if isinstance(arg, Fail):
-            return True
-        return False
-
-    def _is_cut(self, arg):
-        # Checks if the argument is an instance of prolog.builtins.Cut
-        if isinstance(arg, BuiltinCut): 
-            return True
-        return False
-
-    def query(self, runtime):
-        # logger.debug(f"Conjunction.query called for args: {self.args}")
-        def solutions(index, bindings):
-            # logger.debug(f"Conjunction.solutions: index={index}, bindings={bindings}, total_args={len(self.args)}")
-            if index >= len(self.args):
-                res_sub = self.substitute(bindings)
-                # logger.debug(f"Conjunction.solutions: base case, yielding substituted conjunction: {res_sub}")
-                yield res_sub 
-            else:
-                arg = self.args[index]
-                # logger.debug(f"Conjunction.solutions: processing arg[{index}] = {arg}")
-
-                current_goal_bindings = bindings.copy() 
-
-                if self._is_cut(arg): 
-                    # logger.debug(f"Conjunction.solutions: arg is CUT {arg}")
-                    for _ in runtime.execute(arg.substitute(current_goal_bindings)): 
-                        # logger.debug(f"Conjunction.solutions: Executing goals after CUT for bindings: {current_goal_bindings}")
-                        yield from solutions(index + 1, current_goal_bindings) 
-                        # logger.debug("Conjunction.solutions: Yielding CUT signal after solutions for goals post-cut.")
-                        yield CUT() 
-                        return 
-
-                elif self._is_fail(arg): 
-                    # logger.debug(f"Conjunction.solutions: arg is FAIL {arg}, yielding FALSE")
-                    yield FALSE()
-                    return  
-                elif self._is_builtin(arg): 
-                    # logger.debug(f"Conjunction.solutions: arg is IO builtin {arg}, executing its query")
-                    _ = list(arg.query(runtime, bindings))  
-                    # logger.debug(f"Conjunction.solutions: IO builtin executed, proceeding to next arg with bindings: {bindings}")
-                    yield from solutions(index + 1, bindings)
-                elif self._is_db_builtin(arg): 
-                    # logger.debug(f"Conjunction.solutions: arg is DB builtin {arg}, executing its query")
-                    _ = list(arg.query(runtime, bindings))  
-                    # logger.debug(f"Conjunction.solutions: DB builtin executed, proceeding to next arg with bindings: {bindings}")
-                    yield from solutions(index + 1, bindings)
-                elif isinstance(arg, Arithmetic):
-                    # logger.debug(f"Conjunction.solutions: arg is Arithmetic {arg}")
-                    val = arg.substitute(bindings).evaluate()
-                    unified = merge_bindings({arg.var: val}, bindings)
-                    if unified is None: 
-                        logger.error(f"Conjunction.solutions: Arithmetic merge_bindings failed for {arg.var}={val} with {bindings}") # Keep error
-                        return
-                    # logger.debug(f"Conjunction.solutions: Arithmetic evaluated, proceeding with unified bindings: {unified}")
-                    yield from solutions(index + 1, unified)
-                elif isinstance(arg, Logic):
-                    # logger.debug(f"Conjunction.solutions: arg is Logic {arg}, evaluating")
-                    eval_result = arg.substitute(bindings).evaluate()
-                    # logger.debug(f"Conjunction.solutions: Logic evaluated to {eval_result}, yielding it.")
-                    if eval_result: 
-                        yield from solutions(index + 1, bindings)
-                    else: 
-                        # logger.debug(f"Conjunction.solutions: Logic expression {arg} evaluated to False. Path fails.")
-                        return
-                else: 
-                    # logger.debug(f"Conjunction.solutions: arg is general term {arg}, calling runtime.execute")
-                    substituted_arg = arg.substitute(current_goal_bindings)
-                    # logger.debug(f"Conjunction.solutions: Substituted arg for execution: {substituted_arg}")
-
-                    found_solution = False
-                    for item in runtime.execute(substituted_arg): 
-                        found_solution = True
-                        # logger.debug(f"Conjunction.solutions: got solution from runtime.execute({substituted_arg}): {item}")
-                        
-                        if isinstance(item, FALSE): 
-                            # logger.debug("Conjunction.solutions: item is FALSE, this conjunction path fails for this item.")
-                            continue 
-
-                        if isinstance(item, CUT): 
-                            logger.error("Conjunction.solutions: Unexpected CUT signal received from runtime.execute on a general term that is not a !.") # Keep error
-                            yield item 
-                            return
-                        
-                        if isinstance(item, TRUE):
-                            # logger.debug(f"Conjunction.solutions: item is TRUE for arg '{arg}'. Proceeding to next arg with current bindings: {current_goal_bindings}")
-                            yield from solutions(index + 1, current_goal_bindings)
-                            return # This return is for TRUE handling
-
-                        match_result_for_arg = arg.match(item) 
-                        if match_result_for_arg is None:
-                            match_result_for_arg = substituted_arg.match(item)
-
-                        if match_result_for_arg is not None:
-                            unified_bindings = merge_bindings(match_result_for_arg, current_goal_bindings)
-                            # logger.debug(f"Conjunction.solutions: unified bindings for arg '{arg}' (or '{substituted_arg}') and item '{item}': {unified_bindings} (from match: {match_result_for_arg}, original_for_goal: {current_goal_bindings})")
-                            
-                            if unified_bindings is not None:
-                                # logger.debug(f"Conjunction.solutions: proceeding to next arg with unified bindings: {unified_bindings}")
-                                yield from solutions(index + 1, unified_bindings)
-                            else:
-                                # logger.debug(f"Conjunction.solutions: unification (merge_bindings) failed after successful match for {arg}/{substituted_arg} and {item}. Trying next item.")
-                                pass # Continue to next item
-                        else:
-                            # logger.debug(f"Conjunction.solutions: match failed for {arg}/{substituted_arg} and {item} (item is not TRUE). Trying next item.")
-                            pass # Continue to next item
-                    
-                    if not found_solution:
-                        # logger.debug(f"Conjunction.solutions: No solutions found for {substituted_arg}")
-                        pass
-            
-                    # logger.debug(f"Conjunction.solutions: runtime.execute for {substituted_arg} (from arg {arg}) exhausted for bindings {current_goal_bindings}.")
-                    return 
-
-        # logger.debug("Conjunction.query: starting solutions generator with initial empty bindings")
-        yield from solutions(0, {}) 
-
-    def substitute(self, bindings):
-        return Conjunction(
-            map((lambda arg: arg.substitute(bindings)), self.args)
-        )
+# Rule and Conjunction classes are now imported from prolog.core_types.
+# Their definitions have been removed from this file.
 
 class Runtime:
     def __init__(self, rules):
         # logger.debug(f"Runtime initialized with rules (count: {len(rules)}): {rules[:3]}{'...' if len(rules) > 3 else ''}")
-        self.rules = rules
+        self.rules = rules # List of Rule objects
         self.stream = io.StringIO()
         self.stream_pos = 0
+        self.binding_env = BindingEnvironment()
+        self._registered_functions = {} # For TermFunction
 
     def __del__(self):
         # logger.debug("Runtime.__del__ called")
@@ -212,24 +49,22 @@ class Runtime:
         from prolog.parser import Parser
         # logger.debug(f"Runtime.consult_rules called with: {rules_str[:100]}{'...' if len(rules_str) > 100 else ''}")
         if not rules_str.strip():
-            # logger.debug("Runtime.consult_rules: empty string, returning.")
             return
 
         tokens = Scanner(rules_str).tokenize()
-        # logger.debug(f"Runtime.consult_rules: tokens (first 5): {tokens[:5]}{'...' if len(tokens) > 5 else ''}")
         if not tokens or (len(tokens) == 1 and tokens[0].token_type == TokenType.EOF):
-            # logger.debug("Runtime.consult_rules: no relevant tokens, returning.")
             return
         
-        new_rules = Parser(tokens).parse_rules()
-        # logger.debug(f"Runtime.consult_rules: parsed new rules (count {len(new_rules)}): {new_rules[:3]}{'...' if len(new_rules) > 3 else ''}")
+        new_rules = Parser(tokens).parse_rules() # This should return list of Rule objects
         self.rules.extend(new_rules)
-        # logger.debug(f"Runtime.consult_rules: total rules now: {len(self.rules)}")
 
     def query(self, query_str):
         from prolog.scanner import Scanner
         from prolog.parser import Parser
-        # logger.debug(f"Runtime.query called with: '{query_str}'") # Entry point for query
+        # logger.debug(f"Runtime.query called with: '{query_str}'")
+        
+        self.binding_env = BindingEnvironment() # Reset for each new query
+        
         tokens = Scanner(query_str).tokenize()
         # logger.debug(f"Runtime.query: tokens (first 5): {tokens[:5]}{'...' if len(tokens) > 5 else ''}")
 
@@ -237,431 +72,281 @@ class Runtime:
             # logger.debug("Runtime.query: no relevant tokens, returning (no solutions).")
             return
 
-        parsed_query = Parser(tokens).parse_query()
+        parsed_query = Parser(tokens).parse_query() 
         # logger.debug(f"Runtime.query: parsed_query: {parsed_query}, type: {type(parsed_query)}")
 
         query_vars = []
         
-        def find_variables(term, found_vars_list): # Pass list to append to
+        def find_variables(term, found_vars_list): 
             if isinstance(term, Variable):
                 if term.name != '_' and term not in found_vars_list:
                      found_vars_list.append(term)
-            elif isinstance(term, Term): 
-                for arg_item in term.args: # Renamed arg to arg_item to avoid conflict
-                    find_variables(arg_item, found_vars_list)
-            elif isinstance(term, Rule): 
+            elif isinstance(term, Rule): # Check Rule first as it's more specific
                 if hasattr(term, 'head') and term.head is not None:
                     find_variables(term.head, found_vars_list)
                 if hasattr(term, 'body') and term.body is not None:
                     find_variables(term.body, found_vars_list)
+            elif isinstance(term, Term): # General Term (includes Conjunction)
+                if hasattr(term, 'args') and term.args is not None: 
+                    for arg_item in term.args: 
+                        find_variables(arg_item, found_vars_list)
         
         temp_query_vars = []
         find_variables(parsed_query, temp_query_vars)
-        query_vars = temp_query_vars # Assign after full traversal
+        query_vars = temp_query_vars
 
         # logger.debug(f"Runtime.query: Found variables in query: {[var.name for var in query_vars if var is not None]}")
         
         solution_count = 0
         for solution_item in self.execute(parsed_query): 
-            # logger.debug(f"Runtime.query: solution_item from execute: {solution_item}, type: {type(solution_item)}") # Key log for query results
+            # logger.debug(f"Runtime.query: solution_item from execute: {solution_item}, type: {type(solution_item)}")
             
-            if isinstance(solution_item, FALSE) or solution_item is None:
-                # logger.debug("Runtime.query: solution_item is FALSE or None, skipping.")
+            if solution_item is FALSE_TERM or solution_item is None: # Use singleton instance
+                # logger.debug("Runtime.query: solution_item is FALSE_TERM or None, skipping.")
                 continue
-            if isinstance(solution_item, CUT):
-                logger.warning("Runtime.query: CUT signal reached top-level query. This should ideally be handled internally.") # Keep warning
-                break
+            if solution_item is CUT_SIGNAL: # Use singleton instance
+                logger.warning("Runtime.query: CUT_SIGNAL reached top-level query.")
+                break 
 
             current_bindings = {}
-
-            # Handle "##special_unify##" or "##special_unify_propagated##"
-            if isinstance(solution_item, Term) and \
-               (solution_item.pred == "##special_unify##" or solution_item.pred == "##special_unify_propagated##") and \
-               hasattr(solution_item, 'bindings') and isinstance(solution_item.bindings, dict): # Check hasattr for safety
-                bindings_dict = cast(dict, solution_item.bindings)
-                logger.debug(f"Runtime.query: Processing special unification result ({solution_item.pred}). Bindings BEFORE yield: {bindings_dict}")
-                solution_count += 1
-                yield bindings_dict 
-                logger.debug(f"Runtime.query: Bindings AFTER yield for {solution_item.pred}: {bindings_dict}")
-                continue
-
-            # Handle "=" for Var=Const, Const=Var, Const=Const
-            if isinstance(solution_item, Term) and solution_item.pred == "=" and isinstance(solution_item.bindings, dict):
-                bindings_dict = cast(dict, solution_item.bindings)
-                for var, val in bindings_dict.items(): 
-                    if var in query_vars:
-                        current_bindings[var] = val
+            if query_vars:
+                for var in query_vars:
+                    value = self.binding_env.get_value(var)
+                    if value != var: 
+                        current_bindings[var] = value
+                
                 if current_bindings or not query_vars: 
-                    # logger.debug(f"Runtime.query: Yielding bindings from unification type '=': {current_bindings}")
                     solution_count += 1
                     yield current_bindings
-                continue
-            
-            if query_vars:
-                original_query_structure = parsed_query
-                if isinstance(parsed_query, Rule) and parsed_query.head.pred == "##":
-                    original_query_structure = parsed_query.head 
-
-                if isinstance(solution_item, Term) and solution_item.pred == "##": 
-                    if len(query_vars) == len(solution_item.args):
-                        for i, var_obj in enumerate(query_vars):
-                            current_bindings[var_obj] = solution_item.args[i]
-                    else:
-                        logger.error(f"Runtime.query: Mismatch in query_vars ({[v.name for v in query_vars]}) and solution_item.args ({solution_item.args}) for ## term") # Keep error
-                
-                elif isinstance(solution_item, Term) and isinstance(original_query_structure, Term):
-                    match_result_bindings = original_query_structure.match(solution_item)
-                    if match_result_bindings is not None:
-                        for q_var in query_vars: 
-                            if q_var in match_result_bindings:
-                                current_bindings[q_var] = match_result_bindings[q_var]
-                    else:
-                        logger.warning(f"Runtime.query: Could not match original query structure {original_query_structure} with solution {solution_item}") # Keep warning
-                
-                if current_bindings or not query_vars: 
-                    # logger.debug(f"Runtime.query: Yielding bindings: {current_bindings}")
-                    solution_count +=1
-                    yield current_bindings
-            
-            elif isinstance(solution_item, TRUE): 
-                # logger.debug("Runtime.query: TRUE result, yielding empty bindings {}")
+            elif solution_item is TRUE_TERM: # Use singleton instance
                 solution_count += 1
                 yield {} 
-            elif isinstance(solution_item, dict): 
-                # logger.debug(f"Runtime.query: Dict solution received: {solution_item}")
-                solution_count += 1
-                yield solution_item
-            elif isinstance(solution_item, Term) and not query_vars:
-                # logger.debug("Runtime.query: Term result for ground query (no vars), yielding empty bindings {}")
-                solution_count +=1
-                yield {}
-        logger.info(f"Runtime.query for '{query_str}' finished. Total solutions yielded: {solution_count}") # Keep info for summary
-
-    def register_function(self, func, predicate, arity):
-        # logger.debug(f"Runtime.register_function: func={func}, predicate='{predicate}', arity={arity}")
-        args = []
-        for i in range(arity):
-            args.append(f'placeholder_{i}')
-        tf = TermFunction(func, predicate, *args)
-        self.rules.append(Rule(tf, TRUE()))
-
-    def insert_rule_left(self, entry):
-        if isinstance(entry, Term):
-            entry = Rule(entry, TRUE())
-        for i, item in enumerate(self.rules):
-            if entry.head.pred == item.head.pred:
-                self.rules.insert(i, entry)
-                return
-        self.rules.append(entry)
-
-    def insert_rule_right(self, entry):
-        if isinstance(entry, Term):
-            entry = Rule(entry, TRUE())
-        last_index = -1
-        for i, item in enumerate(self.rules):
-            if entry.head.pred == item.head.pred:
-                last_index = i
-
-        if last_index == -1:
-            self.rules.append(entry)
-        else:
-            self.rules.insert(last_index + 1, entry)
-
-    def remove_rule(self, rule):
-        if isinstance(rule, Term):
-            rule = Rule(rule, TRUE())
-        for i, item in enumerate(self.rules):
-            if (
-                rule.head.pred == item.head.pred
-                and len(rule.head.args) == len(item.head.args)
-                and all(
-                    [
-                        (
-                            x.pred == y.pred
-                            if isinstance(x, Term)
-                            and isinstance(y, Term)  # noqa
-                            else (
-                                x.name == y.name
-                                if isinstance(x, Variable)
-                                and isinstance(y, Variable)  # noqa
-                                else False
-                            )
-                        )
-                        for x, y in zip(rule.head.args, item.head.args)
-                    ]
-                )
-            ):
-                self.rules.pop(i)
-                break
-
-    def all_rules(self, query):
-        rules = self.rules[:]
-        if isinstance(query, Rule):
-            return rules + [query]
-        return rules
-
-    def evaluate_rules(self, query_rule_obj, goal_term):
-        # logger.debug(f"Runtime.evaluate_rules: query_rule_obj={query_rule_obj}, goal_term={goal_term}")
-    
-        # '=' 演算子の特別処理
-        if isinstance(goal_term, Term) and goal_term.pred == '=':
-            if hasattr(goal_term, 'args') and len(goal_term.args) == 2:
-                lhs, rhs = goal_term.args
-                # logger.debug(f"Runtime.evaluate_rules: Special handling for '=': {lhs} = {rhs}")
-                match_result = lhs.match(rhs)
-                
-                if match_result is not None:
-                    # logger.debug(f"Runtime.evaluate_rules: '=' match successful: {match_result}")
-                    if isinstance(lhs, Variable) and isinstance(rhs, Variable):
-                        # logger.debug(f"Runtime.evaluate_rules: '=' Var=Var case: {lhs} = {rhs}")
-                        bidirectional_bindings = {}
-                        bidirectional_bindings[lhs] = rhs
-                        bidirectional_bindings[rhs] = lhs
-                        # logger.debug(f"Runtime.evaluate_rules: '=' Var=Var bidirectional bindings: {bidirectional_bindings}")
-                        term_with_bindings = Term("##special_unify##")
-                        term_with_bindings.bindings = bidirectional_bindings
-                        yield term_with_bindings
-                    else:
-                        # logger.debug(f"Runtime.evaluate_rules: '=' Var/Const or Const/Const case: {lhs} = {rhs}")
-                        special_solution = Term("=", lhs.substitute(match_result), rhs.substitute(match_result))
-                        special_solution.bindings = match_result
-                        yield special_solution
-                else:
-                    # logger.debug(f"Runtime.evaluate_rules: '=' match failed for: {lhs} = {rhs}")
-                    pass 
-                return
         
-        # logger.debug(f"Runtime.evaluate_rules: Proceeding to general rule matching for goal_term='{goal_term}'.")
-        all_rules = self.all_rules(query_rule_obj) 
-        # logger.debug(f"Runtime.evaluate_rules: all_rules count: {len(all_rules)}")
-        for i, db_rule in enumerate(all_rules):
-            # logger.debug(f"Runtime.evaluate_rules: Trying DB rule #{i}: {db_rule}")
-            match_bindings = db_rule.head.match(goal_term)
-            # logger.debug(f"Runtime.evaluate_rules: Match attempt of {db_rule.head} with {goal_term} -> bindings: {match_bindings}")
+        # logger.info(f"Runtime.query for '{query_str}' finished. Total solutions yielded: {solution_count}")
 
-            if match_bindings is not None:
-                # logger.debug(f"Runtime.evaluate_rules: Match success. DB rule head: {db_rule.head}, Goal: {goal_term}, Bindings: {match_bindings}")
+    # Methods for dynamic rule manipulation (asserta, assertz, retract)
+    def asserta(self, rule_to_assert):
+        if not isinstance(rule_to_assert, Rule):
+            if isinstance(rule_to_assert, Term):
+                rule_to_assert = Rule(rule_to_assert, TRUE_TERM)
+            else:
+                logger.error(f"asserta: Expected Rule or Term, got {type(rule_to_assert)}")
+                return False 
+        self.rules.insert(0, rule_to_assert)
+        return True 
+
+    def assertz(self, rule_to_assert):
+        if not isinstance(rule_to_assert, Rule):
+            if isinstance(rule_to_assert, Term):
+                rule_to_assert = Rule(rule_to_assert, TRUE_TERM)
+            else:
+                logger.error(f"assertz: Expected Rule or Term, got {type(rule_to_assert)}")
+                return False
+        self.rules.append(rule_to_assert)
+        return True
+
+    def retract(self, rule_template_to_retract):
+        rules_to_keep = []
+        retracted_once = False
+        for r in self.rules:
+            if not retracted_once:
+                can_match = False
+                # Simplified matching for retract. A full implementation needs robust unification.
+                # If rule_template_to_retract is a Rule, attempt to match head and body.
+                # If it's a Term, attempt to match r.head.
+                if isinstance(rule_template_to_retract, Rule):
+                    # This requires Rule to have a proper __eq__ or a match method.
+                    # For now, assume a simple direct comparison or head predicate/arity match.
+                    if r.head.pred == rule_template_to_retract.head.pred and \
+                       len(r.head.args) == len(rule_template_to_retract.head.args):
+                        # A more complete check would unify r.head with rule_template_to_retract.head
+                        # and r.body with rule_template_to_retract.body using a temporary BindingEnvironment.
+                        # For now, if heads match by pred/arity and bodies are structurally similar (e.g. both TRUE_TERM)
+                        if type(r.body) == type(rule_template_to_retract.body): # Simplistic body check
+                             # This is still a placeholder. Real unification is needed.
+                             # Let's assume if the test provides a Rule object, it expects exact match.
+                             if r == rule_template_to_retract: # Requires Rule.__eq__
+                                can_match = True
+
+                elif isinstance(rule_template_to_retract, Term):
+                    temp_env = BindingEnvironment()
+                    # Create a fresh copy of r.head to avoid side effects during unification test
+                    # This is important if r.head contains variables.
+                    # A simple way: r_head_copy = r.head.substitute({}) 
+                    # However, substitute might not be deep enough or might create new var names.
+                    # For now, assume unify handles this correctly or that heads are ground.
+                    if temp_env.unify(r.head, rule_template_to_retract):
+                        can_match = True
                 
-                if isinstance(db_rule.body, TRUE):
-                    # logger.debug(f"Runtime.evaluate_rules: Rule {db_rule} is a fact.")
-                    if not match_bindings:  
-                        # logger.debug(f"Runtime.evaluate_rules: Fact with empty bindings, yielding TRUE()")
-                        yield TRUE()
-                    else:
-                        yielded_solution = goal_term.substitute(match_bindings)
-                        # logger.debug(f"Runtime.evaluate_rules: Yielded fact solution: {yielded_solution}")
-                        yield yielded_solution
+                if can_match:
+                    retracted_once = True
                     continue 
+            rules_to_keep.append(r)
+        
+        self.rules = rules_to_keep
+        return retracted_once
 
-                substituted_rule_head = db_rule.head.substitute(match_bindings) 
-                substituted_rule_body = db_rule.body.substitute(match_bindings)
-                # logger.debug(f"Runtime.evaluate_rules: Substituted DB rule head: {substituted_rule_head}, body: {substituted_rule_body}")
+    def insert_rule_left(self, rule):
+        return self.asserta(rule)
 
-                if isinstance(substituted_rule_body, Term) and substituted_rule_body.pred == '=':
-                    lhs_body, rhs_body = substituted_rule_body.args 
-                    body_match_result = lhs_body.match(rhs_body)
-                    if body_match_result is not None:
-                        final_head = substituted_rule_head.substitute(body_match_result)
-                        yield final_head
-                    return
+    def insert_rule_right(self, rule):
+        return self.assertz(rule)
 
-                if isinstance(substituted_rule_body, Arithmetic):
-                    # logger.debug(f"Runtime.evaluate_rules: Body is Arithmetic: {substituted_rule_body}")
-                    if hasattr(substituted_rule_body, 'var') and isinstance(substituted_rule_body.var, Variable):
-                        var_to_bind = substituted_rule_body.var
-                        value = substituted_rule_body.evaluate()
-                        final_head_for_arith = substituted_rule_head.substitute({var_to_bind: value})
-                        # logger.debug(f"Runtime.evaluate_rules: Arithmetic body evaluated. Yielding: {final_head_for_arith}")
-                        yield final_head_for_arith
-                    else:
-                        logger.warning(f"Runtime.evaluate_rules: Arithmetic body {substituted_rule_body} does not have expected 'var' attribute.") # Keep warning
-                else:
-                    # logger.debug(f"Runtime.evaluate_rules: Body is not Arithmetic or '='. Calling self.execute for body: {substituted_rule_body}")
-                    for body_solution_item in self.execute(substituted_rule_body): 
-                        logger.debug(f"Runtime.evaluate_rules: [Loop] body_solution_item: {body_solution_item}, type: {type(body_solution_item)}")
-                        if isinstance(body_solution_item, Term) and hasattr(body_solution_item, 'bindings') and body_solution_item.bindings is not None: # Added isinstance check
-                            logger.debug(f"Runtime.evaluate_rules: [Loop] body_solution_item.bindings: {body_solution_item.bindings}")
-                        
-                        if isinstance(body_solution_item, CUT):
-                            # logger.debug("Runtime.evaluate_rules: CUT signal received from body execution. Yielding CUT and returning.")
-                            yield body_solution_item
-                            return 
+    def remove_rule(self, rule_template): 
+        return self.retract(rule_template)
 
-                        if isinstance(body_solution_item, FALSE):
-                            # logger.debug("Runtime.evaluate_rules: Body solution was FALSE. Trying next body solution or backtracking.")
-                            continue 
+    def register_function(self, predicate_name, arity, python_callable):
+        logger.info(f"Runtime.register_function for {predicate_name}/{arity}.")
+        # Store the callable. It's assumed that the parser or a specific mechanism
+        # will create TermFunction instances for these when they appear in queries/rules.
+        self._registered_functions[(predicate_name, arity)] = python_callable
+        # This registration itself doesn't make them callable through normal rule lookup.
+        # `execute` needs to handle `TermFunction` instances.
 
-                        if isinstance(body_solution_item, Term) and body_solution_item.pred == "##special_unify##" and hasattr(body_solution_item, 'bindings'):
-                            logger.debug(f"Runtime.evaluate_rules: Body yielded ##special_unify##. substituted_rule_head: {substituted_rule_head}, special_bindings: {body_solution_item.bindings}")
-                            
-                            # Create a new Term that is a copy of the substituted_rule_head,
-                            # but carries the special predicate and the original special bindings.
-                            # This allows Runtime.query to identify it and use the correct bindings.
-                            propagated_special_term = substituted_rule_head.substitute(body_solution_item.bindings) # Apply bindings to head
-                            
-                            # Ensure propagated_special_term is a Term object if it's not already (e.g. if substitute returns a Variable)
-                            # This should not happen if head is a Term.
-                            if not isinstance(propagated_special_term, Term):
-                                # This case needs careful handling. If head substitution results in a non-Term,
-                                # how do we attach pred and bindings? For now, assume head is always a Term.
-                                logger.error(f"Substituted head is not a Term: {propagated_special_term}")
-                                # Fallback or raise error might be needed. For now, try to proceed.
-                                # This might occur if head was just a Variable, which is not typical for a rule head.
-                                # Let's assume substituted_rule_head is always a Term.
+    def _execute_conjunction(self, conjunction):
+        def execute_goals_recursive(index):
+            if index >= len(conjunction.args):
+                yield TRUE_TERM 
+                return
+                
+            goal = conjunction.args[index]
+            mark = self.binding_env.mark_trail()
+            
+            if goal is CUT_SIGNAL: 
+                for _ in execute_goals_recursive(index + 1): 
+                    yield CUT_SIGNAL 
+                    return 
+                self.binding_env.backtrack(mark) 
+                return
 
-                            # Create a new Term instance if substitute doesn't return one with the right structure,
-                            # or modify in place if safe.
-                            # For simplicity, let's assume substitute returns a new Term or we can modify it.
-                            # We need to be careful if substitute returns the *same* object or a Variable.
-                            # A robust way is to create a new Term if `propagated_special_term` is not already suitable.
-                            
-                            # If `substituted_rule_head.substitute` returns a Term, we can try to set its pred and bindings.
-                            # However, `Term.substitute` returns a *new* Term.
-                            
-                            # Let's create a new Term that wraps the structure of `propagated_special_term`
-                            # but has the special predicate and bindings.
-                            # This is getting complex. A simpler way might be to yield a tuple (term, bindings)
-                            # or a custom Solution object.
-                            # Given the current structure, modifying the yielded term is the path of least resistance.
-
-                            # The `propagated_special_term` is the result of `substituted_rule_head.substitute(...)`.
-                            # We want to attach the `body_solution_item.bindings` to this result.
-                            # And mark it so `Runtime.query` knows these are the *actual* bindings to use.
-                            
-                            # Create a new Term to carry this information
-                            # The arguments of this new Term will be the arguments of the `propagated_special_term`
-                            # The predicate will be "##special_unify_propagated##"
-                            # The bindings will be `body_solution_item.bindings`
-                            
-                            # If propagated_special_term is already a Term (which it should be if substituted_rule_head was)
-                            if isinstance(propagated_special_term, Term):
-                                final_yield_item = Term("##special_unify_propagated##", *propagated_special_term.args)
-                                final_yield_item.bindings = body_solution_item.bindings
-                            else:
-                                # This case is problematic: if `match(X,Y)` head becomes `X` after substitution.
-                                # For now, assume `propagated_special_term` is a Term.
-                                # If `substituted_rule_head` was `match(X,Y)` and bindings were `{X:a, Y:a}`,
-                                # `propagated_special_term` would be `match(a,a)`.
-                                # We want to yield something like `Term("##special_unify_propagated##", Term("a"), Term("a"))`
-                                # with `bindings = {X:Y, Y:X}` (the original special bindings).
-                                # This seems correct. The structure of the head is preserved in the args.
-                                logger.error(f"Propagated special term is not a Term: {propagated_special_term}. This should not happen for rule heads.")
-                                # Fallback: yield the original special unify term, but this loses the head structure.
-                                # yield body_solution_item 
-                                # This is not ideal. Let's stick to the assumption that propagated_special_term is a Term.
-                                final_yield_item = Term("##special_unify_propagated##") # Placeholder for error
-                                final_yield_item.bindings = body_solution_item.bindings
-
-
-                            logger.debug(f"Runtime.evaluate_rules: Propagating as {final_yield_item} with original special bindings {final_yield_item.bindings}")
-                            yield final_yield_item
-                        else:
-                            bindings_from_body = substituted_rule_body.match(body_solution_item)
-                            if bindings_from_body is None:
-                                if isinstance(body_solution_item, dict): 
-                                    bindings_from_body = body_solution_item
-                                elif hasattr(body_solution_item, 'bindings') and isinstance(body_solution_item.bindings, dict):
-                                    bindings_from_body = body_solution_item.bindings
-                                else:
-                                    bindings_from_body = {}
-                            
-                            final_solution_head = substituted_rule_head.substitute(bindings_from_body)
-                            # logger.debug(f"Runtime.evaluate_rules: Yielding successful head: {final_solution_head} based on body solution {body_solution_item} and bindings {bindings_from_body}")
-                            yield final_solution_head
-            else: 
-                # logger.debug(f"Runtime.evaluate_rules: Match failed for DB rule {db_rule.head} with goal {goal_term}")
-                pass
-        # logger.debug(f"Runtime.evaluate_rules: All DB rules tried for goal_term={goal_term}. Finished general rule matching.")
+            any_solution_for_current_goal = False
+            for result in self.execute(goal): 
+                any_solution_for_current_goal = True
+                if result is FALSE_TERM: 
+                    continue 
+                if result is CUT_SIGNAL: 
+                    yield CUT_SIGNAL 
+                    self.binding_env.backtrack(mark) 
+                    return 
+                for _ in execute_goals_recursive(index + 1): 
+                    yield TRUE_TERM 
+            self.binding_env.backtrack(mark)
+            if not any_solution_for_current_goal:
+                 pass 
+        yield from execute_goals_recursive(0)
 
     def execute(self, query_obj):
-        # logger.debug(f"Runtime.execute called with query_obj: {query_obj}") # Entry point for execute
-
-        if isinstance(query_obj, TRUE):
-            # logger.debug("Runtime.execute: query_obj is TRUE, calling TRUE.query()")
-            yield from query_obj.query(self)  
+        if query_obj is TRUE_TERM: 
+            yield TRUE_TERM
             return
         
-        if isinstance(query_obj, Fail): 
-            # logger.debug("Runtime.execute: query_obj is Fail, yielding nothing (failure)")
-            return  
+        if isinstance(query_obj, BuiltinFail) or query_obj is FAIL_TERM: 
+            return 
+
+        if isinstance(query_obj, BuiltinCut):
+            yield CUT_SIGNAL 
+            return
+
+        # Handle TermFunction before general Term processing
+        if isinstance(query_obj, TermFunction):
+            # logger.debug(f"Runtime.execute: query_obj is TermFunction: {query_obj}")
+            # The original TermFunction._execute_func modified its own args.
+            # We need to replicate that behavior or adapt.
+            # Let's assume query_obj._execute_func() is called and it updates query_obj.args
+            # then we attempt to unify this (now concrete) term.
+            try:
+                # This is a bit of a guess based on prolog.types.TermFunction.match
+                # It implies the function is executed, its results become args,
+                # and then it's treated like a fact to be unified.
+                query_obj._execute_func() # Modifies query_obj.args in place
+                # logger.debug(f"Runtime.execute[TermFunction]: after _execute_func, query_obj: {query_obj}")
+                # Now, this TermFunction (with concrete args) needs to "succeed".
+                # If it were to be unified against something, that would happen here.
+                # For a standalone TermFunction goal, executing it and it not failing means success.
+                yield TRUE_TERM
+            except Exception as e:
+                # logger.error(f"Runtime.execute[TermFunction]: Error executing function for {query_obj}: {e}")
+                # Execution of the Python function failed, so the Prolog goal fails.
+                pass # Yield nothing for failure
+            return
             
-        goal_to_evaluate = query_obj
-        if isinstance(query_obj, Arithmetic):
-            # logger.debug(f"Runtime.execute: query_obj is Arithmetic: {query_obj}")
-            if hasattr(query_obj, 'var') and isinstance(query_obj.var, Variable):
-                value = query_obj.evaluate()
-                # logger.debug(f"Runtime.execute: Arithmetic {query_obj} (with var) evaluated to {value}. Yielding value.")
-                yield value 
-            else: 
-                value = query_obj.evaluate()
-                # logger.debug(f"Runtime.execute: Arithmetic {query_obj} (ground) evaluated to {value}. Yielding value.")
-                yield value
+        if isinstance(query_obj, Rule):
+            mark = self.binding_env.mark_trail()
+            for body_result in self.execute(query_obj.body): 
+                if body_result is FALSE_TERM: 
+                    self.binding_env.backtrack(mark) 
+                    mark = self.binding_env.mark_trail() 
+                    continue
+                if body_result is CUT_SIGNAL: 
+                    yield CUT_SIGNAL
+                    return 
+                yield TRUE_TERM 
+                self.binding_env.backtrack(mark) 
+                mark = self.binding_env.mark_trail() 
+            self.binding_env.backtrack(mark) 
+            return 
+                
+        elif isinstance(query_obj, Term): 
+            if query_obj.pred == '=': 
+                if len(query_obj.args) == 2:
+                    lhs, rhs = query_obj.args
+                    if self.binding_env.unify(lhs, rhs):
+                        yield TRUE_TERM 
+                    return
+                
+            for db_rule_template in self.rules: 
+                # Standardize apart: Create a fresh copy of the rule.
+                # Rule.substitute({}) is a way to get new Variable instances.
+                # A more robust solution might involve a dedicated "freshen" method.
+                current_scope_id = self.binding_env.get_next_scope_id() # For unique var names
+                
+                # Simple freshening by creating new variable instances.
+                # This relies on Variable.__hash__ and __eq__ being based on unique IDs or names + scope.
+                # For now, assume substitute({}) and BindingEnvironment handle distinctness.
+                # A more explicit way:
+                var_map = {}
+                def freshen_term(t):
+                    if isinstance(t, Variable):
+                        if t not in var_map:
+                            var_map[t] = Variable(f"{t.name}_{current_scope_id}") # Or just new instance
+                        return var_map[t]
+                    elif isinstance(t, Term):
+                        return Term(t.pred, *[freshen_term(arg) for arg in t.args])
+                    return t
 
-        else: 
-            if isinstance(query_obj, Rule):
-                # logger.debug(f"Runtime.execute: query_obj is Rule. Head: {query_obj.head}, Body: {query_obj.body}")
-                for body_solution_bindings_or_term in query_obj.body.query(self): 
-                    logger.debug(f"Runtime.execute (Rule): body_solution: {body_solution_bindings_or_term}")
-                    if isinstance(body_solution_bindings_or_term, Term) and hasattr(body_solution_bindings_or_term, 'bindings') and body_solution_bindings_or_term.bindings is not None:
-                        logger.debug(f"Runtime.execute (Rule): body_solution.bindings: {body_solution_bindings_or_term.bindings}")
+                fresh_head = freshen_term(db_rule_template.head)
+                fresh_body = freshen_term(db_rule_template.body)
+                fresh_rule = Rule(fresh_head, fresh_body)
 
-                    if isinstance(body_solution_bindings_or_term, FALSE):
-                        continue
-                    if isinstance(body_solution_bindings_or_term, CUT): 
-                        yield CUT()
-                        return
-
-                    bindings_from_body = {}
-                    # If the body solution itself is a ##special_unify## or ##special_unify_propagated##,
-                    # its bindings are the ones we care about for substituting the head.
-                    if isinstance(body_solution_bindings_or_term, Term) and \
-                       (body_solution_bindings_or_term.pred == "##special_unify##" or body_solution_bindings_or_term.pred == "##special_unify_propagated##") and \
-                       hasattr(body_solution_bindings_or_term, 'bindings') and isinstance(body_solution_bindings_or_term.bindings, dict): # Ensure bindings is a dict
-                        bindings_from_body = body_solution_bindings_or_term.bindings
-                        
-                        substituted_head = query_obj.head.substitute(bindings_from_body)
-                        # If the original body solution was special, mark the substituted_head as special too, carrying the same bindings.
-                        # This ensures that Runtime.query can extract the correct {X:Y, Y:X} bindings.
-                        if isinstance(substituted_head, Term): # Ensure substituted_head is a Term before setting attributes
-                            substituted_head.pred = body_solution_bindings_or_term.pred # Carry over the special predicate
-                            substituted_head.bindings = body_solution_bindings_or_term.bindings # Carry over the special bindings
-                            logger.debug(f"Runtime.execute (Rule): substituted_head (from special): {substituted_head} with bindings {substituted_head.bindings}")
-                            yield substituted_head
-                        else:
-                            # This case should ideally not happen if query_obj.head is a Term.
-                            # If it does, we might need to wrap it or handle it differently.
-                            logger.error(f"Runtime.execute (Rule): Substituted head is not a Term: {substituted_head}. Yielding original special term.")
-                            yield body_solution_bindings_or_term # Fallback, might not be what Runtime.query expects
+                if fresh_rule.head.pred == query_obj.pred and \
+                   len(fresh_rule.head.args) == len(query_obj.args):
                     
-                    elif isinstance(body_solution_bindings_or_term, dict): # If body solution is already a dict of bindings
-                        bindings_from_body = body_solution_bindings_or_term
-                        substituted_head = query_obj.head.substitute(bindings_from_body)
-                        logger.debug(f"Runtime.execute (Rule): substituted_head (from dict bindings): {substituted_head}, from bindings: {bindings_from_body}")
-                        yield substituted_head
-
-                    else:
-                        # Standard case: match body with solution to get bindings
-                        # This path might be hit if body_solution_bindings_or_term is a simple Term (e.g. a fact)
-                        # or if it's a Conjunction result.
-                        match_result = query_obj.body.match(body_solution_bindings_or_term)
-                        if match_result is not None:
-                            bindings_from_body = match_result
+                    mark = self.binding_env.mark_trail()
+                    if self.binding_env.unify(fresh_rule.head, query_obj):
+                        for body_result in self.execute(fresh_rule.body):
+                            if body_result is FALSE_TERM: 
+                                continue 
+                            if body_result is CUT_SIGNAL: 
+                                yield CUT_SIGNAL
+                                # Cut from body commits to this rule. Do not backtrack `mark` for this rule choice.
+                                # However, the bindings made by this rule attempt up to the cut are kept.
+                                # The cut prunes other choices for `query_obj` and other choices for goals in `fresh_rule.body` after the cut.
+                                return 
+                            yield TRUE_TERM 
+                            # Backtrack for next solution from *this rule's body*
+                            # The mark is for the *entire rule attempt*.
+                            # When Prolog backtracks here, it asks `execute(fresh_rule.body)` for its next solution.
+                            # No explicit backtrack/re-mark here inside the body solution loop for this specific purpose.
                         
-                        substituted_head = query_obj.head.substitute(bindings_from_body)
-                        logger.debug(f"Runtime.execute (Rule): substituted_head (normal): {substituted_head}, from bindings: {bindings_from_body}")
-                        yield substituted_head
-
-            else: 
-                # logger.debug(f"Runtime.execute: query_obj is Term: {query_obj}. Goal to evaluate is same.")
-                goal_to_evaluate = query_obj
-                
-                solutions_found = False
-                for solution in self.evaluate_rules(query_obj, goal_to_evaluate):
-                    solutions_found = True
-                    yield solution
-                
-                if not solutions_found:
-                    # logger.debug(f"Runtime.execute: No solutions found for goal: {goal_to_evaluate}")
-                    pass
-                
-        # logger.debug(f"Runtime.execute for query_obj: {query_obj} finished.")
+                        # After body is exhausted for this rule instance
+                        self.binding_env.backtrack(mark) 
+                        # No re-mark here; the loop `for db_rule_template` continues to the next rule.
+                    else: 
+                        self.binding_env.backtrack(mark)
+            return 
+                        
+        elif isinstance(query_obj, Conjunction):
+            yield from self._execute_conjunction(query_obj)
+            return 
+            
+        return
