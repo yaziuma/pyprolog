@@ -14,7 +14,6 @@ class TestTokenizerAndParserBasics(BaseTestCore):
     def test_atom_tokenization(self):
         """最も基本的なアトムのトークン化のテスト"""
         logger.info("Starting test: test_atom_tokenization")
-        from prolog.token_type import TokenType
         tokens = Scanner("a").tokenize()
         assert len(tokens) == 2  # アトムトークン + EOF
         assert tokens[0].lexeme == "a"

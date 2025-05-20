@@ -2,7 +2,7 @@ from .expression import Visitor
 from .errors import InterpreterError
 import typing
 if typing.TYPE_CHECKING:
-    from .types import Number, FALSE
+    pass
 from . import types as prolog_types # Use an alias to avoid conflict
 from prolog.logger import logger # Added logger for zero division warning
 

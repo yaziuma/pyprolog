@@ -23,7 +23,7 @@ class TestBasicParsingAndTypes(BaseTestCore):
         self._assert_false("my_fail")
 
     def test_query_resulting_in_false_type(self): 
-        logger.info(f"Starting test: test_query_resulting_in_false_type")
+        logger.info("Starting test: test_query_resulting_in_false_type")
         self._assert_false("a = b") 
         self._consult("always_fail_rule :- fail.")
         self._assert_false("always_fail_rule")

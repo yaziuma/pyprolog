@@ -4,7 +4,7 @@ from prolog.logger import logger
 logger.debug("base.py loaded") # Changed from test_core_improvements.py
 
 from prolog.interpreter import Runtime
-from prolog.types import Term, Variable, Number, Dot, TRUE, FALSE, CUT
+from prolog.types import Term, Variable, Number
 # from prolog.builtins import Retract, AssertA, AssertZ # Not directly used in these refactored tests yet
 # from prolog.errors import ParserError, PrologError, UnificationError # Not directly caught in these refactored tests yet
 

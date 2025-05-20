@@ -3,47 +3,10 @@ from .math_interpreter import MathInterpreter
 from .logic_interpreter import LogicInterpreter
 from .expression import Visitor, PrimaryExpression, BinaryExpression
 from .merge_bindings import merge_bindings
+from .core_types import Variable  # Import Variable from core_types
 from prolog.logger import logger
 
 logger.debug("types.py loaded")
-
-class Variable:
-    def __init__(self, name):
-        # logger.debug(f"Variable initialized: {name}") # Can be very verbose
-        self.name = name
-
-    def match(self, other):
-        logger.debug(f"Variable.match({self}) called with other: {other}")
-        bindings = dict()
-        if self != other:
-            bindings[self] = other
-        logger.debug(f"Variable.match returning: {bindings}")
-        return bindings
-
-    def substitute(self, bindings):
-        logger.debug(f"Variable.substitute({self}) called with bindings: {bindings}")
-        # Defensive Null check for bindings
-        if bindings is None:
-            logger.warning(f"Variable.substitute: bindings is None for {self}")
-            return self
-        
-        value = bindings.get(self, None)
-        if value is not None:
-            # Prevent infinite recursion if a variable is bound to itself
-            if value == self:
-                logger.debug(f"Variable.substitute: {self} is bound to itself. Returning self.")
-                return self
-            result = value.substitute(bindings)
-            logger.debug(f"Variable.substitute returning (from value): {result}")
-            return result
-        logger.debug(f"Variable.substitute returning (self): {self}")
-        return self
-
-    def __str__(self):
-        return str(self.name)
-
-    def __repr__(self):
-        return str(self)
 
 class Dot:
     def __init__(self, head, tail=None):
@@ -106,7 +69,7 @@ class Dot:
         # 空リストの特殊ケース処理
         if isinstance(self.head, Term) and self.head.pred == "[]" and self.tail is None:
             # 空リストはそのまま返す - 置換の必要なし
-            logger.debug(f"Dot.substitute: empty list detected, returning unchanged")
+            logger.debug("Dot.substitute: empty list detected, returning unchanged")
             return self
         
         # 値が代入されている場合の処理
@@ -329,6 +292,7 @@ class Term:
         # logger.debug(f"Term initialized with pred: {pred}, args: {args}") # Can be very verbose
         self.pred = pred
         self.args = list(args)
+        self.bindings = None # Add bindings attribute
 
     def match(self, other):
         logger.debug(f"Term.match({self}) called with other: {other}")
