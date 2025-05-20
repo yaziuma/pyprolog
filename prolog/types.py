@@ -203,28 +203,25 @@ class Bar:
         self.tail = tail
 
     def match(self, other):
-        logger.debug(f"Bar.match({self}) called with other: {other}")
-        if not isinstance(other, Dot):
-            logger.debug("Bar.match (other is not Dot) returning: None")
+        logger.debug(f"Bar.match({self}) called with other: {other}") # Changed Term.match to Bar.match for clarity
+        if not isinstance(other, Dot): # Bar can only match against a Dot (list)
+            logger.debug(f"Bar.match: 'other' is not a Dot, it's a {type(other)}. Returning None.")
             return None
 
-        try:
-            if isinstance(self.head, Dot):
-                len_self_head = 0
-                # Correctly get length of a Dot list by iterating it
-                for _ in self.head: # Relies on Dot being iterable
-                    len_self_head += 1
-            elif isinstance(self.head, Variable) or isinstance(self.head, Term):
-                logger.warning(f"Bar.match: self.head ({self.head}, type {type(self.head)}) is not a Dot. " +
-                               "This match logic expects self.head to be a list prefix (Dot). " +
-                               "Treating as non-match for this complex prefix logic.")
+        # Determine the length of the head part of the Bar expression
+        # Assuming self.head is a Dot instance representing the elements before the |
+        len_self_head = 0
+        if isinstance(self.head, Dot):
+            try:
+                len_self_head = len(list(self.head))
+            except Exception as e: # Catch any error during len calculation
+                logger.error(f"Bar.match: Error calculating length of self.head ({self.head}): {e}")
                 return None
-            else: 
-                logger.error(f"Bar.match: self.head ({self.head}, type {type(self.head)}) has unexpected type for prefix matching.")
-                return None
-        except TypeError as e: # This will catch if self.head (if Dot) is not iterable
-            logger.error(f"Bar.match: TypeError when trying to determine length of self.head ({self.head}). Error: {e}. Cannot determine prefix length.")
-            return None
+        elif isinstance(self.head, Term) and self.head.pred == "[]": # Empty list as head
+             len_self_head = 0
+        else: # Single element as head
+            len_self_head = 1
+
 
         other_elements = []
         try:
@@ -234,24 +231,41 @@ class Bar:
             return None
 
         if len(other_elements) < len_self_head: 
-            logger.debug("Bar.match (other list too short) returning: None")
+            logger.debug(f"Bar.match (other list too short: {len(other_elements)} < {len_self_head}) returning: None")
             return None
 
         other_left_elements = other_elements[:len_self_head]
         other_right_elements = other_elements[len_self_head:]
 
-        other_head_dot = Dot.from_list(other_left_elements)
-        other_tail_dot = Dot.from_list(other_right_elements)
+        # Construct Dot for the head part of 'other' to match against self.head
+        # If self.head is not a Dot (e.g. a single Term or Variable), it should match a list of one element.
+        
+        # Match for the head part
+        head_match_input_for_other = Dot.from_list(other_left_elements)
+        if len_self_head == 0 and isinstance(self.head, Term) and self.head.pred == "[]": # self.head is []
+            head_match = self.head.match(head_match_input_for_other) # Match [] with Dot representing other_left_elements
+        elif len_self_head == 1 and not isinstance(self.head, Dot): # self.head is a single item e.g. X in [X|Y]
+             if len(other_left_elements) == 1:
+                 head_match = self.head.match(other_left_elements[0]) # Match X with the single element
+             else: # Should not happen if len(other_elements) < len_self_head check is correct
+                 logger.error(f"Bar.match: Mismatch in logic for single head element. other_left_elements: {other_left_elements}")
+                 return None
+        else: # self.head is a Dot e.g. [a,b] in [[a,b]|Y]
+            head_match = self.head.match(head_match_input_for_other)
 
-        head_match = self.head.match(other_head_dot)
-        tail_match = self.tail.match(other_tail_dot)
+
+        # Match for the tail part
+        # self.tail should match the rest of the list 'other_right_elements'
+        tail_match_input_for_other = Dot.from_list(other_right_elements)
+        tail_match = self.tail.match(tail_match_input_for_other)
+
 
         if head_match is not None and tail_match is not None:
             merged = merge_bindings(head_match, tail_match) 
             logger.debug(f"Bar.match (success) returning: {merged}")
             return merged 
 
-        logger.debug("Bar.match (failed) returning: None")
+        logger.debug(f"Bar.match (failed, head_match: {head_match}, tail_match: {tail_match}) returning: None")
         return None
 
     def substitute(self, bindings):

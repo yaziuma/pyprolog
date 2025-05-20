@@ -129,8 +129,11 @@ class Conjunction(Term):
                     substituted_arg = arg.substitute(current_goal_bindings)
                     logger.debug(f"Conjunction.solutions: Substituted arg for execution: {substituted_arg}")
 
+                    found_solution = False
                     for item in runtime.execute(substituted_arg): 
-                        logger.debug(f"Conjunction.solutions: item from runtime.execute({substituted_arg}): {item}")
+                        found_solution = True
+                        logger.debug(f"Conjunction.solutions: got solution from runtime.execute({substituted_arg}): {item}")
+                        
                         if isinstance(item, FALSE): 
                             logger.debug("Conjunction.solutions: item is FALSE, this conjunction path fails for this item.")
                             continue 
@@ -142,6 +145,8 @@ class Conjunction(Term):
 
                         match_result_for_arg = arg.match(item) 
                         if match_result_for_arg is None:
+                            # If direct match fails, try matching the substituted_arg with the item.
+                            # This can be useful if 'item' is a more instantiated version.
                             match_result_for_arg = substituted_arg.match(item)
 
                         if match_result_for_arg is not None:
@@ -156,6 +161,9 @@ class Conjunction(Term):
                         else:
                             logger.debug(f"Conjunction.solutions: match failed for {arg}/{substituted_arg} and {item}. Trying next item.")
                     
+                    if not found_solution:
+                        logger.debug(f"Conjunction.solutions: No solutions found for {substituted_arg}")
+            
                     logger.debug(f"Conjunction.solutions: runtime.execute for {substituted_arg} (from arg {arg}) exhausted for bindings {current_goal_bindings}.")
                     return 
 
@@ -388,7 +396,7 @@ class Runtime:
 
     def evaluate_rules(self, query_rule_obj, goal_term):
         logger.debug(f"Runtime.evaluate_rules: query_rule_obj={query_rule_obj}, goal_term={goal_term}")
-
+    
         # '=' 演算子の特別処理
         if isinstance(goal_term, Term) and goal_term.pred == '=':
             if hasattr(goal_term, 'args') and len(goal_term.args) == 2:
@@ -401,13 +409,10 @@ class Runtime:
                     if isinstance(lhs, Variable) and isinstance(rhs, Variable):
                         # 変数間の単一化は特殊処理
                         logger.debug(f"Runtime.evaluate_rules: '=' Var=Var case: {lhs} = {rhs}")
-                        bidirectional_bindings = match_result.copy() # match_result should already be bidirectional from Variable.match
+                        bidirectional_bindings = match_result.copy() 
                         
-                        # Ensure both directions are explicitly in this binding set for ##special_unify##
-                        # Variable.match now ensures X:Y and Y:X if both are Variables.
-                        # So, match_result itself should be correct.
-                        # For clarity and safety, we can re-assert, though it might be redundant
-                        # if Variable.match is correctly implemented.
+                        # Variable.matchが双方向束縛を作成するようになれば冗長かもしれないが、
+                        # 安全のために明示的に設定
                         bidirectional_bindings[lhs] = rhs
                         bidirectional_bindings[rhs] = lhs
                         
@@ -416,9 +421,8 @@ class Runtime:
                         term_with_bindings.bindings = bidirectional_bindings
                         yield term_with_bindings
                     else:
-                        # Var=Const または Const=Const の場合
+                        # Var=Const または Const=Const の場合は既存の処理
                         logger.debug(f"Runtime.evaluate_rules: '=' Var/Const or Const/Const case: {lhs} = {rhs}")
-                        # The original behavior for non Var-Var cases:
                         special_solution = Term("=", lhs.substitute(match_result), rhs.substitute(match_result))
                         special_solution.bindings = match_result
                         yield special_solution
@@ -426,22 +430,40 @@ class Runtime:
                     # Match failed for '='
                     logger.debug(f"Runtime.evaluate_rules: '=' match failed for: {lhs} = {rhs}")
                     pass # Do not yield, effectively failing this path for '='
-                return # Crucial: after '=' handling (success or fail), return from evaluate_rules for this goal.
+                return # 「=」処理後はreturn
         
         # If we reach here, it was not a specially handled '=' goal, proceed with general rule matching.
         # Note: The 'if not is_special_equals:' check is removed as the logic is now self-contained for '='.
             logger.debug(f"Runtime.evaluate_rules: Proceeding to general rule matching for goal_term='{goal_term}'.")
-            for db_rule in self.all_rules(query_rule_obj):
-                logger.debug(f"Runtime.evaluate_rules: Trying DB rule: {db_rule}")
+            all_rules = self.all_rules(query_rule_obj) # query_rule_obj を使用
+            logger.debug(f"Runtime.evaluate_rules: all_rules count: {len(all_rules)}") # all_rules の数をログに出力
+            for i, db_rule in enumerate(all_rules):
+                logger.debug(f"Runtime.evaluate_rules: Trying DB rule #{i}: {db_rule}") # ルール番号と内容をログに出力
                 match_bindings = db_rule.head.match(goal_term)
                 logger.debug(f"Runtime.evaluate_rules: Match attempt of {db_rule.head} with {goal_term} -> bindings: {match_bindings}")
 
                 if match_bindings is not None:
-                    logger.debug(f"Runtime.evaluate_rules: Match success. DB rule head: {db_rule.head}, Goal: {goal_term}")
-                    substituted_rule_head = db_rule.head.substitute(match_bindings)
+                    logger.debug(f"Runtime.evaluate_rules: Match success. DB rule head: {db_rule.head}, Goal: {goal_term}, Bindings: {match_bindings}")
+                    
+                    # Handle facts (rules with TRUE body)
+                    if isinstance(db_rule.body, TRUE):
+                        logger.debug(f"Runtime.evaluate_rules: Rule {db_rule} is a fact.")
+                        # Yield the goal term instantiated by the successful match.
+                        # This allows the caller (Conjunction or Runtime.query) to get the bindings.
+                        yielded_solution = goal_term.substitute(match_bindings)
+                        logger.debug(f"Runtime.evaluate_rules: Yielded fact solution: {yielded_solution}")
+                        yield yielded_solution
+                        # After yielding a solution for a fact, continue to the next rule in the DB,
+                        # as there might be other matching facts or rules.
+                        continue 
+
+                    # If it's not a fact, then it's a rule with a body that needs further processing.
+                    # Substitute head and body of the rule with the bindings from the head match.
+                    substituted_rule_head = db_rule.head.substitute(match_bindings) 
                     substituted_rule_body = db_rule.body.substitute(match_bindings)
                     logger.debug(f"Runtime.evaluate_rules: Substituted DB rule head: {substituted_rule_head}, body: {substituted_rule_body}")
 
+                    # Now, process the body of the rule (e.g., if it's '=', Arithmetic, or a general conjunction)
                     if isinstance(substituted_rule_body, Term) and substituted_rule_body.pred == '=':
                         lhs_body, rhs_body = substituted_rule_body.args # Renamed to avoid conflict
                         body_match_result = lhs_body.match(rhs_body)
@@ -539,5 +561,14 @@ class Runtime:
             else: 
                 logger.debug(f"Runtime.execute: query_obj is Term: {query_obj}. Goal to evaluate is same.")
                 goal_to_evaluate = query_obj
-                yield from self.evaluate_rules(query_obj, goal_to_evaluate) 
+                
+                # 以下を追加：ゴール評価時の処理を詳細化
+                solutions_found = False
+                for solution in self.evaluate_rules(query_obj, goal_to_evaluate):
+                    solutions_found = True
+                    yield solution
+                
+                if not solutions_found:
+                    logger.debug(f"Runtime.execute: No solutions found for goal: {goal_to_evaluate}")
+                
         logger.debug(f"Runtime.execute for query_obj: {query_obj} finished.")
