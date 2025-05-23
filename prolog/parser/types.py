@@ -1,4 +1,4 @@
-from prolog.core.types import Term, Variable, TRUE_TERM
+from prolog.core.types import Term, Variable, TRUE_TERM, FALSE_TERM
 
 
 class Number(Term):
@@ -32,7 +32,7 @@ class Number(Term):
             return Number(self.value + other.value)
         raise TypeError(f"Cannot add Number and {type(other)}")
 
-    def substract(self, other):
+    def subtract(self, other):  # Renamed from substract
         if isinstance(other, Number):
             return Number(self.value - other.value)
         raise TypeError(f"Cannot subtract Number and {type(other)}")
@@ -169,7 +169,7 @@ class Bar(Term):
 
 # 定数
 TRUE = TRUE_TERM
-FALSE = lambda: Term("false")  # FALSE は関数として定義されている可能性
+FALSE = FALSE_TERM
 
 
 # TermFunction の追加実装（runtime/interpreter.py で必要）
