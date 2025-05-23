@@ -1,26 +1,39 @@
 # parser.py の完全修正版
 
 from .token_type import TokenType
-from .token import Token
-from prolog.core.types import Variable, Term, Rule, Conjunction, TRUE_TERM, TRUEClass, Fail, CUTClass
+
+# from .token import Token # Unused import
+from prolog.core.types import (
+    Variable,
+    Term,
+    Rule,
+    Conjunction,
+    TRUE_TERM,
+    Fail,
+)  # Removed TRUEClass, CUTClass
 from prolog.runtime.builtins import Write, Nl, Tab, Retract, AssertA, AssertZ
+
 # Cut は prolog.core.types から、Cutクラスをインポート
-from prolog.core.types import Cut
-from .types import Arithmetic, Logic, Number, Dot, Bar
-from .expression import BinaryExpression, PrimaryExpression
+from prolog.core.types import Cut  # This is the Cut class from core.types
+from .types import Arithmetic, Number  # Removed Logic
+
+# from .expression import BinaryExpression, PrimaryExpression # Unused imports
 from prolog.util.logger import logger
 
 logger.debug("parser.py loaded (new version)")
 
+
 def default_error_handler(line, message):
     print(f"Line[{line}] Error: {message}")
     raise Exception("Parser error")
+
 
 def is_single_param_buildin(token_type):
     st = set([TokenType.RETRACT, TokenType.ASSERTA, TokenType.ASSERTZ])
     if token_type in st:
         return True
     return False
+
 
 class Parser:
     def __init__(self, tokens, error_handler=None):
@@ -60,7 +73,7 @@ class Parser:
         if token is None:
             return False
         return token.token_type == token_type
-    
+
     def _parse_atom(self):
         token = self._advance()  # Consume the token
 
@@ -111,14 +124,16 @@ class Parser:
         logger.debug(
             f"Parser._parse_term entered. Current token: {self._peek()}, index: {self._current}"
         )
-        
+
         atom_or_builtin_obj = self._parse_atom()
         logger.debug(
             f"Parser._parse_term after _parse_atom: atom_or_builtin_obj={atom_or_builtin_obj}, type={type(atom_or_builtin_obj)}, next token: {self._peek()}"
         )
 
-        # 型チェックを修正：クラス型を使用
-        if isinstance(atom_or_builtin_obj, (TRUEClass, Fail, Cut)): # Cutはprolog.core.types.Cut
+        # 型チェックを修正：TRUE_TERMとの直接比較、FailおよびCutクラスとのisinstance比較
+        if atom_or_builtin_obj is TRUE_TERM or isinstance(
+            atom_or_builtin_obj, (Fail, Cut)
+        ):  # Cutはprolog.core.types.Cut
             if self._token_matches(TokenType.LEFTPAREN):
                 self._report(
                     self._peek().line,
@@ -199,9 +214,9 @@ class Parser:
                     lhs_term = Term(current_predicate_name, *args)
         else:
             # 安全な属性アクセス
-            lexeme = getattr(token, 'lexeme', 'N/A')
-            token_type = getattr(token, 'token_type', 'Unknown')
-            line = getattr(token, 'line', -1)
+            lexeme = getattr(token, "lexeme", "N/A")
+            token_type = getattr(token, "token_type", "Unknown")
+            line = getattr(token, "line", -1)
             self._report(
                 line,
                 f"Parser._parse_term: Unhandled token type {token_type} ({lexeme}) for LHS parsing.",
@@ -261,16 +276,16 @@ class Parser:
             self._report(
                 self._peek().line, f"Expected :- in rule but got {self._peek()}"
             )
-            return None # エラー時はNoneを返す
+            return None  # エラー時はNoneを返す
 
         self._advance()
         args = []
         while not self._token_matches(TokenType.DOT):
             term_arg = self._parse_term()
-            if term_arg is None: # _parse_termがエラーでNoneを返した場合
+            if term_arg is None:  # _parse_termがエラーでNoneを返した場合
                 return None
             args.append(term_arg)
-            
+
             if not self._token_matches(TokenType.COMMA) and not self._token_matches(
                 TokenType.DOT
             ):
@@ -278,19 +293,20 @@ class Parser:
                     self._peek().line,
                     f"Expected , or . in term but got {self._peek()}",
                 )
-                return None # エラー時はNoneを返す
+                return None  # エラー時はNoneを返す
 
             if self._token_matches(TokenType.COMMA):
                 self._advance()
-            elif self._token_matches(TokenType.DOT): # ドットが見つかったらループを抜ける
+            elif self._token_matches(
+                TokenType.DOT
+            ):  # ドットが見つかったらループを抜ける
                 break
-            else: # カンマでもドットでもない場合（実際には上のチェックで捕捉されるはず）
-                 self._report(
+            else:  # カンマでもドットでもない場合（実際には上のチェックで捕捉されるはず）
+                self._report(
                     self._peek().line,
                     f"Unexpected token in rule body: {self._peek()}",
                 )
-                 return None
-
+                return None
 
         if not self._token_matches(TokenType.DOT):
             self._report(
@@ -299,19 +315,18 @@ class Parser:
             )
             return None
 
-        self._advance() # Consume the dot
+        self._advance()  # Consume the dot
         body = None
         if len(args) == 1:
             body = args[0]
         elif len(args) > 1:
             body = Conjunction(args)
-        else: # argsが空の場合（例： `p :- .` のような不正なケース）
+        else:  # argsが空の場合（例： `p :- .` のような不正なケース）
             self._report(
-                self._peek().line, # or self._previous().line if more appropriate
+                self._peek().line,  # or self._previous().line if more appropriate
                 "Rule body cannot be empty after ':-'.",
             )
             return None
-
 
         result = Rule(head, body)
         logger.debug(f"Parser._parse_rule: parsed rule: {result}, type: {type(result)}")
@@ -330,17 +345,21 @@ class Parser:
         elif predicate_name == "assertz":
             return AssertZ(args[0])
         else:
-            self._report(self._peek().line, f"Unknown single-argument built-in: {predicate_name}")
-            return None # 不明なビルトイン
+            self._report(
+                self._peek().line, f"Unknown single-argument built-in: {predicate_name}"
+            )
+            return None  # 不明なビルトイン
 
     def _parse_arithmetic(self, variable_token):
         variable = self._create_variable(variable_token.lexeme)
         if not self._token_matches(TokenType.IS):
-            self._report(self._peek().line, "Expected 'is' operator for arithmetic expression.")
+            self._report(
+                self._peek().line, "Expected 'is' operator for arithmetic expression."
+            )
             return None
 
         self._advance()  # Consume 'is'
-        
+
         # ここで算術式の右辺をパースするロジックが必要
         # 簡単な例として、数値または変数を期待
         rhs_token = self._advance()
@@ -352,9 +371,11 @@ class Parser:
             expression_rhs = self._create_variable(rhs_token.lexeme)
         # TODO: より複雑な算術式（例: X is Y + Z）のパースをサポートする
         else:
-            self._report(rhs_token.line, f"Invalid right-hand side for 'is': {rhs_token.lexeme}")
+            self._report(
+                rhs_token.line, f"Invalid right-hand side for 'is': {rhs_token.lexeme}"
+            )
             return None
-            
+
         return Arithmetic(variable, expression_rhs)
 
     def parse(self):
@@ -363,14 +384,16 @@ class Parser:
         while not self._is_at_end():
             try:
                 stmt = self._parse_rule()
-                if stmt: # stmtがNoneでない場合のみ追加
+                if stmt:  # stmtがNoneでない場合のみ追加
                     statements.append(stmt)
                 else:
                     # _parse_ruleがNoneを返した場合、エラーが発生しているはずなので、
                     # エラーリカバリを試みるか、パースを中止する
                     # ここでは単純に次のトークンに進んでリカバリを試みる（より高度なリカバリが必要な場合もある）
-                    logger.warning("Parser.parse: _parse_rule returned None, attempting to recover by advancing.")
-                    if not self._is_at_end(): # EOFでなければ進む
+                    logger.warning(
+                        "Parser.parse: _parse_rule returned None, attempting to recover by advancing."
+                    )
+                    if not self._is_at_end():  # EOFでなければ進む
                         # エラー箇所に応じて、どこまでスキップするかを決める必要がある
                         # 例えば、次のドット(.)やEOFまでスキップするなど
                         # ここでは単純に1トークン進めるが、これでは不十分な場合が多い
@@ -379,7 +402,7 @@ class Parser:
                         # 次の明確な区切り（例：次の '.'）までスキップする戦略。
                         # 今回はエラーハンドラが例外を投げる設定なので、実際にはここまで来ない想定。
                         # もし例外を投げないエラーハンドラを使う場合は、ここでの処理が重要になる。
-                        pass # default_error_handlerが例外を投げるので、ここは実行されないはず
+                        pass  # default_error_handlerが例外を投げるので、ここは実行されないはず
 
             except Exception as e:
                 logger.error(f"Parser.parse: Exception during parsing: {e}")
@@ -387,6 +410,6 @@ class Parser:
                 # エラーリカバリを試みる。
                 # default_error_handler が例外を投げるので、ループはここで終了する。
                 # もし例外をキャッチして継続したい場合は、ここでエラー処理を行う。
-                break # エラーが発生したらパースを中止
+                break  # エラーが発生したらパースを中止
 
         return statements

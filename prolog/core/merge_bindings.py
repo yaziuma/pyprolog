@@ -1,150 +1,227 @@
-from prolog.core.types import Variable # Variable をインポ�EチE
+# prolog/core/merge_bindings.py
+from prolog.core.types import Variable
 from prolog.util.logger import logger
 
-def merge_bindings(bindings1, bindings2):
-    logger.debug(f"merge_bindings called with bindings1: {bindings1}, bindings2: {bindings2}")
-    if bindings1 is None or bindings2 is None:
-        logger.debug("merge_bindings: One or both bindings are None, returning None.")
-        return None
 
-    merged_bindings = bindings1.copy()
-    logger.debug(f"merge_bindings: Initial merged_bindings (copy of bindings1): {merged_bindings}")
-    
-    # 変数マッピング解決のための補助関数
-    def resolve_binding_chain(var, bindings, visited=None):
-        """変数の束縛チェーンをたどって最終的な値を取征E""
-        if visited is None:
-            visited = set()
-            
-        if var in visited:
-            logger.warning(f"resolve_binding_chain: Circular reference detected for {var}. Returning var itself.")
-            return var  # 循環を検�E
-            
-        visited.add(var)
-        
-        value = bindings.get(var, None)
-        if value is None or not isinstance(value, Variable):
-            return value if value is not None else var
-            
-        return resolve_binding_chain(value, bindings, visited)
+def merge_bindings(bindings1, bindings2=None):
+    """バインディングを結合する（後方互換性を保持）
 
-    # 変数グラフ�E作�E
-    var_graph = {}
+    Args:
+        bindings1: 最初のバインディング（辞書またはBindingEnvironment）
+        bindings2: 2番目のバインディング（辞書またはBindingEnvironment、オプション）
 
-    # bindings1 からグラフを初期構篁E
-    for var, val in bindings1.items():
-        if isinstance(var, Variable) and isinstance(val, Variable):
-            if var not in var_graph:
-                var_graph[var] = set()
-            if val not in var_graph:
-                var_graph[val] = set()
-            var_graph[var].add(val)
-            var_graph[val].add(var)
-            logger.debug(f"merge_bindings: var_graph from b1: added edge {var}-{val}")
+    Returns:
+        結合されたバインディング辞書またはBindingEnvironment
 
-    # bindings2 を統合し、グラフを拡張
-    for var_b, val_b in bindings2.items():
-        if isinstance(var_b, Variable) and isinstance(val_b, Variable):
-            # var_b と val_b を同値としてグラフに追加
-            if var_b not in var_graph:
-                var_graph[var_b] = set()
-            if val_b not in var_graph:
-                var_graph[val_b] = set()
-            var_graph[var_b].add(val_b)
-            var_graph[val_b].add(var_b)
-            logger.debug(f"merge_bindings: var_graph from b2 (V-V): added edge {var_b}-{val_b}")
+    注意:
+        - 両方が辞書の場合：辞書を返す
+        - どちらかがBindingEnvironmentの場合：BindingEnvironmentを返す
+        - 競合する場合はbindings2が優先される
+    """
+    # BindingEnvironmentの検出
+    from prolog.core.binding_environment import BindingEnvironment
 
-        # merged_bindings の更新ロジチE��
-        if var_b in merged_bindings:
-            val_a = merged_bindings[var_b]
-            
-            if isinstance(val_a, Variable) and isinstance(val_b, Variable):
-                # 既にグラフに追加されてぁE��はぁE
-                pass
-            elif isinstance(val_a, Variable): # val_b は定数
-                # val_a めEval_b に束縁E
-                merged_bindings[val_a] = val_b
-                logger.debug(f"merge_bindings: b2 conflict processing (V-C): {val_a} -> {val_b}")
-            elif isinstance(val_b, Variable): # val_a は定数
-                # val_b めEval_a に束縁E
-                merged_bindings[val_b] = val_a
-                logger.debug(f"merge_bindings: b2 conflict processing (C-V): {val_b} -> {val_a}")
-            elif val_a != val_b: # 両方定数で値が異なめE
-                logger.debug(f"merge_bindings: Conflict! {var_b} is bound to {val_a} in b1 and {val_b} in b2. Returning None.")
-                return None # 矛盾
-        else:
-            # var_b ぁEbindings1 に存在しなかった場合、新しい束縛として追加
-            merged_bindings[var_b] = val_b
-            logger.debug(f"merge_bindings: b2 new binding: {var_b} -> {val_b}")
+    # bindings1がNoneの場合の処理
+    if bindings1 is None:
+        if bindings2 is None:
+            return {}
+        return bindings2
 
-    # 変数グラフから最終的な merged_bindings を構篁E
-    visited_nodes = set()
-    final_merged_bindings = {}
+    # bindings2がNoneの場合の処理
+    if bindings2 is None:
+        return bindings1
 
-    for node in var_graph:
-        if node not in visited_nodes:
-            component = set()
-            q = [node]
-            head = 0
-            while head < len(q):
-                curr = q[head]
-                head += 1
-                if curr not in visited_nodes:
-                    visited_nodes.add(curr)
-                    component.add(curr)
-                    if curr in var_graph:
-                        for neighbor in var_graph[curr]:
-                            if neighbor not in visited_nodes:
-                                q.append(neighbor)
-            
-            logger.debug(f"merge_bindings: var_graph component found: {component}")
-            # こ�Eコンポ�Eネント�Eの変数はすべて同値
-            # コンポ�Eネント�Eに定数への束縛があるか確誁E
-            constant_binding_value = None
-            
-            for var_in_component in component:
-                # merged_bindings から直接解決された値を確誁E
-                resolved_value_for_component_var = resolve_binding_chain(var_in_component, merged_bindings)
-                
-                if resolved_value_for_component_var is not None and not isinstance(resolved_value_for_component_var, Variable):
-                    if constant_binding_value is not None and constant_binding_value != resolved_value_for_component_var:
-                        logger.debug(f"merge_bindings: Conflict in component {component}. Var {var_in_component} (resolved to {resolved_value_for_component_var}) conflicts with existing constant {constant_binding_value}. Returning None.")
-                        return None # 矛盾
-                    constant_binding_value = resolved_value_for_component_var
-                    logger.debug(f"merge_bindings: var_graph component {component}: found constant binding via {var_in_component} -> {constant_binding_value}")
+    # 両方がBindingEnvironmentの場合
+    if isinstance(bindings1, BindingEnvironment) and isinstance(
+        bindings2, BindingEnvironment
+    ):
+        logger.debug("merge_bindings: Both are BindingEnvironment instances")
+        # 新しい環境を作成し、両方の内容を統合
+        merged_env = bindings1.copy()
 
-            if constant_binding_value is not None:
-                # コンポ�Eネント�Eの全変数をこの定数に束縁E
-                for var_in_component in component:
-                    final_merged_bindings[var_in_component] = constant_binding_value
-                logger.debug(f"merge_bindings: var_graph component {component}: all bound to constant {constant_binding_value}")
+        # bindings2の内容をmerged_envに統合
+        for var in bindings2.parent:
+            if var != bindings2.parent[var]:  # 自分自身以外にバインドされている場合
+                root_value = bindings2.get_value(var)
+                if root_value != var:
+                    merged_env.unify(var, root_value)
+
+        return merged_env
+
+    # 一方がBindingEnvironment、もう一方が辞書の場合
+    if isinstance(bindings1, BindingEnvironment):
+        logger.debug(
+            "merge_bindings: bindings1 is BindingEnvironment, bindings2 is dict"
+        )
+        merged_env = bindings1.copy()
+
+        # 辞書の内容をBindingEnvironmentに統合
+        for var, value in bindings2.items():
+            merged_env.unify(var, value)
+
+        return merged_env
+
+    if isinstance(bindings2, BindingEnvironment):
+        logger.debug(
+            "merge_bindings: bindings1 is dict, bindings2 is BindingEnvironment"
+        )
+        merged_env = bindings2.copy()
+
+        # 辞書の内容をBindingEnvironmentに統合
+        for var, value in bindings1.items():
+            merged_env.unify(var, value)
+
+        return merged_env
+
+    # 両方が辞書の場合（従来の動作）
+    logger.debug("merge_bindings: Both are dictionaries")
+    if not isinstance(bindings1, dict) or not isinstance(bindings2, dict):
+        logger.warning(
+            f"merge_bindings: Unexpected types: {type(bindings1)}, {type(bindings2)}"
+        )
+        return bindings1 if bindings1 is not None else bindings2
+
+    # 辞書のマージ処理
+    merged = bindings1.copy()
+
+    for var, value in bindings2.items():
+        if var in merged:
+            # 競合がある場合、値の整合性をチェック
+            existing_value = merged[var]
+
+            # 両方が同じ値の場合は問題なし
+            if existing_value == value:
+                continue
+
+            # 一方が変数で他方が具体値の場合、具体値を優先
+            if isinstance(existing_value, Variable) and not isinstance(value, Variable):
+                merged[var] = value
+            elif not isinstance(existing_value, Variable) and isinstance(
+                value, Variable
+            ):
+                # 既存の値が具体値なので変更しない
+                continue
+
+            # 両方が具体値で異なる場合は警告を出してbindings2を優先
+            elif not isinstance(existing_value, Variable) and not isinstance(
+                value, Variable
+            ):
+                logger.warning(
+                    f"merge_bindings: Conflicting bindings for {var}: {existing_value} vs {value}. "
+                    f"Using {value} from bindings2."
+                )
+                merged[var] = value
+
+            # 両方が変数の場合もbindings2を優先
             else:
-                # コンポ�Eネント�Eの全ての変数間に双方向束縛を設宁E
-                # 代表允E��して、コンポ�Eネント�Eの最初�E要素�E�また�Eソートされた最初�E要素�E�を選ぶ
-                representative = sorted(list(component), key=lambda v: v.name)[0] # 名前でソートして一貫性を保つ
-                for v_in_comp in component:
-                    if v_in_comp != representative:
-                         final_merged_bindings[v_in_comp] = representative
-                # 代表允E�E身も何かに束縛される忁E��がある場合があるが、ここでは他�E変数への参�Eで十�E
-                # 忁E��であれば、代表允E��自身に束縛すめEfinal_merged_bindings[representative] = representative も検訁E
-                logger.debug(f"merge_bindings: var_graph component {component}: all bound to representative {representative}")
+                merged[var] = value
+        else:
+            merged[var] = value
+
+    return merged
 
 
-    # 既存�E merged_bindings のぁE��、var_graph に含まれなぁE��縛（主に定数への直接束縛）をfinalにコピ�E
-    for k, v in merged_bindings.items():
-        is_k_in_graph = isinstance(k, Variable) and k in var_graph
-        
-        if not is_k_in_graph: # キーがグラフになぁE��数、また�E非変数
-            if k not in final_merged_bindings: # まだ final になければ追加
-                 # ここで k ぁEVariable の場合、その束縛チェーンを解決する
-                 if isinstance(k, Variable):
-                     final_value = resolve_binding_chain(k, merged_bindings)
-                     if final_value is not None: # None でなぁE��合�Eみ更新
-                         final_merged_bindings[k] = final_value
-                     # else: k は束縛されてぁE��ぁE�Eで、final_merged_bindings には追加しなぁE
-                 else: # k が非変数の場合（通常はありえなぁE��念のため�E�E
-                     final_merged_bindings[k] = v
-            # else: k は既に final_merged_bindings で処琁E��れてぁE���E�グラフ経由など�E�E
+def bindings_to_dict(bindings):
+    """BindingEnvironmentまたは辞書を辞書形式に変換する
 
-    logger.debug(f"merge_bindings: Final merged_bindings from graph and non-graph part: {final_merged_bindings}")
-    return final_merged_bindings
+    Args:
+        bindings: BindingEnvironmentインスタンスまたは辞書
+
+    Returns:
+        dict: バインディング辞書
+    """
+    from prolog.core.binding_environment import BindingEnvironment
+
+    if bindings is None:
+        return {}
+
+    if isinstance(bindings, dict):
+        return bindings.copy()
+
+    if isinstance(bindings, BindingEnvironment):
+        result = {}
+        for var in bindings.parent:
+            value = bindings.get_value(var)
+            if value != var:  # 自分自身以外にバインドされている場合のみ
+                result[var] = value
+        return result
+
+    logger.warning(f"bindings_to_dict: Unexpected type: {type(bindings)}")
+    return {}
+
+
+def dict_to_binding_environment(bindings_dict):
+    """辞書をBindingEnvironmentに変換する
+
+    Args:
+        bindings_dict: バインディング辞書
+
+    Returns:
+        BindingEnvironment: 新しいバインディング環境
+    """
+    from prolog.core.binding_environment import BindingEnvironment
+
+    env = BindingEnvironment()
+
+    if bindings_dict:
+        for var, value in bindings_dict.items():
+            env.unify(var, value)
+
+    return env
+
+
+def unify_with_bindings(term1, term2, bindings=None):
+    """2つの項を既存のバインディングに基づいて単一化する
+
+    Args:
+        term1: 単一化する項1
+        term2: 単一化する項2
+        bindings: 既存のバインディング（辞書またはBindingEnvironment、オプション）
+
+    Returns:
+        tuple: (成功したかどうか, 更新されたバインディング)
+    """
+    from prolog.core.binding_environment import BindingEnvironment
+
+    # バインディング環境の準備
+    if isinstance(bindings, BindingEnvironment):
+        env = bindings.copy()
+    elif isinstance(bindings, dict):
+        env = dict_to_binding_environment(bindings)
+    else:
+        env = BindingEnvironment()
+
+    # 単一化を試行
+    success = env.unify(term1, term2)
+
+    # 結果を返す（元のバインディングの形式に合わせる）
+    if isinstance(bindings, dict):
+        return success, bindings_to_dict(env)
+    else:
+        return success, env
+
+
+def apply_substitution(term, bindings):
+    """項にバインディングを適用して置換する
+
+    Args:
+        term: 置換する項
+        bindings: バインディング（辞書またはBindingEnvironment）
+
+    Returns:
+        置換された項
+    """
+    from prolog.core.binding_environment import BindingEnvironment
+
+    if hasattr(term, "substitute"):
+        return term.substitute(bindings)
+
+    # BindingEnvironmentの場合の直接処理
+    if isinstance(bindings, BindingEnvironment):
+        return bindings.get_value(term)
+
+    # 辞書の場合
+    if isinstance(bindings, dict) and term in bindings:
+        return bindings[term]
+
+    return term
