@@ -1,11 +1,11 @@
-from prolog.token_type import TokenType
-# Ensure interpreter import is safe (it should be if interpreter uses method-local imports for Parser)
-from .interpreter import Conjunction, Rule
-from .types import Arithmetic, Logic, Variable, Term, TRUE, Number, Dot, Bar
-from .builtins import Fail, Write, Nl, Tab, Retract, AssertA, AssertZ, Cut
+from .token_type import TokenType
+from .token import Token
+from prolog.core.types import Variable, Term, Rule, Conjunction, TRUE_TERM as TRUE
+from prolog.runtime.builtins import Fail, Write, Nl, Tab, Retract, AssertA, AssertZ, Cut
+from .types import Arithmetic, Logic, Number, Dot, Bar
 from .expression import BinaryExpression, PrimaryExpression
-from prolog.logger import logger
-from .token import Token # Ensure Token is imported
+from prolog.util.logger import logger
+
 
 logger.debug("parser.py loaded (new version)")
 
