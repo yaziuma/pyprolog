@@ -18,7 +18,7 @@ def start(input_path):
                 rules_text += line
                 line = reader.readline()
 
-        rules = Parser(Scanner(rules_text).tokenize()).parse_rules()
+        rules = Parser(Scanner(rules_text).tokenize())._parse_rule()
         runtime = Runtime(rules)
     except Exception as e:
         print(f"Error loading rules: {e}")

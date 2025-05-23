@@ -30,7 +30,7 @@ def test_query_with_builtins():
     door('dinninr room', kitchen).
     '''
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     goal_text = "room(X), tab, write(X), nl."
@@ -110,7 +110,7 @@ def test_fail_builtin():
     room(cellar).
     '''
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     goal_text = 'room(X), tab, write(X), nl, fail.'
@@ -134,7 +134,7 @@ def test_cut_predicate():
     cut_test_b('last clause_b'). 
     '''
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     

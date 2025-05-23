@@ -37,7 +37,7 @@ def test_simple_predicate_function():
     '''
 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
 
     runtime = Runtime(rules)
 
@@ -72,7 +72,7 @@ def test_two_variable_predicate_function():
     '''
 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
 
     runtime = Runtime(rules)
 
@@ -104,7 +104,7 @@ def test_two_predicate_functions():
     '''
 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
 
     runtime = Runtime(rules)
 

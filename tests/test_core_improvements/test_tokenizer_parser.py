@@ -105,7 +105,7 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         logger.info("Starting test: test_simple_atom_parsing")
         try:
             tokens = Scanner("a.").tokenize()
-            parsed_query = Parser(tokens).parse_query()
+            parsed_query = Parser(tokens)._parse_term()
             assert parsed_query is not None  # パース結果が存在する
             
             # 形式に応じて適切なアサーションを選択
@@ -124,7 +124,7 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         logger.info("Starting test: test_true_atom_parsing")
         try:
             tokens = Scanner("true.").tokenize()
-            parsed_query = Parser(tokens).parse_query()
+            parsed_query = Parser(tokens)._parse_term()
             
             # 形式に応じて適切なアサーションを選択
             # TRUEオブジェクトとして解釈される場合
@@ -144,7 +144,7 @@ class TestTokenizerAndParserBasics(BaseTestCore):
             from prolog.builtins import Fail
             
             tokens = Scanner("fail.").tokenize()
-            parsed_query = Parser(tokens).parse_query()
+            parsed_query = Parser(tokens)._parse_term()
             
             # 形式に応じて適切なアサーションを選択
             assert parsed_query is not None  # パース結果が存在する
@@ -163,7 +163,7 @@ class TestTokenizerAndParserBasics(BaseTestCore):
             from prolog.builtins import Cut
             
             tokens = Scanner("!.").tokenize()
-            parsed_query = Parser(tokens).parse_query()
+            parsed_query = Parser(tokens)._parse_term()
             
             # 形式に応じて適切なアサーションを選択
             assert parsed_query is not None  # パース結果が存在する
@@ -180,7 +180,7 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         logger.info("Starting test: test_simple_structure_parsing")
         try:
             tokens = Scanner("p(a).").tokenize()
-            parsed_query = Parser(tokens).parse_query()
+            parsed_query = Parser(tokens)._parse_term()
             
             assert parsed_query is not None  # パース結果が存在する
             
@@ -206,7 +206,7 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         logger.info("Starting test: test_variable_parsing")
         try:
             tokens = Scanner("X.").tokenize()
-            parsed_query = Parser(tokens).parse_query()
+            parsed_query = Parser(tokens)._parse_term()
             
             assert parsed_query is not None  # パース結果が存在する
             
@@ -231,7 +231,7 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         logger.info("Starting test: test_equal_operator_parsing")
         try:
             tokens = Scanner("X = a.").tokenize()
-            parsed_query = Parser(tokens).parse_query()
+            parsed_query = Parser(tokens)._parse_term()
             
             assert parsed_query is not None  # パース結果が存在する
             

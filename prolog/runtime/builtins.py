@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from prolog.core.merge_bindings import merge_bindings
-# Unused imports: Cut as CoreCut, Fail as CoreFail
+from prolog.core.types import Term, TRUE_TERM, FALSE_TERM
 
 
 class BuiltinsBase(ABC):
@@ -111,7 +111,7 @@ class DatabaseOp(ABC):
         pass
 
     @abstractmethod
-    def execute(self, runtime):  # Changed parameter name from remove_rule to runtime
+    def execute(self, runtime):
         pass
 
     def query(self, runtime, bindings=None):
@@ -119,42 +119,19 @@ class DatabaseOp(ABC):
             bindings = {}
 
         if hasattr(self.arg, "query"):
-            param_bound = list(
-                self.arg.query(runtime)
-            )  # As per user's initial prompt, no bindings passed to self.arg.query
-            if param_bound:  # if arg.query succeeded and yielded results
-                param_bound_term = param_bound[0]  # Take the first result (a Term)
-
-                # The self.match(param_bound_term) part:
-                # self is DatabaseOp instance, e.g. Retract(X)
-                # param_bound_term is a Term, e.g. my_fact(a)
-                # DatabaseOp.match(self, other) is:
-                #   bindings_map = dict()
-                #   if self != other: bindings_map[self] = other
-                #   return bindings_map
-                # So, match_result_bindings = {Retract(X): my_fact(a)} if they differ.
+            param_bound = list(self.arg.query(runtime))
+            if param_bound:
+                param_bound_term = param_bound[0]
                 match_result_bindings = self.match(param_bound_term)
-
                 unified = merge_bindings(match_result_bindings, bindings)
-                # unified now might contain {Retract(X): my_fact(a), ... existing bindings ...}
-
                 substituted = self.substitute(unified)
-                # For Retract(X).substitute(unified):
-                #   value = unified.get(Retract(X), None) -> my_fact(a)
-                #   if value (my_fact(a)) is not None and hasattr(value, 'substitute'):
-                #     if hasattr(my_fact(a), 'args') and my_fact(a).args: -> e.g. arg is 'a'
-                #       return Retract(my_fact(a).args[0].substitute(unified)) -> Retract('a'.substitute(unified)) -> Retract('a')
-                #     elif isinstance(my_fact(a), DatabaseOp): ...
-                #     else: return Retract(my_fact(a)) -> Retract(my_fact(a))
-                # This logic seems to be what the user intended for DatabaseOp argument resolution.
-
                 if substituted is not None and hasattr(substituted, "execute"):
                     substituted.execute(runtime)
-            else:  # self.arg.query failed or yielded no results
+            else:
                 substituted = self.substitute(bindings)
                 if substituted is not None and hasattr(substituted, "execute"):
                     substituted.execute(runtime)
-        else:  # self.arg is not queryable (e.g., a simple term like `foo(a)` or a variable)
+        else:
             substituted = self.substitute(bindings)
             if substituted is not None and hasattr(substituted, "execute"):
                 substituted.execute(runtime)
@@ -164,41 +141,28 @@ class DatabaseOp(ABC):
 
 class Retract(DatabaseOp):
     def __init__(self, arg):
-        super().__init__(arg)  # Call parent __init__
+        super().__init__(arg)
         self.pred = "retract"
-        # self.arg = arg # Already done by super
 
     def substitute(self, bindings):
-        # This substitution logic is from the user's initial prompt
-        value = bindings.get(self, None)  # Check if the DatabaseOp itself is bound
-        if value is not None and hasattr(
-            value, "substitute"
-        ):  # If `retract(X)` is bound to `retract(foo(a))`
-            # `value` would be the `retract(foo(a))` term.
-            # We need to return a new `Retract` instance with the argument from `value`.
+        value = bindings.get(self, None)
+        if value is not None and hasattr(value, "substitute"):
             if hasattr(value, "args") and value.args:
-                return Retract(
-                    value.args[0].substitute(bindings)
-                )  # Substitute the arg of the bound value
-            elif isinstance(
-                value, DatabaseOp
-            ):  # If bound to another DatabaseOp instance
-                return Retract(value.arg.substitute(bindings))  # Substitute its arg
-            else:  # If bound to a simple term, use it as the argument
-                return Retract(value)  # Or value.substitute(bindings) if it's a term?
+                return Retract(value.args[0].substitute(bindings))
+            elif isinstance(value, DatabaseOp):
+                return Retract(value.arg.substitute(bindings))
+            else:
+                return Retract(value)
 
-        # If the DatabaseOp itself is not bound, substitute its argument
         if hasattr(self.arg, "substitute"):
             substituted_arg = self.arg.substitute(bindings)
             if substituted_arg is not None:
                 return Retract(substituted_arg)
-            return None  # If arg substitution fails
-        return Retract(
-            self.arg
-        )  # Arg is not substitutable (e.g. a Python string/number)
+            return None
+        return Retract(self.arg)
 
     def execute(self, runtime):
-        if hasattr(runtime, "remove_rule"):  # Check if runtime can remove_rule
+        if hasattr(runtime, "remove_rule"):
             runtime.remove_rule(self.arg)
 
     def __str__(self):
@@ -210,9 +174,8 @@ class Retract(DatabaseOp):
 
 class AssertA(DatabaseOp):
     def __init__(self, arg):
-        super().__init__(arg)  # Call parent __init__
+        super().__init__(arg)
         self.pred = "asserta"
-        # self.arg = arg
 
     def substitute(self, bindings):
         value = bindings.get(self, None)
@@ -244,9 +207,8 @@ class AssertA(DatabaseOp):
 
 class AssertZ(DatabaseOp):
     def __init__(self, arg):
-        super().__init__(arg)  # Call parent __init__
+        super().__init__(arg)
         self.pred = "assertz"
-        # self.arg = arg
 
     def substitute(self, bindings):
         value = bindings.get(self, None)
@@ -274,3 +236,41 @@ class AssertZ(DatabaseOp):
 
     def __repr__(self):
         return str(self)
+
+
+# BuiltinCutとBuiltinFailクラスを追加
+class Cut(Term):
+    """カット演算子のBuiltin実装"""
+    def __init__(self):
+        super().__init__("!")
+        self.pred = "!"
+
+    def substitute(self, bindings):
+        return self
+
+    def __str__(self):
+        return "!"
+
+    def __repr__(self):
+        return "Cut()"
+
+
+class Fail(Term):
+    """Fail演算子のBuiltin実装"""
+    def __init__(self):
+        super().__init__("fail")
+        self.pred = "fail"
+
+    def substitute(self, bindings):
+        return self
+
+    def __str__(self):
+        return "fail"
+
+    def __repr__(self):
+        return "Fail()"
+
+
+# エイリアス（後方互換性のため）
+BuiltinCut = Cut
+BuiltinFail = Fail

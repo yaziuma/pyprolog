@@ -9,7 +9,7 @@ def test_insert_rule_left(): # asserta (direct runtime call)
     room(kitchen).
     '''
     tokens = Scanner(initial_rules_text).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     original_rule_count = len(runtime.rules)
@@ -45,7 +45,7 @@ def test_insert_rule_right(): # assertz (direct runtime call)
     room(kitchen).
     '''
     tokens = Scanner(initial_rules_text).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     original_rule_count = len(runtime.rules)
@@ -77,7 +77,7 @@ def test_remove_rule_fact(): # retract (direct runtime call for a fact)
     room(bathroom). 
     '''
     tokens = Scanner(initial_rules_text).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     original_rule_count = len(runtime.rules)
@@ -119,7 +119,7 @@ def test_remove_complex_rule(): # retract (direct runtime call for a rule with b
     take(pen). % Another rule for take/1
     '''
     tokens = Scanner(initial_rules_text).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     original_rule_count = len(runtime.rules)
@@ -184,7 +184,7 @@ def test_retract_rule_builtin_context(): # retract used within a rule
     disappear(Place) :- retract(here(Place)). 
     '''
     tokens = Scanner(initial_rules_text).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     # Initial rules: here(kitchen), here(office), disappear(P) :- retract(here(P)).
@@ -216,7 +216,7 @@ def test_retract_and_asserta_rule_builtin_context():
     # unless `retract/1` is defined to backtrack and retract all on redo (which is standard).
     # Let's assume it retracts the first one it finds.
     tokens = Scanner(initial_rules_text).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     # here(kitchen), move(NP) :- ...
@@ -256,7 +256,7 @@ def test_assertz_rule_builtin_context():
     appear(Item) :- assertz(block(Item)).
     '''
     tokens = Scanner(initial_rules_text).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     # block(a), appear(I) :- ...

@@ -8,7 +8,7 @@ def test_logic_equal():
     sum_eq_4(Y) :- X is Y + 2, X =:= 4.
     ''' 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
 
@@ -28,7 +28,7 @@ def test_logic_not_equal():
     sum_not_eq_4(Y) :- X is Y + 2, X =\= 4.
     ''' 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
 
@@ -47,7 +47,7 @@ def test_logic_greater():
     sum_gt_4(Y) :- X is Y + 2, X > 4.
     '''
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
 
@@ -72,7 +72,7 @@ def test_logic_greater_or_equal():
     sum_ge_4(Y) :- X is Y + 2, X >= 4.
     '''
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
 
@@ -96,7 +96,7 @@ def test_logic_less():
     sum_lt_4(Y) :- X is Y + 2, X < 4.
     '''
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
 
@@ -121,7 +121,7 @@ def test_logic_less_or_equal():
     sum_le_4(Y) :- X is Y + 2, X =< 4.
     ''' 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
 

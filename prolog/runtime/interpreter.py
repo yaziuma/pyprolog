@@ -1,6 +1,4 @@
 import io
-
-# from typing import cast # Not used in the design doc's Runtime snippets
 from prolog.core.types import (
     Term,
     Variable,
@@ -9,34 +7,25 @@ from prolog.core.types import (
     TRUE_TERM,
     FALSE_TERM,
     CUT_SIGNAL,
-    FAIL_TERM,  # Import renamed singletons
+    FAIL_TERM,
 )
-
-# from prolog.types import TermFunction  # TODO: implement # Import TermFunction
 from prolog.parser.token_type import TokenType
 from prolog.util.logger import logger
 from prolog.core.binding_environment import BindingEnvironment
 
-# Ensure builtins are correctly referenced, assuming prolog.builtins for these
+# BuiltinCutとBuiltinFailをインポート
 from prolog.runtime.builtins import Cut as BuiltinCut, Fail as BuiltinFail
-
-# Scanner and Parser will be imported inside methods to break circular dependency
-
-# Rule and Conjunction classes are now imported from prolog.core_types.
-# Their definitions have been removed from this file.
 
 
 class Runtime:
     def __init__(self, rules):
-        # logger.debug(f"Runtime initialized with rules (count: {len(rules)}): {rules[:3]}{'...' if len(rules) > 3 else ''}")
-        self.rules = rules  # List of Rule objects
+        self.rules = rules
         self.stream = io.StringIO()
         self.stream_pos = 0
         self.binding_env = BindingEnvironment()
-        self._registered_functions = {}  # For TermFunction
+        self._registered_functions = {}
 
     def __del__(self):
-        # logger.debug("Runtime.__del__ called")
         self.stream.close()
 
     def stream_write(self, text):
@@ -49,7 +38,6 @@ class Runtime:
         return line
 
     def reset_stream(self):
-        # logger.debug("Runtime.reset_stream called")
         self.stream.seek(0)
         self.stream.truncate(0)
         self.stream_pos = 0
@@ -58,7 +46,6 @@ class Runtime:
         from prolog.parser.scanner import Scanner
         from prolog.parser.parser import Parser
 
-        # logger.debug(f"Runtime.consult_rules called with: {rules_str[:100]}{'...' if len(rules_str) > 100 else ''}")
         if not rules_str.strip():
             return
 
@@ -66,27 +53,22 @@ class Runtime:
         if not tokens or (len(tokens) == 1 and tokens[0].token_type == TokenType.EOF):
             return
 
-        new_rules = Parser(
-            tokens
-        ).parse_rules()  # This should return list of Rule objects
+        new_rules = Parser(tokens)._parse_rule()
         self.rules.extend(new_rules)
 
     def query(self, query_str):
         from prolog.parser.scanner import Scanner
         from prolog.parser.parser import Parser
-        # logger.debug(f"Runtime.query called with: '{query_str}'")
 
-        self.binding_env = BindingEnvironment()  # Reset for each new query
+        # 新しいクエリごとにバインディング環境をリセット
+        self.binding_env = BindingEnvironment()
 
         tokens = Scanner(query_str).tokenize()
-        # logger.debug(f"Runtime.query: tokens (first 5): {tokens[:5]}{'...' if len(tokens) > 5 else ''}")
 
         if not tokens or (len(tokens) == 1 and tokens[0].token_type == TokenType.EOF):
-            # logger.debug("Runtime.query: no relevant tokens, returning (no solutions).")
             return
 
-        parsed_query = Parser(tokens).parse_query()
-        # logger.debug(f"Runtime.query: parsed_query: {parsed_query}, type: {type(parsed_query)}")
+        parsed_query = Parser(tokens)._parse_term()
 
         query_vars = []
 
@@ -94,12 +76,12 @@ class Runtime:
             if isinstance(term, Variable):
                 if term.name != "_" and term not in found_vars_list:
                     found_vars_list.append(term)
-            elif isinstance(term, Rule):  # Check Rule first as it's more specific
+            elif isinstance(term, Rule):
                 if hasattr(term, "head") and term.head is not None:
                     find_variables(term.head, found_vars_list)
                 if hasattr(term, "body") and term.body is not None:
                     find_variables(term.body, found_vars_list)
-            elif isinstance(term, Term):  # General Term (includes Conjunction)
+            elif isinstance(term, Term):
                 if hasattr(term, "args") and term.args is not None:
                     for arg_item in term.args:
                         find_variables(arg_item, found_vars_list)
@@ -108,18 +90,11 @@ class Runtime:
         find_variables(parsed_query, temp_query_vars)
         query_vars = temp_query_vars
 
-        # logger.debug(f"Runtime.query: Found variables in query: {[var.name for var in query_vars if var is not None]}")
-
         solution_count = 0
         for solution_item in self.execute(parsed_query):
-            # logger.debug(f"Runtime.query: solution_item from execute: {solution_item}, type: {type(solution_item)}")
-
-            if (
-                solution_item is FALSE_TERM or solution_item is None
-            ):  # Use singleton instance
-                # logger.debug("Runtime.query: solution_item is FALSE_TERM or None, skipping.")
+            if solution_item is FALSE_TERM or solution_item is None:
                 continue
-            if solution_item is CUT_SIGNAL:  # Use singleton instance
+            if solution_item is CUT_SIGNAL:
                 logger.warning("Runtime.query: CUT_SIGNAL reached top-level query.")
                 break
 
@@ -133,21 +108,16 @@ class Runtime:
                 if current_bindings or not query_vars:
                     solution_count += 1
                     yield current_bindings
-            elif solution_item is TRUE_TERM:  # Use singleton instance
+            elif solution_item is TRUE_TERM:
                 solution_count += 1
                 yield {}
 
-        # logger.info(f"Runtime.query for '{query_str}' finished. Total solutions yielded: {solution_count}")
-
-    # Methods for dynamic rule manipulation (asserta, assertz, retract)
     def asserta(self, rule_to_assert):
         if not isinstance(rule_to_assert, Rule):
             if isinstance(rule_to_assert, Term):
                 rule_to_assert = Rule(rule_to_assert, TRUE_TERM)
             else:
-                logger.error(
-                    f"asserta: Expected Rule or Term, got {type(rule_to_assert)}"
-                )
+                logger.error(f"asserta: Expected Rule or Term, got {type(rule_to_assert)}")
                 return False
         self.rules.insert(0, rule_to_assert)
         return True
@@ -157,9 +127,7 @@ class Runtime:
             if isinstance(rule_to_assert, Term):
                 rule_to_assert = Rule(rule_to_assert, TRUE_TERM)
             else:
-                logger.error(
-                    f"assertz: Expected Rule or Term, got {type(rule_to_assert)}"
-                )
+                logger.error(f"assertz: Expected Rule or Term, got {type(rule_to_assert)}")
                 return False
         self.rules.append(rule_to_assert)
         return True
@@ -170,33 +138,14 @@ class Runtime:
         for r in self.rules:
             if not retracted_once:
                 can_match = False
-                # Simplified matching for retract. A full implementation needs robust unification.
-                # If rule_template_to_retract is a Rule, attempt to match head and body.
-                # If it's a Term, attempt to match r.head.
                 if isinstance(rule_template_to_retract, Rule):
-                    # This requires Rule to have a proper __eq__ or a match method.
-                    # For now, assume a simple direct comparison or head predicate/arity match.
-                    if r.head.pred == rule_template_to_retract.head.pred and len(
-                        r.head.args
-                    ) == len(rule_template_to_retract.head.args):
-                        # A more complete check would unify r.head with rule_template_to_retract.head
-                        # and r.body with rule_template_to_retract.body using a temporary BindingEnvironment.
-                        # For now, if heads match by pred/arity and bodies are structurally similar (e.g. both TRUE_TERM)
-                        if type(r.body) is type(
-                            rule_template_to_retract.body
-                        ):  # Simplistic body check
-                            # This is still a placeholder. Real unification is needed.
-                            # Let's assume if the test provides a Rule object, it expects exact match.
-                            if r == rule_template_to_retract:  # Requires Rule.__eq__
+                    if (r.head.pred == rule_template_to_retract.head.pred and 
+                        len(r.head.args) == len(rule_template_to_retract.head.args)):
+                        if type(r.body) is type(rule_template_to_retract.body):
+                            if r == rule_template_to_retract:
                                 can_match = True
-
                 elif isinstance(rule_template_to_retract, Term):
                     temp_env = BindingEnvironment()
-                    # Create a fresh copy of r.head to avoid side effects during unification test
-                    # This is important if r.head contains variables.
-                    # A simple way: r_head_copy = r.head.substitute({})
-                    # However, substitute might not be deep enough or might create new var names.
-                    # For now, assume unify handles this correctly or that heads are ground.
                     if temp_env.unify(r.head, rule_template_to_retract):
                         can_match = True
 
@@ -219,11 +168,7 @@ class Runtime:
 
     def register_function(self, predicate_name, arity, python_callable):
         logger.info(f"Runtime.register_function for {predicate_name}/{arity}.")
-        # Store the callable. It's assumed that the parser or a specific mechanism
-        # will create TermFunction instances for these when they appear in queries/rules.
         self._registered_functions[(predicate_name, arity)] = python_callable
-        # This registration itself doesn't make them callable through normal rule lookup.
-        # `execute` needs to handle `TermFunction` instances.
 
     def _execute_conjunction(self, conjunction):
         def execute_goals_recursive(index):
@@ -270,27 +215,13 @@ class Runtime:
             yield CUT_SIGNAL
             return
 
-        # Handle TermFunction before general Term processing
-        if isinstance(query_obj, TermFunction):
-            # logger.debug(f"Runtime.execute: query_obj is TermFunction: {query_obj}")
-            # The original TermFunction._execute_func modified its own args.
-            # We need to replicate that behavior or adapt.
-            # Let's assume query_obj._execute_func() is called and it updates query_obj.args
-            # then we attempt to unify this (now concrete) term.
+        # TermFunction処理（もし実装されている場合）
+        if hasattr(query_obj, '_execute_func') and callable(getattr(query_obj, '_execute_func')):
             try:
-                # This is a bit of a guess based on prolog.types.TermFunction.match
-                # It implies the function is executed, its results become args,
-                # and then it's treated like a fact to be unified.
-                query_obj._execute_func()  # Modifies query_obj.args in place
-                # logger.debug(f"Runtime.execute[TermFunction]: after _execute_func, query_obj: {query_obj}")
-                # Now, this TermFunction (with concrete args) needs to "succeed".
-                # If it were to be unified against something, that would happen here.
-                # For a standalone TermFunction goal, executing it and it not failing means success.
+                query_obj._execute_func()
                 yield TRUE_TERM
             except Exception:
-                # logger.error(f"Runtime.execute[TermFunction]: Error executing function for {query_obj}: {e}")
-                # Execution of the Python function failed, so the Prolog goal fails.
-                pass  # Yield nothing for failure
+                pass
             return
 
         if isinstance(query_obj, Rule):
@@ -310,6 +241,7 @@ class Runtime:
             return
 
         elif isinstance(query_obj, Term):
+            # '=' の特別処理
             if query_obj.pred == "=":
                 if len(query_obj.args) == 2:
                     lhs, rhs = query_obj.args
@@ -317,26 +249,17 @@ class Runtime:
                         yield TRUE_TERM
                     return
 
+            # データベースルールとのマッチング
             for db_rule_template in self.rules:
-                # Standardize apart: Create a fresh copy of the rule.
-                # Rule.substitute({}) is a way to get new Variable instances.
-                # A more robust solution might involve a dedicated "freshen" method.
-                current_scope_id = (
-                    self.binding_env.get_next_scope_id()
-                )  # For unique var names
+                # 新しいスコープIDで変数を標準化
+                current_scope_id = self.binding_env.get_next_scope_id()
 
-                # Simple freshening by creating new variable instances.
-                # This relies on Variable.__hash__ and __eq__ being based on unique IDs or names + scope.
-                # For now, assume substitute({}) and BindingEnvironment handle distinctness.
-                # A more explicit way:
                 var_map = {}
 
                 def freshen_term(t):
                     if isinstance(t, Variable):
                         if t not in var_map:
-                            var_map[t] = Variable(
-                                f"{t.name}_{current_scope_id}"
-                            )  # Or just new instance
+                            var_map[t] = Variable(f"{t.name}_{current_scope_id}")
                         return var_map[t]
                     elif isinstance(t, Term):
                         return Term(t.pred, *[freshen_term(arg) for arg in t.args])
@@ -346,9 +269,8 @@ class Runtime:
                 fresh_body = freshen_term(db_rule_template.body)
                 fresh_rule = Rule(fresh_head, fresh_body)
 
-                if fresh_rule.head.pred == query_obj.pred and len(
-                    fresh_rule.head.args
-                ) == len(query_obj.args):
+                if (fresh_rule.head.pred == query_obj.pred and 
+                    len(fresh_rule.head.args) == len(query_obj.args)):
                     mark = self.binding_env.mark_trail()
                     if self.binding_env.unify(fresh_rule.head, query_obj):
                         for body_result in self.execute(fresh_rule.body):
@@ -356,19 +278,10 @@ class Runtime:
                                 continue
                             if body_result is CUT_SIGNAL:
                                 yield CUT_SIGNAL
-                                # Cut from body commits to this rule. Do not backtrack `mark` for this rule choice.
-                                # However, the bindings made by this rule attempt up to the cut are kept.
-                                # The cut prunes other choices for `query_obj` and other choices for goals in `fresh_rule.body` after the cut.
                                 return
                             yield TRUE_TERM
-                            # Backtrack for next solution from *this rule's body*
-                            # The mark is for the *entire rule attempt*.
-                            # When Prolog backtracks here, it asks `execute(fresh_rule.body)` for its next solution.
-                            # No explicit backtrack/re-mark here inside the body solution loop for this specific purpose.
 
-                        # After body is exhausted for this rule instance
                         self.binding_env.backtrack(mark)
-                        # No re-mark here; the loop `for db_rule_template` continues to the next rule.
                     else:
                         self.binding_env.backtrack(mark)
             return

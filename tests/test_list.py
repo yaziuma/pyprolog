@@ -156,7 +156,7 @@ def test_parser_match_list_with_simple_terms():
     '''
 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
 
     runtime = Runtime(rules)
 
@@ -175,7 +175,7 @@ def test_parser_bind_list_with_simple_terms():
     '''
 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
 
     runtime = Runtime(rules)
 
@@ -211,7 +211,7 @@ def test_parser_match_list_with_wrong_number_of_vars():
     '''
 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
 
     runtime = Runtime(rules)
 
@@ -230,7 +230,7 @@ def test_parser_bind_list_with_vars():
     '''
 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
 
     runtime = Runtime(rules)
 
@@ -258,7 +258,7 @@ def test_parser_bind_list_with_bar_tail_var():
     '''
 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
 
     runtime = Runtime(rules)
 
@@ -286,7 +286,7 @@ def test_parser_list_with_head_and_bar_tail_var():
     '''
 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
 
     runtime = Runtime(rules)
 
@@ -314,7 +314,7 @@ def test_parser_list_with_head_and_bar_tail_list():
     '''
 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
 
     runtime = Runtime(rules)
 
