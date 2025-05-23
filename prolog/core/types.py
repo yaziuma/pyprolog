@@ -249,6 +249,28 @@ FALSE_TERM = FALSEClass()
 CUT_SIGNAL = CUTClass()
 FAIL_TERM = Fail()
 
+# List-related constants and helpers
+EMPTY_LIST_ATOM = Term("[]")
+
+def is_list(term):
+    """Checks if a term is a Prolog list (either empty or a dot pair)."""
+    return is_empty_list(term) or (isinstance(term, Term) and term.pred == '.' and len(term.args) == 2)
+
+def is_empty_list(term):
+    """Checks if a term is the empty list atom '[]'."""
+    return isinstance(term, Term) and term.pred == '[]' and not term.args
+
+def get_list_head(term):
+    """Gets the head of a list. Assumes term is a non-empty list."""
+    if not is_list(term) or is_empty_list(term):
+        raise TypeError("Term is not a non-empty list.")
+    return term.args[0]
+
+def get_list_tail(term):
+    """Gets the tail of a list. Assumes term is a non-empty list."""
+    if not is_list(term) or is_empty_list(term):
+        raise TypeError("Term is not a non-empty list.")
+    return term.args[1]
 
 # 後方互換性のための関数形式（廃止予定）
 def TRUE():
