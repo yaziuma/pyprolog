@@ -10,7 +10,7 @@ class TestListProcessing(BaseTestCore):
     def test_parse_empty_list_direct(self):
         logger.info("Starting test: test_parse_empty_list_direct")
         rule_tokens = Scanner("p([]).").tokenize()
-        parsed_rule = Parser(rule_tokens).parse_rules()[0]
+        parsed_rule = Parser(rule_tokens)._parse_rule()[0]
         empty_list_term = parsed_rule.head.args[0]
 
         assert isinstance(empty_list_term, Dot), "Empty list should be parsed as a Dot object."

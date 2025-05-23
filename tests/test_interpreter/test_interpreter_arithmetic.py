@@ -9,7 +9,7 @@ def test_support_for_numbers():
     window(error, 15, 4.0, 20, 78).
     '''
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     # The original query 'window(T, X, X, Z, W).' implies X should unify with itself.
@@ -49,7 +49,7 @@ def test_support_for_numbers():
     window(error, 15, 4.0, 20, 78).
     '''
     tokens_adj = Scanner(source_adjusted).tokenize()
-    rules_adj = Parser(tokens_adj).parse_rules()
+    rules_adj = Parser(tokens_adj)._parse_rule()
     assert rules_adj is not None
     runtime_adj = Runtime(rules_adj)
     goal_text = 'window(T, X, X, Z, W).' 
@@ -86,7 +86,7 @@ def test_simple_arithmetics():
     test(Y) :- Y is 5 + 2 * 3 - 1.
     ''' 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     goal_text = "test(Res)." 
@@ -106,7 +106,7 @@ def test_arithmetics_with_grouping():
     test(Z) :- Z is (5 + 2) * (3 - 1).
     ''' 
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     goal_text = "test(Res)."
@@ -126,7 +126,7 @@ def test_arithmetics_with_variables():
     c_to_f(C, F) :- F is C * 9 / 5 + 32.
     '''
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     
@@ -159,7 +159,7 @@ def test_arithmetics_with_variables_same_as_rule():
     # Here, the query variable 'F' has the same name as a variable in the rule's head.
     # This is fine, as standardization-apart should handle it.
     tokens = Scanner(source).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     

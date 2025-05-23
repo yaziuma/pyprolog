@@ -98,7 +98,7 @@ def test_puzzle1():
         exists(house(_, ZebraOwner, _, _, zebra), Houses).
     '''
     tokens = Scanner(puzzle_rules_text).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     goal_text = 'solution(WaterDrinker, ZebraOwner).'
@@ -168,7 +168,7 @@ def test_puzzle2():
     exists(house(_, FishOwner, _, _, fish), Houses).
     '''
     tokens = Scanner(puzzle_rules_text).tokenize()
-    rules = Parser(tokens).parse_rules()
+    rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     goal_text = 'solution(FishOwner).'

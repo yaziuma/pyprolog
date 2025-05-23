@@ -99,7 +99,7 @@ def run_repl(runtime):
                 continue
 
             try:
-                goal = Parser(Scanner(query).tokenize()).parse_query()
+                goal = Parser(Scanner(query).tokenize())._parse_term()
 
                 runtime.reset_stream()
 
