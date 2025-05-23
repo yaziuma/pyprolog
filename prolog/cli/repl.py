@@ -5,11 +5,11 @@ from prompt_toolkit import prompt
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from pathlib import Path
-from .parser import Parser
-from .scanner import Scanner
-from .interpreter import Variable, Rule
-from .errors import InterpreterError, ScannerError
-from .types import FALSE, CUT, Dot, Bar
+from prolog.parser.parser import Parser
+from prolog.parser.scanner import Scanner
+from prolog.core.types import Variable, Rule
+from prolog.core.errors import InterpreterError, ScannerError
+from prolog.parser.types import Dot, Bar`nfrom prolog.core.types import FALSE_TERM as FALSE, CUT_SIGNAL as CUT
 
 
 init(autoreset=True)

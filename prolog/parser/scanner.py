@@ -5,14 +5,17 @@ from prolog.util.logger import logger
 
 logger.debug("scanner.py loaded")
 
+
 def default_error_handler(line, message):
-    print(f'Line[{line}] Error: {message}')
-    raise ScannerError('Scanner error')
+    print(f"Line[{line}] Error: {message}")
+    raise ScannerError("Scanner error")
 
 
 class Scanner:
     def __init__(self, source, report=default_error_handler):
-        logger.debug(f"Scanner initialized with source: {source[:50]}{'...' if len(source) > 50 else ''}")
+        logger.debug(
+            f"Scanner initialized with source: {source[:50]}{'...' if len(source) > 50 else ''}"
+        )
         self._source = source
         self._tokens = []
         self._start = 0
@@ -23,17 +26,17 @@ class Scanner:
 
     def _initialize_keywords(self):
         keywords = {
-            'fail': TokenType.FAIL,
-            'write': TokenType.WRITE,
-            'nl': TokenType.NL,
-            'tab': TokenType.TAB,
-            'is': TokenType.IS,
-            'retract': TokenType.RETRACT,
-            'asserta': TokenType.ASSERTA,
-            'assertz': TokenType.ASSERTZ,
-            'true': TokenType.TRUE,
-            'mod': TokenType.MOD,
-            'div': TokenType.DIV,
+            "fail": TokenType.FAIL,
+            "write": TokenType.WRITE,
+            "nl": TokenType.NL,
+            "tab": TokenType.TAB,
+            "is": TokenType.IS,
+            "retract": TokenType.RETRACT,
+            "asserta": TokenType.ASSERTA,
+            "assertz": TokenType.ASSERTZ,
+            "true": TokenType.TRUE,
+            "mod": TokenType.MOD,
+            "div": TokenType.DIV,
         }
         return keywords
 
@@ -41,9 +44,7 @@ class Scanner:
         self._add_token_with_literal(token_type, None)
 
     def _add_token_with_literal(self, token_type, literal, lex=None):
-        lexeme = (
-            self._source[self._start : self._current] if lex is None else lex
-        )
+        lexeme = self._source[self._start : self._current] if lex is None else lex
         # logger.debug(f"Adding token: type={token_type}, lexeme='{lexeme}', literal={literal}, line={self._line}") # Potentially too verbose
         self._tokens.append(Token(token_type, lexeme, literal, self._line))
 
@@ -70,33 +71,33 @@ class Scanner:
 
     def _peek(self):
         if self._is_at_end():
-            return '\0'
+            return "\0"
         return self._source[self._current]
 
     def _peek_next(self):
         if self._current + 1 >= len(self._source):
-            return '\0'
+            return "\0"
         return self._source[self._current + 1]
 
     def _is_digit(self, c):
-        return c >= '0' and c <= '9'
+        return c >= "0" and c <= "9"
 
     def _is_alphanumeric(self, c):
         return (
-            (c >= 'a' and c <= 'z')
-            or (c >= 'A' and c <= 'Z')
-            or (c >= '0' and c <= '9')
-            or (c == '_')
+            (c >= "a" and c <= "z")
+            or (c >= "A" and c <= "Z")
+            or (c >= "0" and c <= "9")
+            or (c == "_")
         )
 
     def _is_lowercase_alpha(self, c):
-        return c >= 'a' and c <= 'z'
+        return c >= "a" and c <= "z"
 
     def _is_uppercase_alpha(self, c):
-        return c >= 'A' and c <= 'Z'
+        return c >= "A" and c <= "Z"
 
     def _is_whitespace(self, c):
-        return c == ' ' or c == '\r' or c == '\t'
+        return c == " " or c == "\r" or c == "\t"
 
     def _str_to_number(self, strnum):
         try:
@@ -126,7 +127,7 @@ class Scanner:
         while self._is_digit(self._peek()):
             self._advance()
 
-        if self._peek() == '.' and self._is_digit(self._peek_next()):
+        if self._peek() == "." and self._is_digit(self._peek_next()):
             self._advance()
             while self._is_digit(self._peek()):
                 self._advance()
@@ -136,12 +137,12 @@ class Scanner:
 
     def _process_string_literal(self):
         while self._peek() != "'" and not self._is_at_end():
-            if self._peek() == '\n':
+            if self._peek() == "\n":
                 self._line += 1
             self._advance()
 
         if self._is_at_end():
-            self._report(self._line, 'Unterminated string')
+            self._report(self._line, "Unterminated string")
 
         self._advance()
 
@@ -153,81 +154,81 @@ class Scanner:
 
         if self._is_whitespace(c):
             pass
-        elif c == '\n':
+        elif c == "\n":
             self._line += 1
-        elif c == '%':
-            while not self._peek() == '\n' and not self._is_at_end():
+        elif c == "%":
+            while not self._peek() == "\n" and not self._is_at_end():
                 self._advance()
-        elif c == '/' and self._is_next('*'):
+        elif c == "/" and self._is_next("*"):
             while not self._is_at_end():
                 c = self._advance()
-                if c == '*' and self._is_next('/'):
+                if c == "*" and self._is_next("/"):
                     break
                 if self._is_at_end():
-                    self._report(self._line, 'Unterminated comment')
+                    self._report(self._line, "Unterminated comment")
         elif c == "'":
             self._process_string_literal()
         elif self._is_lowercase_alpha(c):
             self._process_atom()
-        elif c == '_':
+        elif c == "_":
             if not self._is_alphanumeric(self._peek_next()):
                 self._add_token(TokenType.UNDERSCORE)
             else:
                 self._process_variable()
         elif self._is_uppercase_alpha(c):
             self._process_variable()
-        elif c == '-' and self._is_digit(self._peek()):
+        elif c == "-" and self._is_digit(self._peek()):
             # TODO: refactor this logic to unary operator
             self._process_number()
         elif self._is_digit(c):
             self._process_number()
-        elif c == '[':
+        elif c == "[":
             self._add_token(TokenType.LEFTBRACKET)
-        elif c == ']':
+        elif c == "]":
             self._add_token(TokenType.RIGHTBRACKET)
-        elif c == '|':
+        elif c == "|":
             self._add_token(TokenType.BAR)
-        elif c == '!':
+        elif c == "!":
             self._add_token(TokenType.CUT)
-        elif c == '(':
+        elif c == "(":
             self._add_token(TokenType.LEFTPAREN)
-        elif c == ')':
+        elif c == ")":
             self._add_token(TokenType.RIGHTPAREN)
-        elif c == '*':
+        elif c == "*":
             self._add_token(TokenType.STAR)
-        elif c == '/':
+        elif c == "/":
             self._add_token(TokenType.SLASH)
-        elif c == '+':
+        elif c == "+":
             self._add_token(TokenType.PLUS)
-        elif c == '-':
+        elif c == "-":
             self._add_token(TokenType.MINUS)
-        elif c == '=' and self._is_next('='):
+        elif c == "=" and self._is_next("="):
             self._add_token(TokenType.EQUALEQUAL)
-        elif c == '=' and self._is_next('/'):
+        elif c == "=" and self._is_next("/"):
             self._add_token(TokenType.EQUALSLASH)
-        elif c == '=':  # 単独の = 演算子
+        elif c == "=":  # 単独の = 演算子
             self._add_token(TokenType.EQUAL)
-        elif c == '=' and self._is_next('/'):
+        elif c == "=" and self._is_next("/"):
             self._add_token(TokenType.EQUALSLASH)
-        elif c == '=' and self._is_next('<'):
+        elif c == "=" and self._is_next("<"):
             self._add_token(TokenType.EQUALLESS)
-        elif c == '<':
+        elif c == "<":
             self._add_token(TokenType.LESS)
-        elif c == '>' and self._is_next('='):
+        elif c == ">" and self._is_next("="):
             self._add_token(TokenType.GREATEREQUAL)
-        elif c == '>':
+        elif c == ">":
             self._add_token(TokenType.GREATER)
-        elif c == ':':
-            if self._is_next('-'):
+        elif c == ":":
+            if self._is_next("-"):
                 self._add_token(TokenType.COLONMINUS)
             else:
-                self._report(self._line, f'Expected `-` but found `{c}`')
-        elif c == '.':
+                self._report(self._line, f"Expected `-` but found `{c}`")
+        elif c == ".":
             self._add_token(TokenType.DOT)
-        elif c == ',':
+        elif c == ",":
             self._add_token(TokenType.COMMA)
         else:
-            self._report(self._line, f'Unexpected character: {c}')
+            self._report(self._line, f"Unexpected character: {c}")
 
     def tokenize(self):
         logger.debug("Scanner.tokenize called")
@@ -236,5 +237,7 @@ class Scanner:
             self._scan_token()
 
         self._add_token(TokenType.EOF)
-        logger.debug(f"Scanner.tokenize returning (first 5): {self._tokens[:5]}{'...' if len(self._tokens) > 5 else ''}")
+        logger.debug(
+            f"Scanner.tokenize returning (first 5): {self._tokens[:5]}{'...' if len(self._tokens) > 5 else ''}"
+        )
         return self._tokens

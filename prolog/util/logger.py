@@ -29,7 +29,10 @@ def setup_logger(name: str = "prolog_mcp") -> logging.Logger:
     logger.setLevel(logging.DEBUG)
 
     # ログフォーマットの設定
-    formatter = logging.Formatter("[%(asctime)s] %(levelname)-8s %(name)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    formatter = logging.Formatter(
+        "[%(asctime)s] %(levelname)-8s %(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     # ファイルハンドラの設定（ログローテーション付き）
     file_handler = RotatingFileHandler(
@@ -40,7 +43,9 @@ def setup_logger(name: str = "prolog_mcp") -> logging.Logger:
     )
     # pytest実行中はファイルへのログ出力を抑制する
     if "PYTEST_CURRENT_TEST" in os.environ:
-        file_handler.setLevel(logging.CRITICAL + 1)  # CRITICALより上のレベルを設定して事実上無効化
+        file_handler.setLevel(
+            logging.CRITICAL + 1
+        )  # CRITICALより上のレベルを設定して事実上無効化
     else:
         file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)

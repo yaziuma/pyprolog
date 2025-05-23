@@ -2,4 +2,4 @@
 from .repl import REPL
 from .prolog import main
 
-__all__ = ['REPL', 'main']
+__all__ = ["REPL", "main"]

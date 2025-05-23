@@ -1,7 +1,7 @@
-from prolog.interpreter import Runtime
-from prolog.core_types import Variable, Term, Rule, FALSE_TERM, TRUE_TERM, CUT_SIGNAL, Conjunction
-from prolog.parser import Parser
-from prolog.scanner import Scanner
+from prolog.runtime.interpreter import Runtime
+from prolog.core.types import Variable, Term, Rule, FALSE_TERM, TRUE_TERM, CUT_SIGNAL, Conjunction
+from prolog.parser.parser import Parser
+from prolog.parser.scanner import Scanner
 # For stream capture if we test write/nl/tab output
 import io
 import sys
