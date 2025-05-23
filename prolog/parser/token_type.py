@@ -24,9 +24,12 @@ class TokenType(Enum):
     GREATER = (auto(),)
     LESS = (auto(),)
     GREATEREQUAL = (auto(),)
-    EQUALLESS = (auto(),)
-    EQUALEQUAL = (auto(),)
-    EQUALSLASH = (auto(),)
+    EQUALLESS = (auto(),) # =<
+    LESSEQUAL = (auto(),) # <=
+    EQUALEQUAL = (auto(),) # ==
+    EQUALCOLONEQUAL = (auto(),) # =:=
+    EQUALSLASHEQUAL = (auto(),) # =\=
+    EQUALSLASH = (auto(),) # =/=
     RETRACT = (auto(),)
     ASSERTA = (auto(),)
     ASSERTZ = (auto(),)

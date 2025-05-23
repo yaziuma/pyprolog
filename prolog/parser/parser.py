@@ -350,30 +350,75 @@ class Parser:
             )
             return None  # 不明なビルトイン
 
-    def _parse_arithmetic(self, variable_token):
-        variable = self._create_variable(variable_token.lexeme)
-        if not self._token_matches(TokenType.IS):
-            self._report(
-                self._peek().line, "Expected 'is' operator for arithmetic expression."
-            )
+    def _parse_primary_arithmetic_expr(self):
+        """Parses a primary arithmetic expression (Number, Variable, or parenthesized expression)."""
+        if self._token_matches(TokenType.NUMBER):
+            token = self._advance()
+            return Number(token.literal)
+        elif self._token_matches(TokenType.VARIABLE):
+            token = self._advance()
+            return self._create_variable(token.lexeme)
+        elif self._token_matches(TokenType.LEFTPAREN):
+            self._advance()  # Consume '('
+            expr = self._parse_additive_expr() # Start parsing the inner expression
+            if not self._token_matches(TokenType.RIGHTPAREN):
+                self._report(self._peek().line, "Expected ')' after expression.")
+                return None
+            self._advance()  # Consume ')'
+            return expr
+        else:
+            self._report(self._peek().line, f"Unexpected token in arithmetic expression: {self._peek().lexeme}")
             return None
 
+    def _parse_multiplicative_expr(self):
+        """Parses multiplicative expressions (*, /)."""
+        expr = self._parse_primary_arithmetic_expr()
+        if expr is None: return None
+
+        while self._token_matches(TokenType.STAR) or self._token_matches(TokenType.SLASH):
+            operator_token = self._advance()
+            op_type = operator_token.token_type
+            
+            right = self._parse_primary_arithmetic_expr()
+            if right is None: return None
+            
+            # Assuming Arithmetic can handle operator type or we need a more complex structure
+            # For now, let's assume Arithmetic stores operator as string and two operands
+            # This might require changes to the Arithmetic class in prolog.parser.types
+            op_str = "*" if op_type == TokenType.STAR else "/"
+            expr = Term(op_str, expr, right) # Using Term for now, ideally Arithmetic class handles this
+        return expr
+
+    def _parse_additive_expr(self):
+        """Parses additive expressions (+, -)."""
+        expr = self._parse_multiplicative_expr()
+        if expr is None: return None
+
+        while self._token_matches(TokenType.PLUS) or self._token_matches(TokenType.MINUS):
+            operator_token = self._advance()
+            op_type = operator_token.token_type
+
+            right = self._parse_multiplicative_expr()
+            if right is None: return None
+
+            op_str = "+" if op_type == TokenType.PLUS else "-"
+            expr = Term(op_str, expr, right) # Using Term for now
+        return expr
+
+    def _parse_arithmetic(self, variable_token):
+        """Parses an 'is' expression: Variable is ArithmeticExpression."""
+        variable = self._create_variable(variable_token.lexeme)
+        if not self._token_matches(TokenType.IS):
+            # This check should ideally be done before calling _parse_arithmetic
+            self._report(self._peek().line, "Expected 'is' operator.")
+            return None
+        
         self._advance()  # Consume 'is'
 
-        # ここで算術式の右辺をパースするロジックが必要
-        # 簡単な例として、数値または変数を期待
-        rhs_token = self._advance()
-        expression_rhs = None
-
-        if self._is_type(rhs_token, TokenType.NUMBER):
-            expression_rhs = Number(rhs_token.literal)
-        elif self._is_type(rhs_token, TokenType.VARIABLE):
-            expression_rhs = self._create_variable(rhs_token.lexeme)
-        # TODO: より複雑な算術式（例: X is Y + Z）のパースをサポートする
-        else:
-            self._report(
-                rhs_token.line, f"Invalid right-hand side for 'is': {rhs_token.lexeme}"
-            )
+        expression_rhs = self._parse_additive_expr() # Start with highest precedence
+        
+        if expression_rhs is None:
+            # _parse_additive_expr should have reported the error
             return None
 
         return Arithmetic(variable, expression_rhs)

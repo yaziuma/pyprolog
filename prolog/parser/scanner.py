@@ -202,27 +202,57 @@ class Scanner:
             self._add_token(TokenType.PLUS)
         elif c == "-":
             self._add_token(TokenType.MINUS)
-        elif c == "=" and self._is_next("="):
-            self._add_token(TokenType.EQUALEQUAL)
-        elif c == "=" and self._is_next("/"):
-            self._add_token(TokenType.EQUALSLASH)
-        elif c == "=":  # 単独の = 演算子
-            self._add_token(TokenType.EQUAL)
-        elif c == "=" and self._is_next("/"):
-            self._add_token(TokenType.EQUALSLASH)
-        elif c == "=" and self._is_next("<"):
-            self._add_token(TokenType.EQUALLESS)
+        elif c == "=":
+            if self._is_next("="): # ==
+                self._add_token(TokenType.EQUALEQUAL)
+            elif self._is_next(":"): # =:=
+                if self._is_next("="):
+                    self._add_token(TokenType.EQUALCOLONEQUAL) # TokenType.EQUAL_ARITH or similar
+                else:
+                    # Rollback _is_next for ':'
+                    self._current -=1
+                    self._report(self._line, f"Expected `=` after `=:` for `=:=` operator, found `{self._peek()}`")
+            elif self._is_next("\\"): # =\=
+                if self._is_next("="):
+                    self._add_token(TokenType.EQUALSLASHEQUAL) # TokenType.NOT_EQUAL_ARITH or similar
+                else:
+                    # Rollback _is_next for '\'
+                    self._current -=1
+                    self._report(self._line, f"Expected `=` after `=\\` for `=\=` operator, found `{self._peek()}`")
+            elif self._is_next("<"): # =<
+                self._add_token(TokenType.EQUALLESS)
+            # Note: EQUALSLASH for =/= might need to be distinct from =\=
+            # For now, assuming EQUALSLASH was intended for =/=
+            elif self._is_next("/"): # =/=
+                 if self._is_next("="): # Check for =/=
+                    self._add_token(TokenType.EQUALSLASH) # Or a more specific =/= token
+                 else:
+                    # Rollback _is_next for '/'
+                    self._current -=1
+                    self._add_token(TokenType.EQUAL) # Fallback to just = if not =/=
+            else:  # 単独の = 演算子
+                self._add_token(TokenType.EQUAL)
         elif c == "<":
-            self._add_token(TokenType.LESS)
-        elif c == ">" and self._is_next("="):
-            self._add_token(TokenType.GREATEREQUAL)
-        elif c == ">":
-            self._add_token(TokenType.GREATER)
-        elif c == ":":
-            if self._is_next("-"):
-                self._add_token(TokenType.COLONMINUS)
+            if self._is_next("="): # <=
+                self._add_token(TokenType.LESSEQUAL)
             else:
-                self._report(self._line, f"Expected `-` but found `{c}`")
+                self._add_token(TokenType.LESS)
+        elif c == ">":
+            if self._is_next("="): # >=
+                self._add_token(TokenType.GREATEREQUAL)
+            else:
+                self._add_token(TokenType.GREATER)
+        elif c == ":":
+            if self._is_next("-"): # :-
+                self._add_token(TokenType.COLONMINUS)
+            # Removed the 'else' that reported "Expected - but found :",
+            # as a single ':' might be part of another operator like '=:'
+            # or could be an error if it's truly standalone and not expected.
+            # If a standalone ':' is an error, it should be caught after all valid multi-char ops are checked.
+            # For now, let it fall through to "Unexpected character" if not part of a known sequence.
+            else: # A single ':' is not a standard token on its own usually.
+                 self._report(self._line, f"Unexpected character after colon: {self._peek()}")
+
         elif c == ".":
             self._add_token(TokenType.DOT)
         elif c == ",":

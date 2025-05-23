@@ -19,7 +19,12 @@ from prolog.runtime.builtins import Cut as BuiltinCut, Fail as BuiltinFail
 
 class Runtime:
     def __init__(self, rules):
-        self.rules = rules
+        if isinstance(rules, Rule):
+            self.rules = [rules]
+        elif rules is None: # Handle cases where rules might be None
+            self.rules = []
+        else: # Assuming rules is already a list or an iterable that list() can handle
+            self.rules = list(rules)
         self.stream = io.StringIO()
         self.stream_pos = 0
         self.binding_env = BindingEnvironment()
@@ -53,8 +58,17 @@ class Runtime:
         if not tokens or (len(tokens) == 1 and tokens[0].token_type == TokenType.EOF):
             return
 
-        new_rules = Parser(tokens)._parse_rule()
-        self.rules.extend(new_rules)
+        # Use parse() to get a list of rules
+        parsed_result = Parser(tokens).parse()
+        if isinstance(parsed_result, list):
+            new_rules = parsed_result
+        elif parsed_result is not None: # If parse() somehow returns a single rule
+            new_rules = [parsed_result]
+        else: # If parse() returns None (e.g., on error and no recovery)
+            new_rules = []
+
+        if new_rules: # Only extend if there are rules to add
+            self.rules.extend(new_rules)
 
     def query(self, query_str):
         from prolog.parser.scanner import Scanner
