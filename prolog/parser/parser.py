@@ -10,6 +10,7 @@ from prolog.core.types import (
     Conjunction,
     TRUE_TERM,
     Fail,
+    EMPTY_LIST_ATOM, # Added for list parsing
 )  # Removed TRUEClass, CUTClass
 from prolog.runtime.builtins import Write, Nl, Tab, Retract, AssertA, AssertZ
 
@@ -74,95 +75,150 @@ class Parser:
             return False
         return token.token_type == token_type
 
-    def _parse_atom(self):
-        token = self._advance()  # Consume the token
+    def _expect(self, token_type, message):
+        if self._token_matches(token_type):
+            return self._advance()
+        token_for_line = self._peek() if not self._is_at_end() else self._previous()
+        line = getattr(token_for_line, 'line', -1)
+        self._report(line, message)
+        raise Exception(message)
 
-        if self._is_type(token, TokenType.TRUE):
-            return TRUE_TERM  # インスタンスを直接返す
-        if self._is_type(token, TokenType.FAIL):
+    def _parse_list(self):
+        logger.debug(f"Parser._parse_list entered. Current token: {self._peek()}")
+        # _parse_term peeks for LEFTBRACKET, then calls _parse_list.
+        # _parse_list should start by consuming LEFTBRACKET.
+        self._advance() # Consume '[' (LEFTBRACKET)
+
+        if self._token_matches(TokenType.RIGHTBRACKET): # Corrected: RIGHTBRACKET
+            self._advance()  # Consume ']'
+            logger.debug("Parser._parse_list: Parsed empty list.")
+            return EMPTY_LIST_ATOM
+
+        elements = []
+        while True:
+            if self._is_at_end():
+                self._report(self._previous().line, "Unexpected EOF in list.")
+                return None # Or raise
+            
+            term = self._parse_term()
+            if term is None:
+                return None
+            elements.append(term)
+
+            if self._token_matches(TokenType.COMMA):
+                self._advance()  # Consume ','
+                if self._token_matches(TokenType.RIGHTBRACKET): # Corrected: RIGHTBRACKET, Case like [a,]
+                    self._report(self._peek().line, "Unexpected ']' after comma in list, expected term.")
+                    return None # Or raise
+                if self._token_matches(TokenType.BAR): # Case like [a,|]
+                     self._report(self._peek().line, "Unexpected '|' after comma in list.")
+                     return None # Or raise
+                if self._is_at_end(): # Case like [a, EOF
+                    self._report(self._previous().line, "Unexpected EOF after comma in list.")
+                    return None # Or raise
+            elif self._token_matches(TokenType.BAR):
+                self._advance()  # Consume '|'
+                if self._is_at_end():
+                    self._report(self._previous().line, "Unexpected EOF after '|' in list.")
+                    return None # Or raise
+                tail = self._parse_term()
+                if tail is None:
+                    return None
+                self._expect(TokenType.RIGHTBRACKET, "Expected ']' after tail in list.") # Corrected: RIGHTBRACKET
+                
+                current_list = tail
+                for element in reversed(elements):
+                    current_list = Term('.', [element, current_list])
+                logger.debug(f"Parser._parse_list: Parsed list with tail: {current_list}")
+                return current_list
+            elif self._token_matches(TokenType.RIGHTBRACKET): # Corrected: RIGHTBRACKET
+                self._advance()  # Consume ']'
+                current_list = EMPTY_LIST_ATOM
+                for element in reversed(elements):
+                    current_list = Term('.', [element, current_list])
+                logger.debug(f"Parser._parse_list: Parsed proper list: {current_list}")
+                return current_list
+            else:
+                self._report(self._peek().line, f"Expected ',', '|', or ']' in list, but got {self._peek().token_type}.")
+                return None # Or raise
+
+    def _parse_atom(self):
+        # This method is called when _parse_term has determined the upcoming token
+        # is NOT a LEFT_BRACKET. It's for parsing simple elements like atoms, numbers, vars.
+        peeked_token = self._peek()
+
+        if self._is_type(peeked_token, TokenType.TRUE):
+            self._advance()
+            return TRUE_TERM
+        if self._is_type(peeked_token, TokenType.FAIL):
+            self._advance()
             return Fail()
-        if self._is_type(token, TokenType.CUT):
+        if self._is_type(peeked_token, TokenType.CUT):
+            self._advance()
             return Cut()
 
-        # 残りのコードは変更なし
-        if (
-            not self._is_type(token, TokenType.ATOM)
-            and not self._is_type(token, TokenType.VARIABLE)
-            and not self._is_type(token, TokenType.UNDERSCORE)
-            and not self._is_type(token, TokenType.NUMBER)
-            and not self._is_type(token, TokenType.WRITE)
-            and not self._is_type(token, TokenType.NL)
-            and not self._is_type(token, TokenType.TAB)
-            and not self._is_type(token, TokenType.RETRACT)
-            and not self._is_type(token, TokenType.ASSERTA)
-            and not self._is_type(token, TokenType.ASSERTZ)
-        ):
-            self._report(
-                token.line,
-                f"Bad atom name or unexpected token: {token.lexeme} of type {token.token_type}",
-            )
-            return None
+        token = self._advance() # Consume the actual token
 
-        if (
-            self._is_type(token, TokenType.ATOM)
-            or self._is_type(token, TokenType.VARIABLE)
-            or self._is_type(token, TokenType.UNDERSCORE)
-            or self._is_type(token, TokenType.NUMBER)
-            or self._is_type(token, TokenType.WRITE)
-            or self._is_type(token, TokenType.NL)
-            or self._is_type(token, TokenType.TAB)
-            or self._is_type(token, TokenType.RETRACT)
-            or self._is_type(token, TokenType.ASSERTA)
-            or self._is_type(token, TokenType.ASSERTZ)
-        ):
+        # These token types are returned directly as they are,
+        # _parse_term will then convert them to Variable, Number, or use lexeme for Term.
+        valid_simple_tokens = [
+            TokenType.ATOM, TokenType.VARIABLE, TokenType.UNDERSCORE,
+            TokenType.NUMBER, TokenType.WRITE, TokenType.NL, TokenType.TAB,
+            TokenType.RETRACT, TokenType.ASSERTA, TokenType.ASSERTZ
+        ]
+        if token.token_type in valid_simple_tokens:
             return token
-
-        self._report(token.line, f"Unhandled token in _parse_atom: {token.lexeme}")
+        
+        self._report(
+            token.line,
+            f"Expected an atom, variable, number, or special constant, but got: {token.lexeme} of type {token.token_type}",
+        )
         return None
+
 
     def _parse_term(self):
         logger.debug(
             f"Parser._parse_term entered. Current token: {self._peek()}, index: {self._current}"
         )
 
-        atom_or_builtin_obj = self._parse_atom()
+        # Check for list start first: '['
+        if self._token_matches(TokenType.LEFTBRACKET): # Use LEFTBRACKET
+            return self._parse_list()
+
+        # If not a list, proceed to parse atom, variable, number, or special constants
+        atom_or_builtin_obj = self._parse_atom() # _parse_atom now returns Token or special instance
+        
         logger.debug(
             f"Parser._parse_term after _parse_atom: atom_or_builtin_obj={atom_or_builtin_obj}, type={type(atom_or_builtin_obj)}, next token: {self._peek()}"
         )
 
-        # 型チェックを修正：TRUE_TERMとの直接比較、FailおよびCutクラスとのisinstance比較
-        if atom_or_builtin_obj is TRUE_TERM or isinstance(
-            atom_or_builtin_obj, (Fail, Cut)
-        ):  # Cutはprolog.core.types.Cut
+        # Handle special constants like true, fail, !
+        if atom_or_builtin_obj is TRUE_TERM or isinstance(atom_or_builtin_obj, (Fail, Cut)):
+            # These cannot be functors
             if self._token_matches(TokenType.LEFTPAREN):
                 self._report(
                     self._peek().line,
                     f"Special term '{type(atom_or_builtin_obj).__name__}' cannot be used as a functor.",
                 )
-                return None
+                return None # Or raise
             return atom_or_builtin_obj
 
-        if atom_or_builtin_obj is None:
+        if atom_or_builtin_obj is None: # Error from _parse_atom
             logger.debug("Parser._parse_term: _parse_atom returned None, propagating.")
             return None
 
+        # At this point, atom_or_builtin_obj is a Token object (e.g., ATOM, VARIABLE, NUMBER, etc.)
         token = atom_or_builtin_obj
-        if token is None:
-            self._report(
-                self._peek().line,
-                "Internal parser error: token became None unexpectedly.",
-            )
-            return None
+        
+        lhs_term = None # This will hold the parsed Term, Variable, Number, etc.
 
-        lhs_term = None
-        if self._is_type(token, TokenType.VARIABLE) or self._is_type(
-            token, TokenType.UNDERSCORE
-        ):
+        # Convert Token to specific AST node (Variable, Number, or prepare for Term)
+        if self._is_type(token, TokenType.VARIABLE) or self._is_type(token, TokenType.UNDERSCORE):
             if self._is_type(token, TokenType.UNDERSCORE):
                 lhs_term = Variable("_")
-            elif self._peek().token_type == TokenType.IS:
-                lhs_term = self._parse_arithmetic(token)
-            else:
+            elif self._peek().token_type == TokenType.IS: # Arithmetic expression: Var is Expr
+                lhs_term = self._parse_arithmetic(token) # _parse_arithmetic consumes 'is' and expr
+            else: # Simple variable
                 lhs_term = self._create_variable(token.lexeme)
         elif self._is_type(token, TokenType.NL):
             lhs_term = Nl()
@@ -170,70 +226,58 @@ class Parser:
             lhs_term = Tab()
         elif self._is_type(token, TokenType.NUMBER):
             lhs_term = Number(token.literal)
-        elif (
-            self._is_type(token, TokenType.ATOM)
-            or self._is_type(token, TokenType.WRITE)
-            or is_single_param_buildin(token.token_type)
+        elif ( # ATOM or built-in predicate name that can be a functor
+            self._is_type(token, TokenType.ATOM) or
+            self._is_type(token, TokenType.WRITE) or
+            is_single_param_buildin(token.token_type) # retract, asserta, assertz
         ):
             current_predicate_name = token.lexeme
-
-            if not self._token_matches(TokenType.LEFTPAREN):
-                if self._is_type(token, TokenType.NL):
-                    lhs_term = Nl()
-                elif self._is_type(token, TokenType.TAB):
-                    lhs_term = Tab()
-                else:
-                    lhs_term = Term(current_predicate_name)
-            else:
-                self._advance()
+            if not self._token_matches(TokenType.LEFTPAREN): # Simple atom or 0-arity builtin (if any)
+                # Note: NL and TAB are handled above. Write, Retract, etc., expect args.
+                # So this path is mainly for simple atoms like 'foo'.
+                lhs_term = Term(current_predicate_name)
+            else: # Functor: pred(...) or builtin_pred(...)
+                self._advance()  # Consume '('
                 args = []
-                while not self._token_matches(TokenType.RIGHTPAREN):
-                    parsed_arg = self._parse_term()
-                    if parsed_arg is None:
-                        return None
-                    args.append(parsed_arg)
-                    if not self._token_matches(
-                        TokenType.COMMA
-                    ) and not self._token_matches(TokenType.RIGHTPAREN):
-                        self._report(
-                            self._peek().line,
-                            f"Expected , or ) in term arguments for {current_predicate_name}, but got {self._peek()}",
-                        )
-                        return None
-                    if self._token_matches(TokenType.COMMA):
-                        self._advance()
-                self._advance()
+                if self._token_matches(TokenType.RIGHTPAREN): # pred() case
+                    self._advance() # Consume ')'
+                    # For some builtins like write(), this might be valid (prints newline or similar)
+                    # For user-defined predicates, arity 0 with () is usually same as without.
+                else:
+                    while True:
+                        parsed_arg = self._parse_term()
+                        if parsed_arg is None: return None
+                        args.append(parsed_arg)
+                        if self._token_matches(TokenType.RIGHTPAREN):
+                            self._advance()
+                            break
+                        self._expect(TokenType.COMMA, "Expected ',' or ')' in arguments.")
+                        if self._token_matches(TokenType.RIGHTPAREN):
+                            self._report(self._peek().line, "Unexpected ')' after comma in arguments.")
+                            return None # Or raise
 
+                # Construct Term or specific Builtin class instance
                 if is_single_param_buildin(token.token_type):
-                    lhs_term = self._parse_buildin_single_arg(
-                        current_predicate_name, args
-                    )
+                    lhs_term = self._parse_buildin_single_arg(current_predicate_name, args)
                 elif self._is_type(token, TokenType.WRITE):
                     lhs_term = Write(*args)
-                else:
+                else: # User-defined predicate or other functor
                     lhs_term = Term(current_predicate_name, *args)
         else:
-            # 安全な属性アクセス
+            # This case should ideally not be reached if _parse_atom and list parsing are exhaustive
             lexeme = getattr(token, "lexeme", "N/A")
-            token_type = getattr(token, "token_type", "Unknown")
+            token_type_val = getattr(token, "token_type", "Unknown") # Renamed to avoid clash
             line = getattr(token, "line", -1)
-            self._report(
-                line,
-                f"Parser._parse_term: Unhandled token type {token_type} ({lexeme}) for LHS parsing.",
-            )
+            self._report(line, f"Parser._parse_term: Unhandled token type {token_type_val} ({lexeme}) for term construction.")
             return None
 
         if lhs_term is None:
-            self._report(
-                self._peek().line,
-                f"Parser._parse_term: Could not determine LHS from token {token}",
-            )
+            self._report(self._peek().line, f"Parser._parse_term: Failed to construct term from token {token}")
             return None
+        
+        logger.debug(f"Parser._parse_term: Parsed LHS: {lhs_term}, type: {type(lhs_term)}")
 
-        logger.debug(
-            f"Parser._parse_term: Parsed LHS: {lhs_term}, type: {type(lhs_term)}"
-        )
-
+        # Check for '=' operator (unification)
         if self._token_matches(TokenType.EQUAL):
             self._advance()
             rhs_term = self._parse_term()
