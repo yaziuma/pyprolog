@@ -1,6 +1,6 @@
 from .token_type import TokenType
 from .token import Token
-from prolog.core.types import Variable, Term, Rule, Conjunction, TRUE_TERM as TRUE
+from prolog.core.types import Variable, Term, Rule, Conjunction, TRUE_TERM
 from prolog.runtime.builtins import Fail, Write, Nl, Tab, Retract, AssertA, AssertZ, Cut
 from .types import Arithmetic, Logic, Number, Dot, Bar
 from .expression import BinaryExpression, PrimaryExpression
@@ -200,7 +200,7 @@ class Parser:
         token = self._advance()  # Consume the token
 
         if self._is_type(token, TokenType.TRUE):
-            return TRUE()
+            return TRUE_TERM
         if self._is_type(token, TokenType.FAIL):
             return Fail()
         if self._is_type(token, TokenType.CUT):  # Assuming CUT token is for '!'
@@ -389,7 +389,7 @@ class Parser:
             f"Parser._parse_term after _parse_atom: atom_or_builtin_obj={atom_or_builtin_obj}, type={type(atom_or_builtin_obj)}, next token: {self._peek()}"
         )
 
-        if isinstance(atom_or_builtin_obj, (TRUE, Fail, Cut)):
+        if isinstance(atom_or_builtin_obj, (TRUE_TERM, Fail, Cut)):
             if self._token_matches(TokenType.LEFTPAREN):
                 self._report(
                     self._peek().line,
@@ -520,7 +520,7 @@ class Parser:
 
         if self._token_matches(TokenType.DOT):
             self._advance()
-            result = Rule(head, TRUE())
+            result = Rule(head, TRUE_TERM)
             logger.debug(
                 f"Parser._parse_rule: parsed fact: {result}, type: {type(result)}"
             )
