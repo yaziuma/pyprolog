@@ -13,7 +13,7 @@ class LogicInterpreter(Visitor):
         return expr.accept(self)
 
     def _compute_binary_operand(self, left, operand, right):
-        if type(left) != type(right):
+        if type(left) is not type(right):
             raise InterpreterError(
                 f'left {left} and right {right} operand must have the same type'
             )  # noqa

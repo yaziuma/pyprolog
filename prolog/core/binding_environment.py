@@ -1,5 +1,4 @@
 from prolog.core_types import Variable
-from prolog.logger import logger
 
 class BindingEnvironment:
     """変数バインディングを一元管理する環境

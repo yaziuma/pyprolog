@@ -9,7 +9,7 @@ from prolog.token_type import TokenType
 from prolog.logger import logger
 from prolog.binding_environment import BindingEnvironment
 # Ensure builtins are correctly referenced, assuming prolog.builtins for these
-from prolog.builtins import Write, Nl, Tab, Cut as BuiltinCut, Retract, AssertA, AssertZ, Fail as BuiltinFail
+from prolog.builtins import Cut as BuiltinCut, Fail as BuiltinFail
 
 # Scanner and Parser will be imported inside methods to break circular dependency
 
@@ -162,7 +162,7 @@ class Runtime:
                         # A more complete check would unify r.head with rule_template_to_retract.head
                         # and r.body with rule_template_to_retract.body using a temporary BindingEnvironment.
                         # For now, if heads match by pred/arity and bodies are structurally similar (e.g. both TRUE_TERM)
-                        if type(r.body) == type(rule_template_to_retract.body): # Simplistic body check
+                        if type(r.body) is type(rule_template_to_retract.body): # Simplistic body check
                              # This is still a placeholder. Real unification is needed.
                              # Let's assume if the test provides a Rule object, it expects exact match.
                              if r == rule_template_to_retract: # Requires Rule.__eq__
@@ -264,7 +264,7 @@ class Runtime:
                 # If it were to be unified against something, that would happen here.
                 # For a standalone TermFunction goal, executing it and it not failing means success.
                 yield TRUE_TERM
-            except Exception as e:
+            except Exception:
                 # logger.error(f"Runtime.execute[TermFunction]: Error executing function for {query_obj}: {e}")
                 # Execution of the Python function failed, so the Prolog goal fails.
                 pass # Yield nothing for failure
