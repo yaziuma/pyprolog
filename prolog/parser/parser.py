@@ -339,7 +339,7 @@ class Parser:
              self._report(self._peek().line, "Internal parser error: token became None unexpectedly.")
              return None
 
-        predicate = token.lexeme if hasattr(token, 'lexeme') and token.token_type in [TokenType.ATOM, TokenType.VARIABLE, TokenType.WRITE, TokenType.RETRACT, TokenType.ASSERTA, TokenType.ASSERTZ] else None
+        # predicate = token.lexeme if hasattr(token, 'lexeme') and token.token_type in [TokenType.ATOM, TokenType.VARIABLE, TokenType.WRITE, TokenType.RETRACT, TokenType.ASSERTA, TokenType.ASSERTZ] else None # F841 Removed
 
         lhs_term = None
         if self._is_type(token, TokenType.VARIABLE) or self._is_type(token, TokenType.UNDERSCORE):
@@ -364,8 +364,10 @@ class Parser:
             if not self._token_matches(TokenType.LEFTPAREN): 
                 if self._is_type(token, TokenType.NL):
                     lhs_term = Nl()
-                elif self._is_type(token, TokenType.TAB): lhs_term = Tab()
-                else: lhs_term = Term(current_predicate_name)
+                elif self._is_type(token, TokenType.TAB):
+                    lhs_term = Tab()
+                else:
+                    lhs_term = Term(current_predicate_name)
             else: 
                 self._advance() 
                 args = []
