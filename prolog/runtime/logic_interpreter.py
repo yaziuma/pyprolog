@@ -1,5 +1,5 @@
-from .expression import Visitor
-from .errors import InterpreterError
+from prolog.parser.expression import Visitor
+from prolog.core.errors import InterpreterError
 
 
 class LogicInterpreter(Visitor):
@@ -15,22 +15,22 @@ class LogicInterpreter(Visitor):
     def _compute_binary_operand(self, left, operand, right):
         if type(left) is not type(right):
             raise InterpreterError(
-                f'left {left} and right {right} operand must have the same type'
+                f"left {left} and right {right} operand must have the same type"
             )  # noqa
-        if operand == '==':
+        if operand == "==":
             return left.equal(right)
-        elif operand == '=/':
+        elif operand == "=/":
             return left.not_equal(right)
-        elif operand == '=<':
+        elif operand == "=<":
             return left.equal_less(right)
-        elif operand == '<':
+        elif operand == "<":
             return left.less(right)
-        elif operand == '>=':
+        elif operand == ">=":
             return left.greater_equal(right)
-        elif operand == '>':
+        elif operand == ">":
             return left.greater(right)
         else:
-            raise InterpreterError(f'Invalid binary operand {operand}')
+            raise InterpreterError(f"Invalid binary operand {operand}")
 
     def visit_binary(self, expr):
         left = self._evaluate_expr(expr.left)

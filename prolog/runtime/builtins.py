@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from .merge_bindings import merge_bindings
-from prolog.types import TRUE # Added import for TRUE
+from prolog.core.merge_bindings import merge_bindings
+from prolog.core.types import TRUE_TERM as TRUE # Added import for TRUE
 
 
 class BuiltinsBase(ABC):
@@ -38,10 +38,10 @@ class Fail:
         return str(self)
 
     def query(self, runtime):
-        # 失敗時には何も結果を返さない（解がゼロ）
+        # 失敗時には何も結果を返さなぁE��解がゼロ�E�E
         # logger.debug(f"Fail.query called") # logger is not defined here
-        if False:  # この条件は常にfalse
-            yield  # この行は実行されない（ジェネレータにするための文法的な要素）
+        if False:  # こ�E条件は常にfalse
+            yield  # こ�E行�E実行されなぁE��ジェネレータにするための斁E��的な要素�E�E
         # 何もyieldせずに即時リターン = 失敗を意味する
 
 

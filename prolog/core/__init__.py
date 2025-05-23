@@ -5,8 +5,13 @@ from .errors import InterpreterError, ScannerError, ParserError
 from .merge_bindings import merge_bindings
 
 __all__ = [
-    'Variable', 'Term', 'Rule', 'Conjunction',
-    'BindingEnvironment',
-    'InterpreterError', 'ScannerError', 'ParserError',
-    'merge_bindings'
+    "Variable",
+    "Term",
+    "Rule",
+    "Conjunction",
+    "BindingEnvironment",
+    "InterpreterError",
+    "ScannerError",
+    "ParserError",
+    "merge_bindings",
 ]
