@@ -1,7 +1,7 @@
 from .token import Token
 from .token_type import TokenType
-from .errors import ScannerError
-from prolog.logger import logger
+from prolog.core.errors import ScannerError  # 修正: 正しいパスからインポート
+from prolog.util.logger import logger
 
 logger.debug("scanner.py loaded")
 
