@@ -2,12 +2,13 @@ from prolog.logger import logger
 from prolog.types import Term, Variable, Number
 from .base import BaseTestCore
 
+
 # --- 1.5. 結合と単一化テスト ---
 class TestConjunctionAndUnification(BaseTestCore):
     """
     結合ゴールと単一化に関する詳細なテスト
     """
-    
+
     def test_simple_conjunction(self):
         """単純な結合ゴールのテスト"""
         logger.info("Starting test: test_simple_conjunction")

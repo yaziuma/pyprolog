@@ -4,13 +4,14 @@ from prolog.scanner import Scanner
 from prolog.types import Term, Variable, TRUE
 from .base import BaseTestCore
 
+
 # --- 0. スキャナーとパーサーの最小限テスト ---
 class TestTokenizerAndParserBasics(BaseTestCore):
     """
     最も基本的なスキャナーとパーサーのテストケース。
     他のテストの前に、これらのテストをパスする必要があります。
     """
-    
+
     def test_atom_tokenization(self):
         """最も基本的なアトムのトークン化のテスト"""
         logger.info("Starting test: test_atom_tokenization")
@@ -36,7 +37,7 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         assert len(tokens) == 3  # 2つのアトムトークン + EOF
         assert tokens[0].lexeme == "true"
         assert tokens[1].lexeme == "fail"
-        
+
         # スキャナーが実装されれば、以下のようなトークンタイプの確認も追加
         # from prolog.token_type import TokenType
         # if hasattr(TokenType, 'TRUE'):
@@ -56,7 +57,9 @@ class TestTokenizerAndParserBasics(BaseTestCore):
             expected_lexemes = ["=", "<", ">", "+", "-", "*", "/"]
             for i, lexeme in enumerate(expected_lexemes):
                 if i < len(tokens) - 1:  # EOFを除く
-                    assert tokens[i].lexeme == lexeme or tokens[i].lexeme.startswith(lexeme)
+                    assert tokens[i].lexeme == lexeme or tokens[i].lexeme.startswith(
+                        lexeme
+                    )
         except Exception as e:
             logger.warning(f"演算子のトークン化テストは失敗しました: {e}")
             # このテストは修正が必要なことを示すためにあえて失敗させる
@@ -107,12 +110,12 @@ class TestTokenizerAndParserBasics(BaseTestCore):
             tokens = Scanner("a.").tokenize()
             parsed_query = Parser(tokens)._parse_term()
             assert parsed_query is not None  # パース結果が存在する
-            
+
             # 形式に応じて適切なアサーションを選択
             # 実装によって異なる可能性があるので条件分岐
             if isinstance(parsed_query, Term):
                 assert parsed_query.pred == "a"
-            elif hasattr(parsed_query, 'head') and isinstance(parsed_query.head, Term):
+            elif hasattr(parsed_query, "head") and isinstance(parsed_query.head, Term):
                 assert parsed_query.head.pred == "a" or parsed_query.head.pred == "##"
         except Exception as e:
             logger.warning(f"単純アトムのパーステストは失敗しました: {e}")
@@ -125,13 +128,15 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         try:
             tokens = Scanner("true.").tokenize()
             parsed_query = Parser(tokens)._parse_term()
-            
+
             # 形式に応じて適切なアサーションを選択
             # TRUEオブジェクトとして解釈される場合
             assert parsed_query is not None  # パース結果が存在する
-            assert isinstance(parsed_query, TRUE) or \
-                  (hasattr(parsed_query, 'head') and parsed_query.body == TRUE()) or \
-                  (hasattr(parsed_query, 'pred') and parsed_query.pred == "true")
+            assert (
+                isinstance(parsed_query, TRUE)
+                or (hasattr(parsed_query, "head") and parsed_query.body == TRUE())
+                or (hasattr(parsed_query, "pred") and parsed_query.pred == "true")
+            )
         except Exception as e:
             logger.warning(f"true述語のパーステストは失敗しました: {e}")
             # このテストは修正が必要なことを示すためにあえて失敗させる
@@ -142,15 +147,20 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         logger.info("Starting test: test_fail_atom_parsing")
         try:
             from prolog.builtins import Fail
-            
+
             tokens = Scanner("fail.").tokenize()
             parsed_query = Parser(tokens)._parse_term()
-            
+
             # 形式に応じて適切なアサーションを選択
             assert parsed_query is not None  # パース結果が存在する
-            assert isinstance(parsed_query, Fail) or \
-                  (hasattr(parsed_query, 'head') and isinstance(parsed_query.body, Fail)) or \
-                  (hasattr(parsed_query, 'pred') and parsed_query.pred == "fail")
+            assert (
+                isinstance(parsed_query, Fail)
+                or (
+                    hasattr(parsed_query, "head")
+                    and isinstance(parsed_query.body, Fail)
+                )
+                or (hasattr(parsed_query, "pred") and parsed_query.pred == "fail")
+            )
         except Exception as e:
             logger.warning(f"fail述語のパーステストは失敗しました: {e}")
             # このテストは修正が必要なことを示すためにあえて失敗させる
@@ -161,15 +171,19 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         logger.info("Starting test: test_cut_atom_parsing")
         try:
             from prolog.builtins import Cut
-            
+
             tokens = Scanner("!.").tokenize()
             parsed_query = Parser(tokens)._parse_term()
-            
+
             # 形式に応じて適切なアサーションを選択
             assert parsed_query is not None  # パース結果が存在する
-            assert isinstance(parsed_query, Cut) or \
-                  (hasattr(parsed_query, 'head') and isinstance(parsed_query.body, Cut)) or \
-                  (hasattr(parsed_query, 'pred') and parsed_query.pred == "!")
+            assert (
+                isinstance(parsed_query, Cut)
+                or (
+                    hasattr(parsed_query, "head") and isinstance(parsed_query.body, Cut)
+                )
+                or (hasattr(parsed_query, "pred") and parsed_query.pred == "!")
+            )
         except Exception as e:
             logger.warning(f"カット演算子のパーステストは失敗しました: {e}")
             # このテストは修正が必要なことを示すためにあえて失敗させる
@@ -181,17 +195,17 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         try:
             tokens = Scanner("p(a).").tokenize()
             parsed_query = Parser(tokens)._parse_term()
-            
+
             assert parsed_query is not None  # パース結果が存在する
-            
+
             # 形式に応じて適切なアサーションを選択
-            if hasattr(parsed_query, 'head'):
+            if hasattr(parsed_query, "head"):
                 # Ruleとして解釈される場合
                 assert parsed_query.head.pred == "p" or parsed_query.head.pred == "##"
                 if parsed_query.head.pred == "p":
                     assert len(parsed_query.head.args) == 1
                     assert parsed_query.head.args[0].pred == "a"
-            elif hasattr(parsed_query, 'pred'):
+            elif hasattr(parsed_query, "pred"):
                 # 直接Termとして解釈される場合
                 assert parsed_query.pred == "p"
                 assert len(parsed_query.args) == 1
@@ -207,11 +221,11 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         try:
             tokens = Scanner("X.").tokenize()
             parsed_query = Parser(tokens)._parse_term()
-            
+
             assert parsed_query is not None  # パース結果が存在する
-            
+
             # 形式に応じて適切なアサーションを選択
-            if hasattr(parsed_query, 'head'):
+            if hasattr(parsed_query, "head"):
                 # Ruleとして解釈される場合
                 assert isinstance(parsed_query.head, Term)
                 assert parsed_query.head.pred == "##"  # クエリの変数を収集する特殊述語
@@ -232,18 +246,18 @@ class TestTokenizerAndParserBasics(BaseTestCore):
         try:
             tokens = Scanner("X = a.").tokenize()
             parsed_query = Parser(tokens)._parse_term()
-            
+
             assert parsed_query is not None  # パース結果が存在する
-            
+
             # 形式に応じて適切なアサーションを選択
-            if hasattr(parsed_query, 'head') and hasattr(parsed_query, 'body'):
+            if hasattr(parsed_query, "head") and hasattr(parsed_query, "body"):
                 # Ruleとして解釈される場合
                 assert parsed_query.head.pred == "##"
                 assert len(parsed_query.head.args) >= 1
                 assert isinstance(parsed_query.head.args[0], Variable)
                 assert parsed_query.head.args[0].name == "X"
                 # ボディが等号式
-                if hasattr(parsed_query.body, 'pred'):
+                if hasattr(parsed_query.body, "pred"):
                     assert parsed_query.body.pred == "="
                     assert len(parsed_query.body.args) == 2
                     assert isinstance(parsed_query.body.args[0], Variable)

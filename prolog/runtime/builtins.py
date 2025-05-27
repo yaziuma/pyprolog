@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from prolog.core.merge_bindings import merge_bindings
-from prolog.core.types import Term, TRUE_TERM, FALSE_TERM
+from prolog.core.types import Term
 
 
 class BuiltinsBase(ABC):
@@ -241,6 +241,7 @@ class AssertZ(DatabaseOp):
 # BuiltinCutとBuiltinFailクラスを追加
 class Cut(Term):
     """カット演算子のBuiltin実装"""
+
     def __init__(self):
         super().__init__("!")
         self.pred = "!"
@@ -257,6 +258,7 @@ class Cut(Term):
 
 class Fail(Term):
     """Fail演算子のBuiltin実装"""
+
     def __init__(self):
         super().__init__("fail")
         self.pred = "fail"

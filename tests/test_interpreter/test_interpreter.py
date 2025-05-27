@@ -1,11 +1,20 @@
 from prolog.runtime.interpreter import Runtime
-from prolog.core.types import Variable, Term, Rule, FALSE_TERM, TRUE_TERM, CUT_SIGNAL, Conjunction
+from prolog.core.types import (
+    Variable,
+    Term,
+    Rule,
+    FALSE_TERM,
+    TRUE_TERM,
+    CUT_SIGNAL,
+    Conjunction,
+)
 from prolog.parser.parser import Parser
 from prolog.parser.scanner import Scanner
 import cProfile
 import functools
 import pstats
 import tempfile
+
 
 def profile_me(func):
     @functools.wraps(func)
@@ -15,8 +24,10 @@ def profile_me(func):
         profiler.runcall(func, *args, **kwargs)
         profiler.dump_stats(file)
         metrics = pstats.Stats(file)
-        metrics.strip_dirs().sort_stats('time').print_stats(100)
+        metrics.strip_dirs().sort_stats("time").print_stats(100)
+
     return wraps
+
 
 # test_simple_rule_match - MOVED to test_interpreter_basic.py
 # test_query_with_multiple_results - MOVED to test_interpreter_basic.py
@@ -48,9 +59,10 @@ def profile_me(func):
 # test_retract_and_asserta_rule - MOVED to test_interpreter_dynamic_db.py
 # test_assertz_rule_builtin_context - MOVED to test_interpreter_dynamic_db.py
 
+
 @profile_me
 def test_puzzle1():
-    puzzle_rules_text = '''
+    puzzle_rules_text = """
     exists(A, list(A, _, _, _, _)).
     exists(A, list(_, A, _, _, _)).
     exists(A, list(_, _, A, _, _)).
@@ -96,33 +108,39 @@ def test_puzzle1():
         puzzle(Houses),
         exists(house(_, WaterDrinker, water, _, _), Houses),
         exists(house(_, ZebraOwner, _, _, zebra), Houses).
-    '''
+    """
     tokens = Scanner(puzzle_rules_text).tokenize()
     rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
-    goal_text = 'solution(WaterDrinker, ZebraOwner).'
-    
-    water_drinker_var = Variable('WaterDrinker')
-    zebra_owner_var = Variable('ZebraOwner')
+    goal_text = "solution(WaterDrinker, ZebraOwner)."
 
-    expected_solutions = [
-        {'WaterDrinker': 'norwegian', 'ZebraOwner': 'japanese'}
-    ]
-    
+    water_drinker_var = Variable("WaterDrinker")
+    zebra_owner_var = Variable("ZebraOwner")
+
+    expected_solutions = [{"WaterDrinker": "norwegian", "ZebraOwner": "japanese"}]
+
     solutions_found = 0
     for i, bindings_dict in enumerate(runtime.query(goal_text)):
         solutions_found += 1
         assert water_drinker_var in bindings_dict
         assert zebra_owner_var in bindings_dict
-        
-        assert str(bindings_dict[water_drinker_var]) == expected_solutions[i]['WaterDrinker']
-        assert str(bindings_dict[zebra_owner_var]) == expected_solutions[i]['ZebraOwner']
-            
-    assert solutions_found == len(expected_solutions), f"Expected {len(expected_solutions)} solutions, got {solutions_found}"
+
+        assert (
+            str(bindings_dict[water_drinker_var])
+            == expected_solutions[i]["WaterDrinker"]
+        )
+        assert (
+            str(bindings_dict[zebra_owner_var]) == expected_solutions[i]["ZebraOwner"]
+        )
+
+    assert solutions_found == len(expected_solutions), (
+        f"Expected {len(expected_solutions)} solutions, got {solutions_found}"
+    )
+
 
 def test_puzzle2():
-    puzzle_rules_text = '''
+    puzzle_rules_text = """
     exists(A, list(A, _, _, _, _)).
     exists(A, list(_, A, _, _, _)).
     exists(A, list(_, _, A, _, _)).
@@ -166,23 +184,21 @@ def test_puzzle2():
     solution(FishOwner) :-
     puzzle(Houses),
     exists(house(_, FishOwner, _, _, fish), Houses).
-    '''
+    """
     tokens = Scanner(puzzle_rules_text).tokenize()
     rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
-    goal_text = 'solution(FishOwner).'
-    
-    fish_owner_var = Variable('FishOwner')
+    goal_text = "solution(FishOwner)."
 
-    expected_solutions = [
-        {'FishOwner': 'german'}
-    ]
-    
+    fish_owner_var = Variable("FishOwner")
+
+    expected_solutions = [{"FishOwner": "german"}]
+
     solutions_found = 0
     for i, bindings_dict in enumerate(runtime.query(goal_text)):
         solutions_found += 1
         assert fish_owner_var in bindings_dict
-        assert str(bindings_dict[fish_owner_var]) == expected_solutions[i]['FishOwner']
-            
+        assert str(bindings_dict[fish_owner_var]) == expected_solutions[i]["FishOwner"]
+
     assert solutions_found == len(expected_solutions)
