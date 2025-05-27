@@ -6,7 +6,7 @@ from prolog.runtime.math_interpreter import MathInterpreter
 from prolog.runtime.logic_interpreter import LogicInterpreter
 from prolog.core.operators import operator_registry, OperatorType, OperatorInfo
 from prolog.core.errors import PrologError
-from typing import Callable
+from typing import Union, Callable
 
 # ログ設定
 import logging
@@ -152,35 +152,37 @@ class Runtime:
             f"未対応のアリティを持つ演算子: {op_info.symbol} (アリティ {op_info.arity})"
         )
 
-    def query(self, query_string):
-        """既存API互換性を保持"""
-        return list(self.execute_query(query_string))
-        
     def execute_query(self, query_string):
-        """統合設計を活用したクエリ実行"""
         logger.debug(f"Executing query: {query_string}")
         try:
-            # 統合設計：Scanner と Parser を使用
             tokens = Scanner(query_string).scan_tokens()
-            
+            logger.debug(f"Tokens: {tokens}")
+
             if not query_string.strip().endswith("."):
-                query_string = query_string + "."
-                tokens = Scanner(query_string).scan_tokens()
-                
-            parsed_structures = Parser(tokens).parse()
-
-            if not parsed_structures:
-                return []
-
-            # クエリゴールの抽出
-            if isinstance(parsed_structures[0], Fact):
-                query_goal = parsed_structures[0].head
-            elif isinstance(parsed_structures[0], Rule):
-                query_goal = parsed_structures[0].head
+                query_string_with_dot = query_string + "."
             else:
+                query_string_with_dot = query_string
+
+            tokens_for_query = Scanner(query_string_with_dot).scan_tokens()
+            parsed_query_structures = Parser(tokens_for_query).parse()
+
+            if not parsed_query_structures:
+                logger.error("Query parsing failed or produced no structures.")
                 return []
 
-            # 統合設計：統一された実行エンジン
+            if isinstance(parsed_query_structures[0], Fact):
+                query_goal = parsed_query_structures[0].head
+            elif isinstance(parsed_query_structures[0], Rule):
+                logger.warning("Query parsed as a rule, using its head as the goal.")
+                query_goal = parsed_query_structures[0].head
+            else:
+                logger.error(
+                    f"Unexpected parsed query structure: {parsed_query_structures[0]}"
+                )
+                return []
+
+            logger.debug(f"Parsed query goal: {query_goal}")
+
             solutions = []
             initial_env = BindingEnvironment()
 
@@ -189,18 +191,25 @@ class Runtime:
                 query_vars = self._get_vars_from_term(query_goal)
 
                 for var_name in query_vars:
-                    var_obj = Variable(var_name)
                     value = env.get_value(var_name)
                     if value is not None:
-                        result[var_obj] = self.logic_interpreter.dereference(value, env)
+                        result[var_name] = self.logic_interpreter.dereference(
+                            value, env
+                        )
 
-                if result or not query_vars:
+                if result:
                     solutions.append(result)
+                elif not query_vars:
+                    solutions.append({})
 
+            logger.debug(f"Solutions: {solutions}")
             return solutions
 
+        except PrologError as e:
+            logger.error(f"Prolog execution error: {e}")
+            return []
         except Exception as e:
-            logger.error(f"Query execution error: {e}", exc_info=True)
+            logger.error(f"Unexpected error during query execution: {e}", exc_info=True)
             return []
 
     def _get_vars_from_term(self, term):
@@ -237,33 +246,33 @@ class Runtime:
             return False
 
     def execute(self, goal, env: BindingEnvironment):
-        """統合設計：演算子処理の統一"""
+        """指定されたゴールを現在の環境で評価し、成功した環境のジェネレータを返す"""
         logger.debug(f"Executing goal: {goal} with env: {env}")
 
         if isinstance(goal, Term):
-            # 統合設計：operator_registry で演算子を識別
-            functor_name = goal.functor.name if hasattr(goal.functor, 'name') else str(goal.functor)
-            op_info = operator_registry.get_operator(functor_name)
-            
-            if op_info and functor_name in self._operator_evaluators:
-                evaluator = self._operator_evaluators[functor_name]
+            op_info = operator_registry.get_operator(str(goal.functor))
+            if op_info and op_info.symbol in self._operator_evaluators:
+                evaluator = self._operator_evaluators[op_info.symbol]
                 try:
-                    # 統合設計：統一された演算子評価
                     success = self._evaluate_operator(goal, op_info, evaluator, env)
+
                     if success:
-                        logger.debug(f"Operator goal {goal} succeeded")
+                        logger.debug(
+                            f"Operator goal {goal} succeeded. Yielding env: {env}"
+                        )
                         yield env
                     else:
-                        logger.debug(f"Operator goal {goal} failed")
+                        logger.debug(f"Operator goal {goal} failed.")
                     return
                 except PrologError as e:
-                    logger.debug(f"Error evaluating operator: {e}")
+                    logger.debug(f"Error evaluating operator goal {goal}: {e}")
                     return
                 except NotImplementedError as e:
-                    logger.warning(f"Operator evaluation not implemented: {e}")
-                    # 演算子処理が未実装の場合は通常の述語として処理を続行
+                    logger.warning(
+                        f"Operator {op_info.symbol} evaluation not fully implemented: {e}"
+                    )
+                    return
 
-        # 通常の述語処理
         yield from self.logic_interpreter.solve_goal(goal, env)
 
     def add_rule(self, rule_string):

@@ -39,9 +39,8 @@ def test_query_with_multiple_results():
 
     isoffice(X) :- location(computer, X), location(chair, X).
     """
-    tokens = Scanner(source).tokenize()
-    rules = Parser(tokens)._parse_rule()
-    assert rules is not None, "Parser returned None for rules"
+    tokens = Scanner(source).scan_tokens()
+    rules = Parser(tokens).parse()
     runtime = Runtime(rules)
     goal_text = "location(X, office)."
 
@@ -83,9 +82,8 @@ def test_multi_term_query():
     door(kitchen, cellar).
     door('dinninr room', kitchen).
     """
-    tokens = Scanner(source).tokenize()
-    rules = Parser(tokens)._parse_rule()
-    assert rules is not None
+    tokens = Scanner(source).scan_tokens()
+    rules = Parser(tokens).parse()
     runtime = Runtime(rules)
     goal_text = "door(kitchen, R), location(T, R)."
 
@@ -131,9 +129,8 @@ def test_support_for_string_literals():
     customer('John Jones', boston, good_credit).
     customer('Sally Smith', chicago, good_credit).
     """
-    tokens = Scanner(source).tokenize()
-    rules = Parser(tokens)._parse_rule()
-    assert rules is not None
+    tokens = Scanner(source).scan_tokens()
+    rules = Parser(tokens).parse()
     runtime = Runtime(rules)
     goal_text = "customer('Sally Smith', Y, Z)."
 

@@ -1,6 +1,15 @@
 from prolog.parser.token import Token
 from prolog.parser.token_type import TokenType
-from prolog.core.types import Term, Variable, Atom, Number, String, Rule, Fact
+from prolog.core.types import (
+    Term,
+    Variable,
+    Atom,
+    Number,
+    String,
+    Rule,
+    Fact,
+    PrologType,
+)
 from prolog.core.operators import operator_registry, Associativity
 
 
@@ -20,7 +29,7 @@ class Parser:
         self._error_handler = error_handler
 
     def parse(self):
-        """統合設計：プログラム全体を解析"""
+        """プログラム全体を解析し、ルールのリストを返す"""
         rules = []
         while not self._is_at_end():
             if self._peek_token_type() == TokenType.EOF:
@@ -34,52 +43,6 @@ class Parser:
                 break
         return rules
 
-    def _parse_expression_with_precedence(self, max_allowed_op_precedence: int):
-        """統合設計：演算子優先度を考慮した式解析"""
-        left = self._parse_primary()
-        if left is None:
-            return None
-
-        while not self._is_at_end():
-            peek_token = self._peek()
-
-            if not hasattr(peek_token, "lexeme"):
-                break
-
-            current_op_symbol = peek_token.lexeme
-            
-            # 統合設計：operator_registry を使用
-            if not operator_registry.is_operator(current_op_symbol):
-                break
-
-            op_info = operator_registry.get_operator(current_op_symbol)
-            if not op_info:
-                self._error(peek_token, f"Operator '{current_op_symbol}' not found in registry")
-                return None
-
-            if op_info.precedence > max_allowed_op_precedence:
-                break
-
-            self._advance()  # 演算子を消費
-
-            # 統合設計：結合性を考慮
-            if op_info.associativity == Associativity.LEFT:
-                next_max_precedence = op_info.precedence - 1
-            elif op_info.associativity == Associativity.RIGHT:
-                next_max_precedence = op_info.precedence
-            else:  # NON_ASSOCIATIVE
-                next_max_precedence = op_info.precedence - 1
-
-            right = self._parse_expression_with_precedence(next_max_precedence)
-            if right is None:
-                self._error(self._peek(), f"Expected right operand for '{current_op_symbol}'")
-                return None
-
-            left = Term(Atom(current_op_symbol), [left, right])
-
-        return left
-    
-    # 既存メソッドは統合設計に合わせて調整...
     def _parse_rule(self):
         """単一のルールまたはファクトを解析"""
         parsed_head_candidate = self._parse_term()
@@ -161,6 +124,54 @@ class Parser:
     def _parse_term(self):
         """単一の項を解析 (演算子優先順位法を利用)"""
         return self._parse_expression_with_precedence(1200)
+
+    def _parse_expression_with_precedence(self, max_allowed_op_precedence: int):
+        """演算子優先度を考慮した式解析"""
+        left = self._parse_primary()
+        if left is None:
+            return None
+
+        while not self._is_at_end():
+            peek_token = self._peek()
+
+            if not hasattr(peek_token, "lexeme"):
+                break
+
+            current_op_symbol = peek_token.lexeme
+            if not operator_registry.is_operator(current_op_symbol):
+                break
+
+            op_info = operator_registry.get_operator(current_op_symbol)
+            if not op_info:
+                self._error(
+                    peek_token,
+                    f"Internal error: Operator '{current_op_symbol}' recognized but not found in registry.",
+                )
+                return None
+
+            if op_info.precedence > max_allowed_op_precedence:
+                break
+
+            self._advance()  # Consume operator
+
+            if op_info.associativity == Associativity.LEFT:
+                next_max_precedence_for_rhs = op_info.precedence - 1
+            elif op_info.associativity == Associativity.RIGHT:
+                next_max_precedence_for_rhs = op_info.precedence
+            else:  # NON_ASSOCIATIVE
+                next_max_precedence_for_rhs = op_info.precedence - 1
+
+            right = self._parse_expression_with_precedence(next_max_precedence_for_rhs)
+            if right is None:
+                self._error(
+                    self._peek(),
+                    f"Expected right-hand operand for operator '{current_op_symbol}'.",
+                )
+                return None
+
+            left = Term(Atom(current_op_symbol), [left, right])
+
+        return left
 
     def _parse_primary(self):
         """最も基本的な要素を解析"""
@@ -284,7 +295,7 @@ class Parser:
         if hasattr(token, "token_type"):
             return token.token_type
         elif hasattr(token, "type"):
-            return token.token_type
+            return token.type
         else:
             # フォールバック
             return TokenType.EOF
