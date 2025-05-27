@@ -1,388 +1,300 @@
-import io
-from prolog.core.types import (
-    Term,
-    Variable,
-    Rule,
-    Conjunction,
-    TRUE_TERM,
-    FALSE_TERM,
-    CUT_SIGNAL,
-    FAIL_TERM,
-)
-from prolog.parser.token_type import TokenType
-from prolog.util.logger import logger
+from prolog.core.types import Term, Variable, Number, Rule, Fact
 from prolog.core.binding_environment import BindingEnvironment
-# BuiltinCutとBuiltinFailをインポート
-from prolog.runtime.builtins import Cut as BuiltinCut, Fail as BuiltinFail
-from prolog.parser.types import Arithmetic, TermFunction # Import Arithmetic and TermFunction
-from prolog.runtime.math_interpreter import MathInterpreter # Import MathInterpreter
-from prolog.parser import types as prolog_parser_types # For Number instance check
-from prolog.core.errors import InterpreterError # For handling math errors
+from prolog.parser.scanner import Scanner
+from prolog.parser.parser import Parser
+from prolog.runtime.math_interpreter import MathInterpreter
+from prolog.runtime.logic_interpreter import LogicInterpreter
+from prolog.core.operators import operator_registry, OperatorType, OperatorInfo
+from prolog.core.errors import PrologError
+from typing import Callable
+
+# ログ設定
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class Runtime:
-    def __init__(self, rules):
-        if isinstance(rules, Rule):
-            self.rules = [rules]
-        elif rules is None: # Handle cases where rules might be None
-            self.rules = []
-        else: # Assuming rules is already a list or an iterable that list() can handle
-            self.rules = list(rules)
-        self.stream = io.StringIO()
-        self.stream_pos = 0
-        self.binding_env = BindingEnvironment()
-        self._registered_functions = {}
+    def __init__(self, rules=None):
+        self.rules = rules if rules is not None else []
+        self.math_interpreter = MathInterpreter()
+        self.logic_interpreter = LogicInterpreter(self.rules, self)
+        self._operator_evaluators = self._build_evaluator_map()
 
-    def __del__(self):
-        self.stream.close()
+    def _build_evaluator_map(self):
+        """演算子評価関数マップを構築"""
+        evaluators = {}
 
-    def stream_write(self, text):
-        self.stream.write(text)
+        # 算術演算子
+        arithmetic_ops = operator_registry.get_operators_by_type(
+            OperatorType.ARITHMETIC
+        )
+        for op_info in arithmetic_ops:
+            if op_info.symbol != "is":
+                if op_info.evaluator is None:
+                    evaluators[op_info.symbol] = self._create_arithmetic_evaluator(
+                        op_info.symbol
+                    )
+                elif hasattr(op_info.evaluator, "__call__"):  # callable check
+                    evaluators[op_info.symbol] = op_info.evaluator
 
-    def stream_read(self):
-        self.stream.seek(self.stream_pos)
-        line = self.stream.read()
-        self.stream_pos = self.stream.tell()
-        return line
-
-    def reset_stream(self):
-        self.stream.seek(0)
-        self.stream.truncate(0)
-        self.stream_pos = 0
-
-    def consult_rules(self, rules_str):
-        from prolog.parser.scanner import Scanner
-        from prolog.parser.parser import Parser
-
-        if not rules_str.strip():
-            return
-
-        tokens = Scanner(rules_str).tokenize()
-        if not tokens or (len(tokens) == 1 and tokens[0].token_type == TokenType.EOF):
-            return
-
-        # Use parse() to get a list of rules
-        parsed_result = Parser(tokens).parse()
-        if isinstance(parsed_result, list):
-            new_rules = parsed_result
-        elif parsed_result is not None: # If parse() somehow returns a single rule
-            new_rules = [parsed_result]
-        else: # If parse() returns None (e.g., on error and no recovery)
-            new_rules = []
-
-        if new_rules: # Only extend if there are rules to add
-            self.rules.extend(new_rules)
-
-    def query(self, query_str):
-        from prolog.parser.scanner import Scanner
-        from prolog.parser.parser import Parser
-
-        # 新しいクエリごとにバインディング環境をリセット
-        self.binding_env = BindingEnvironment()
-
-        tokens = Scanner(query_str).tokenize()
-
-        if not tokens or (len(tokens) == 1 and tokens[0].token_type == TokenType.EOF):
-            return
-
-        parsed_query = Parser(tokens)._parse_term()
-
-        query_vars = []
-
-        def find_variables(term, found_vars_list):
-            if isinstance(term, Variable):
-                if term.name != "_" and term not in found_vars_list:
-                    found_vars_list.append(term)
-            elif isinstance(term, Rule):
-                if hasattr(term, "head") and term.head is not None:
-                    find_variables(term.head, found_vars_list)
-                if hasattr(term, "body") and term.body is not None:
-                    find_variables(term.body, found_vars_list)
-            elif isinstance(term, Term):
-                if hasattr(term, "args") and term.args is not None:
-                    for arg_item in term.args:
-                        find_variables(arg_item, found_vars_list)
-
-        temp_query_vars = []
-        find_variables(parsed_query, temp_query_vars)
-        query_vars = temp_query_vars
-
-        solution_count = 0
-        for solution_item in self.execute(parsed_query):
-            if solution_item is FALSE_TERM or solution_item is None:
-                continue
-            if solution_item is CUT_SIGNAL:
-                logger.warning("Runtime.query: CUT_SIGNAL reached top-level query.")
-                break
-
-            current_bindings = {}
-            if query_vars:
-                for var in query_vars:
-                    value = self.binding_env.get_value(var)
-                    if value != var:
-                        current_bindings[var] = value
-
-                if current_bindings or not query_vars:
-                    solution_count += 1
-                    yield current_bindings
-            elif solution_item is TRUE_TERM:
-                solution_count += 1
-                yield {}
-
-    def asserta(self, rule_to_assert):
-        if not isinstance(rule_to_assert, Rule):
-            if isinstance(rule_to_assert, Term):
-                rule_to_assert = Rule(rule_to_assert, TRUE_TERM)
-            else:
-                logger.error(f"asserta: Expected Rule or Term, got {type(rule_to_assert)}")
-                return False
-        self.rules.insert(0, rule_to_assert)
-        return True
-
-    def assertz(self, rule_to_assert):
-        if not isinstance(rule_to_assert, Rule):
-            if isinstance(rule_to_assert, Term):
-                rule_to_assert = Rule(rule_to_assert, TRUE_TERM)
-            else:
-                logger.error(f"assertz: Expected Rule or Term, got {type(rule_to_assert)}")
-                return False
-        self.rules.append(rule_to_assert)
-        return True
-
-    def retract(self, rule_template_to_retract):
-        rules_to_keep = []
-        retracted_once = False
-        for r in self.rules:
-            if not retracted_once:
-                can_match = False
-                if isinstance(rule_template_to_retract, Rule):
-                    if (r.head.pred == rule_template_to_retract.head.pred and 
-                        len(r.head.args) == len(rule_template_to_retract.head.args)):
-                        if type(r.body) is type(rule_template_to_retract.body):
-                            if r == rule_template_to_retract:
-                                can_match = True
-                elif isinstance(rule_template_to_retract, Term):
-                    temp_env = BindingEnvironment()
-                    if temp_env.unify(r.head, rule_template_to_retract):
-                        can_match = True
-
-                if can_match:
-                    retracted_once = True
-                    continue
-            rules_to_keep.append(r)
-
-        self.rules = rules_to_keep
-        return retracted_once
-
-    def insert_rule_left(self, rule):
-        return self.asserta(rule)
-
-    def insert_rule_right(self, rule):
-        return self.assertz(rule)
-
-    def remove_rule(self, rule_template):
-        return self.retract(rule_template)
-
-    def register_function(self, predicate_name, arity, python_callable):
-        logger.info(f"Runtime.register_function for {predicate_name}/{arity}.")
-        self._registered_functions[(predicate_name, arity)] = python_callable
-
-    def _execute_conjunction(self, conjunction):
-        def execute_goals_recursive(index):
-            if index >= len(conjunction.args):
-                yield TRUE_TERM
-                return
-
-            goal = conjunction.args[index]
-            mark = self.binding_env.mark_trail()
-
-            if goal is CUT_SIGNAL:
-                for _ in execute_goals_recursive(index + 1):
-                    yield CUT_SIGNAL
-                    return
-                self.binding_env.backtrack(mark)
-                return
-
-            any_solution_for_current_goal = False
-            for result in self.execute(goal):
-                any_solution_for_current_goal = True
-                if result is FALSE_TERM:
-                    continue
-                if result is CUT_SIGNAL:
-                    yield CUT_SIGNAL
-                    self.binding_env.backtrack(mark)
-                    return
-                for _ in execute_goals_recursive(index + 1):
-                    yield TRUE_TERM
-            self.binding_env.backtrack(mark)
-            if not any_solution_for_current_goal:
-                pass
-
-        yield from execute_goals_recursive(0)
-
-    def execute(self, query_obj):
-        if query_obj is TRUE_TERM:
-            yield TRUE_TERM
-            return
-
-        # Handle 'is' predicate for arithmetic evaluation
-        if isinstance(query_obj, Arithmetic):
-            var_to_unify = query_obj # Arithmetic object itself is the variable on LHS
-            expression_to_evaluate = query_obj.expression
-
-            math_interpreter = MathInterpreter(self.binding_env)
-            mark = self.binding_env.mark_trail()
-            try:
-                # _evaluate_expr should return a prolog_parser_types.Number or raise InterpreterError
-                evaluated_value_obj = math_interpreter._evaluate_expr(expression_to_evaluate)
-
-                if not isinstance(evaluated_value_obj, prolog_parser_types.Number):
-                    logger.error(f"Arithmetic expression did not evaluate to a Number: {expression_to_evaluate}")
-                    self.binding_env.backtrack(mark) 
-                    return 
-
-                if self.binding_env.unify(var_to_unify, evaluated_value_obj):
-                    yield TRUE_TERM
-            except InterpreterError as e:
-                logger.warning(f"Error during arithmetic evaluation for 'is': {e}")
-                pass 
-            finally:
-                self.binding_env.backtrack(mark)
-            return
-
-        # Handle comparison operators
-        comparison_operators = ["=:=\\", "=\\=\\", ">", ">=", "<", "=<"] # Note: =:= and =\= might be parsed differently
-        # Parser generates: "=:=", "=\\=", ">", ">=", "<", "=<"
-        # Let's use the parser's output directly.
-        parsed_comparison_operators = {
-            "=:=\\": lambda l, r: l == r,
-            "=\\=\\": lambda l, r: l != r,
-            ">": lambda l, r: l > r,
-            ">=": lambda l, r: l >= r,
-            "<": lambda l, r: l < r,
-            "=<": lambda l, r: l <= r,
-        }
-
-        if isinstance(query_obj, Term) and query_obj.pred in parsed_comparison_operators and len(query_obj.args) == 2:
-            lhs_expr = query_obj.args[0]
-            rhs_expr = query_obj.args[1]
-
-            math_interpreter = MathInterpreter(self.binding_env)
-            # Comparison operators do not usually change bindings, so marking trail might not be strictly necessary
-            # unless evaluation itself could have side effects or complex variable instantiations.
-            # For safety and consistency with 'is', we can manage the trail.
-            mark = self.binding_env.mark_trail()
-            try:
-                lhs_evaluated_obj = math_interpreter._evaluate_expr(lhs_expr)
-                rhs_evaluated_obj = math_interpreter._evaluate_expr(rhs_expr)
-
-                if not isinstance(lhs_evaluated_obj, prolog_parser_types.Number) or \
-                   not isinstance(rhs_evaluated_obj, prolog_parser_types.Number):
-                    logger.warning(f"Operands for comparison '{query_obj.pred}' did not evaluate to Numbers.")
-                    # This implies a type error or instantiation error handled by MathInterpreter
-                    self.binding_env.backtrack(mark)
-                    return # Evaluation failed to produce numbers
-
-                # Perform comparison using the .value attribute of prolog_parser_types.Number
-                comparison_succeeded = parsed_comparison_operators[query_obj.pred](
-                    lhs_evaluated_obj.value, rhs_evaluated_obj.value
+        # 比較演算子
+        comparison_ops = operator_registry.get_operators_by_type(
+            OperatorType.COMPARISON
+        )
+        for op_info in comparison_ops:
+            if op_info.evaluator is None:
+                evaluators[op_info.symbol] = self._create_comparison_evaluator(
+                    op_info.symbol
                 )
+            elif hasattr(op_info.evaluator, "__call__"):
+                evaluators[op_info.symbol] = op_info.evaluator
 
-                if comparison_succeeded:
-                    yield TRUE_TERM
-                # If comparison fails, do nothing, implicitly fails and backtracks.
-            
-            except InterpreterError as e:
-                logger.warning(f"Error during comparison evaluation for '{query_obj.pred}': {e}")
-                # Error during evaluation (e.g., instantiation error, type error from MathInterpreter)
-                pass # Implicitly fails and backtracks
-            finally:
-                self.binding_env.backtrack(mark) # Backtrack any changes made during evaluation
-            return # End processing for comparison operator Term
+        # 'is' 演算子の評価
+        is_op = operator_registry.get_operator("is")
+        if is_op:
+            evaluators[is_op.symbol] = self._evaluate_is_operator
 
-        if isinstance(query_obj, BuiltinFail) or query_obj is FAIL_TERM:
-            return
+        # 単一化演算子 '='
+        unify_op = operator_registry.get_operator("=")
+        if unify_op:
+            evaluators[unify_op.symbol] = self._evaluate_unification_operator
 
-        if isinstance(query_obj, BuiltinCut):
-            yield CUT_SIGNAL
-            return
+        return evaluators
 
-        # TermFunction処理
-        if isinstance(query_obj, TermFunction):
-            # hasattr と callable のチェックは isinstance(TermFunction) で代替されるか、
-            # TermFunction の仕様として _execute_func が存在し callable であることが保証されるべき。
-            # ここでは TermFunction なら _execute_func を持つと仮定する。
-            try:
-                query_obj._execute_func() # TermFunction should have this method
-                yield TRUE_TERM
-            except Exception as e:
-                logger.error(f"Error executing TermFunction {query_obj.pred}: {e}")
-                pass
-            return
+    def _create_arithmetic_evaluator(self, op_symbol):
+        """算術演算子の評価関数を生成"""
 
-        if isinstance(query_obj, Rule):
-            mark = self.binding_env.mark_trail()
-            for body_result in self.execute(query_obj.body):
-                if body_result is FALSE_TERM:
-                    self.binding_env.backtrack(mark)
-                    mark = self.binding_env.mark_trail()
-                    continue
-                if body_result is CUT_SIGNAL:
-                    yield CUT_SIGNAL
-                    return
-                yield TRUE_TERM
-                self.binding_env.backtrack(mark)
-                mark = self.binding_env.mark_trail()
-            self.binding_env.backtrack(mark)
-            return
+        def evaluator(left_expr, right_expr, env: BindingEnvironment):
+            left_val = self.math_interpreter.evaluate(left_expr, env)
+            right_val = self.math_interpreter.evaluate(right_expr, env)
+            result = self.math_interpreter.evaluate_binary_op(
+                op_symbol, left_val, right_val
+            )
+            return result
 
-        elif isinstance(query_obj, Term):
-            # '=' の特別処理
-            if query_obj.pred == "=":
-                if len(query_obj.args) == 2:
-                    lhs, rhs = query_obj.args
-                    if self.binding_env.unify(lhs, rhs):
-                        yield TRUE_TERM
-                    return
+        return evaluator
 
-            # データベースルールとのマッチング
-            for db_rule_template in self.rules:
-                # 新しいスコープIDで変数を標準化
-                current_scope_id = self.binding_env.get_next_scope_id()
+    def _create_comparison_evaluator(self, op_symbol):
+        """比較演算子の評価関数を生成"""
 
-                var_map = {}
+        def evaluator(left_expr, right_expr, env: BindingEnvironment):
+            left_val = self.math_interpreter.evaluate(left_expr, env)
+            right_val = self.math_interpreter.evaluate(right_expr, env)
+            return self.math_interpreter.evaluate_comparison_op(
+                op_symbol, left_val, right_val
+            )
 
-                def freshen_term(t):
-                    if isinstance(t, Variable):
-                        if t not in var_map:
-                            var_map[t] = Variable(f"{t.name}_{current_scope_id}")
-                        return var_map[t]
-                    elif isinstance(t, Term):
-                        return Term(t.pred, *[freshen_term(arg) for arg in t.args])
-                    return t
+        return evaluator
 
-                fresh_head = freshen_term(db_rule_template.head)
-                fresh_body = freshen_term(db_rule_template.body)
-                fresh_rule = Rule(fresh_head, fresh_body)
+    def _evaluate_is_operator(self, result_var, expression, env: BindingEnvironment):
+        """'is' 演算子を評価"""
+        if not isinstance(result_var, (Variable, Number)):
+            raise PrologError(
+                f"'is' の左辺は変数または数値でなければなりません: {result_var}"
+            )
 
-                if (fresh_rule.head.pred == query_obj.pred and 
-                    len(fresh_rule.head.args) == len(query_obj.args)):
-                    mark = self.binding_env.mark_trail()
-                    if self.binding_env.unify(fresh_rule.head, query_obj):
-                        for body_result in self.execute(fresh_rule.body):
-                            if body_result is FALSE_TERM:
-                                continue
-                            if body_result is CUT_SIGNAL:
-                                yield CUT_SIGNAL
-                                return
-                            yield TRUE_TERM
+        value = self.math_interpreter.evaluate(expression, env)
 
-                        self.binding_env.backtrack(mark)
+        if not isinstance(value, (int, float)):
+            raise PrologError(
+                f"'is' の右辺は数値に評価されなければなりません: {expression} -> {value}"
+            )
+
+        if isinstance(result_var, Variable):
+            unified, temp_env = self.logic_interpreter.unify(
+                result_var, Number(value), env
+            )
+            return unified
+        elif isinstance(result_var, Number):
+            return result_var.value == value
+
+        return False
+
+    def _evaluate_unification_operator(
+        self, left_term, right_term, env: BindingEnvironment
+    ):
+        """'=' (単一化) 演算子を評価"""
+        unified, _ = self.logic_interpreter.unify(left_term, right_term, env)
+        return unified
+
+    def _evaluate_operator(
+        self,
+        term: Term,
+        op_info: OperatorInfo,
+        evaluator: Callable,
+        env: BindingEnvironment,
+    ):
+        """統一された演算子評価処理"""
+        if op_info.arity == 2:
+            if len(term.args) != 2:
+                raise PrologError(
+                    f"演算子 {op_info.symbol} は2つの引数を取りますが、{len(term.args)}個指定されました。"
+                )
+            arg1, arg2 = term.args[0], term.args[1]
+            return evaluator(arg1, arg2, env)
+        elif op_info.arity == 1:
+            if len(term.args) != 1:
+                raise PrologError(
+                    f"単項演算子 {op_info.symbol} は1つの引数を取りますが、{len(term.args)}個指定されました。"
+                )
+            raise NotImplementedError(
+                f"単項演算子 {op_info.symbol} の評価は未実装です。"
+            )
+        elif op_info.arity == 0:
+            if term.args:
+                raise PrologError(
+                    f"演算子 {op_info.symbol} は引数をを取りませんが、指定されました。"
+                )
+            return evaluator(env)
+
+        raise PrologError(
+            f"未対応のアリティを持つ演算子: {op_info.symbol} (アリティ {op_info.arity})"
+        )
+
+    def execute_query(self, query_string):
+        logger.debug(f"Executing query: {query_string}")
+        try:
+            tokens = Scanner(query_string).scan_tokens()
+            logger.debug(f"Tokens: {tokens}")
+
+            if not query_string.strip().endswith("."):
+                query_string_with_dot = query_string + "."
+            else:
+                query_string_with_dot = query_string
+
+            tokens_for_query = Scanner(query_string_with_dot).scan_tokens()
+            parsed_query_structures = Parser(tokens_for_query).parse()
+
+            if not parsed_query_structures:
+                logger.error("Query parsing failed or produced no structures.")
+                return []
+
+            if isinstance(parsed_query_structures[0], Fact):
+                query_goal = parsed_query_structures[0].head
+            elif isinstance(parsed_query_structures[0], Rule):
+                logger.warning("Query parsed as a rule, using its head as the goal.")
+                query_goal = parsed_query_structures[0].head
+            else:
+                logger.error(
+                    f"Unexpected parsed query structure: {parsed_query_structures[0]}"
+                )
+                return []
+
+            logger.debug(f"Parsed query goal: {query_goal}")
+
+            solutions = []
+            initial_env = BindingEnvironment()
+
+            for env in self.execute(query_goal, initial_env):
+                result = {}
+                query_vars = self._get_vars_from_term(query_goal)
+
+                for var_name in query_vars:
+                    value = env.get_value(var_name)
+                    if value is not None:
+                        result[var_name] = self.logic_interpreter.dereference(
+                            value, env
+                        )
+
+                if result:
+                    solutions.append(result)
+                elif not query_vars:
+                    solutions.append({})
+
+            logger.debug(f"Solutions: {solutions}")
+            return solutions
+
+        except PrologError as e:
+            logger.error(f"Prolog execution error: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error during query execution: {e}", exc_info=True)
+            return []
+
+    def _get_vars_from_term(self, term):
+        """項から変数のリストを再帰的に取得"""
+        vars_found = set()
+
+        def collect_vars(current_term):
+            if isinstance(current_term, Variable):
+                vars_found.add(current_term.name)
+            elif isinstance(current_term, Term):
+                for arg in current_term.args:
+                    collect_vars(arg)
+
+        collect_vars(term)
+        return list(vars_found)
+
+    def consult(self, filename):
+        logger.info(f"Consulting file: {filename}")
+        try:
+            with open(filename, "r") as f:
+                source = f.read()
+
+            tokens = Scanner(source).scan_tokens()
+            new_rules = Parser(tokens).parse()
+            self.rules.extend(new_rules)
+            self.logic_interpreter.rules = self.rules
+            logger.info(f"Consulted {len(new_rules)} rules from {filename}.")
+            return True
+        except FileNotFoundError:
+            logger.error(f"File not found: {filename}")
+            return False
+        except Exception as e:
+            logger.error(f"Error consulting file {filename}: {e}", exc_info=True)
+            return False
+
+    def execute(self, goal, env: BindingEnvironment):
+        """指定されたゴールを現在の環境で評価し、成功した環境のジェネレータを返す"""
+        logger.debug(f"Executing goal: {goal} with env: {env}")
+
+        if isinstance(goal, Term):
+            op_info = operator_registry.get_operator(str(goal.functor))
+            if op_info and op_info.symbol in self._operator_evaluators:
+                evaluator = self._operator_evaluators[op_info.symbol]
+                try:
+                    success = self._evaluate_operator(goal, op_info, evaluator, env)
+
+                    if success:
+                        logger.debug(
+                            f"Operator goal {goal} succeeded. Yielding env: {env}"
+                        )
+                        yield env
                     else:
-                        self.binding_env.backtrack(mark)
-            return
+                        logger.debug(f"Operator goal {goal} failed.")
+                    return
+                except PrologError as e:
+                    logger.debug(f"Error evaluating operator goal {goal}: {e}")
+                    return
+                except NotImplementedError as e:
+                    logger.warning(
+                        f"Operator {op_info.symbol} evaluation not fully implemented: {e}"
+                    )
+                    return
 
-        elif isinstance(query_obj, Conjunction):
-            yield from self._execute_conjunction(query_obj)
-            return
+        yield from self.logic_interpreter.solve_goal(goal, env)
 
-        return
+    def add_rule(self, rule_string):
+        """単一のルール文字列を解析して追加"""
+        logger.debug(f"Adding rule: {rule_string}")
+        try:
+            if not rule_string.strip().endswith("."):
+                rule_string_with_dot = rule_string + "."
+            else:
+                rule_string_with_dot = rule_string
+
+            tokens = Scanner(rule_string_with_dot).scan_tokens()
+            parsed_rules = Parser(tokens).parse()
+            if parsed_rules:
+                for rule in parsed_rules:
+                    self.rules.append(rule)
+                self.logic_interpreter.rules = self.rules
+                logger.info(f"Added {len(parsed_rules)} rule(s): {rule_string}")
+                return True
+            else:
+                logger.error(f"Failed to parse rule string: {rule_string}")
+                return False
+        except Exception as e:
+            logger.error(f"Error adding rule '{rule_string}': {e}", exc_info=True)
+            return False

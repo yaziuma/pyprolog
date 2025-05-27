@@ -1,71 +1,184 @@
-from .token import Token
-from .token_type import TokenType
-from prolog.core.errors import ScannerError  # 修正: 正しいパスからインポート
-from prolog.util.logger import logger
-
-logger.debug("scanner.py loaded")
+from prolog.parser.token import Token
+from prolog.parser.token_type import TokenType
+from prolog.core.operators import operator_registry
 
 
+# エラーハンドラーのデフォルト実装（必要に応じてカスタマイズ可能）
 def default_error_handler(line, message):
-    print(f"Line[{line}] Error: {message}")
-    raise ScannerError("Scanner error")
+    print(f"[line {line}] Error: {message}")
 
 
 class Scanner:
     def __init__(self, source, report=default_error_handler):
-        logger.debug(
-            f"Scanner initialized with source: {source[:50]}{'...' if len(source) > 50 else ''}"
-        )
         self._source = source
         self._tokens = []
         self._start = 0
         self._current = 0
         self._line = 1
         self._report = report
-        self._keywords = self._initialize_keywords()
-
-    def _initialize_keywords(self):
-        keywords = {
+        self._keywords = {
+            "true": TokenType.TRUE,
             "fail": TokenType.FAIL,
-            "write": TokenType.WRITE,
-            "nl": TokenType.NL,
-            "tab": TokenType.TAB,
-            "is": TokenType.IS,
             "retract": TokenType.RETRACT,
             "asserta": TokenType.ASSERTA,
             "assertz": TokenType.ASSERTZ,
-            "true": TokenType.TRUE,
-            "mod": TokenType.MOD,
-            "div": TokenType.DIV,
+            # "is" は演算子として処理されるため、キーワードからは削除
+            # "nl", "tab", "write" も演算子として処理
         }
-        return keywords
+        self._operator_symbols = self._build_operator_symbol_map()
+        # 演算子シンボルを長さの降順でソートし、最長マッチを優先
+        self._sorted_operator_symbols = sorted(
+            self._operator_symbols.keys(), key=len, reverse=True
+        )
 
-    def _add_token(self, token_type):
-        self._add_token_with_literal(token_type, None)
+    def _build_operator_symbol_map(self):
+        """演算子記号からTokenTypeへのマッピングを構築"""
+        symbol_map = {}
+        for symbol, op_info in operator_registry._operators.items():
+            if op_info.token_type:
+                # TokenTypeを名前から取得
+                try:
+                    token_type_member = getattr(TokenType, op_info.token_type)
+                    symbol_map[symbol] = token_type_member
+                except AttributeError:
+                    # TokenType に存在しない場合はエラーログなどを出すか、無視する
+                    # ここでは、初期化時にエラーが発生する可能性があるため、
+                    # _initialize_operator_tokens が呼ばれた後であることを期待
+                    pass  # またはエラー処理
+        return symbol_map
 
-    def _add_token_with_literal(self, token_type, literal, lex=None):
-        lexeme = self._source[self._start : self._current] if lex is None else lex
-        # logger.debug(f"Adding token: type={token_type}, lexeme='{lexeme}', literal={literal}, line={self._line}") # Potentially too verbose
-        self._tokens.append(Token(token_type, lexeme, literal, self._line))
+    def scan_tokens(self):
+        while not self._is_at_end():
+            self._start = self._current
+            self._scan_token()
+        self._tokens.append(Token(TokenType.EOF, "", None, self._line))
+        return self._tokens
 
-    def _is_at_end(self):
-        return self._current >= len(self._source)
+    def _scan_token(self):
+        char = self._advance()
+        if char.isalpha() or char == "_":
+            # アトム、変数、またはキーワード（is, nl, tab, writeなど）
+            self._identifier()
+        elif char.isdigit():
+            self._number()
+        elif char == "'":
+            self._string()
+        elif char == "(":
+            self._add_token(TokenType.LEFTPAREN)
+        elif char == ")":
+            self._add_token(TokenType.RIGHTPAREN)
+        elif char == "[":
+            self._add_token(TokenType.LEFTBRACKET)
+        elif char == "]":
+            self._add_token(TokenType.RIGHTBRACKET)
+        elif char == ",":
+            self._add_token(TokenType.COMMA)
+        elif char == ".":
+            self._add_token(TokenType.DOT)
+        elif char == "|":
+            self._add_token(TokenType.BAR)
+        elif char == ":":
+            if self._match("-"):
+                self._add_token(TokenType.COLONMINUS)
+            else:
+                self._report(
+                    self._line, f"Unexpected character: {char}"
+                )  # ':' 単独はエラー
+        elif char in [" ", "\r", "\t"]:
+            # 空白文字は無視
+            pass
+        elif char == "\n":
+            self._line += 1
+        elif char == "%":  # コメント
+            while self._peek() != "\n" and not self._is_at_end():
+                self._advance()
+        else:
+            # 演算子かどうかをチェック
+            if not self._scan_operator(char):
+                self._report(self._line, f"Unexpected character: {char}")
 
-    def _advance(self):
-        self._current += 1
-        return self._source[self._current - 1]
+    def _scan_operator(self, start_char):
+        """演算子の字句解析（長いものから優先してマッチング）"""
+        # 現在位置から可能な演算子を探索
+        # start_char を含めて、ソースの残りの部分と比較
+        current_segment = (
+            start_char
+            + self._source[
+                self._current : self._current
+                + max(len(s) for s in self._sorted_operator_symbols if s)
+                - 1
+                if self._sorted_operator_symbols
+                else 0
+            ]
+        )
 
-    def _make_token(self, token_type, literal, line):
-        lexeme = self._source[self._start : self._current]
-        return Token(token_type, lexeme, literal, line)
+        for symbol in self._sorted_operator_symbols:
+            if current_segment.startswith(symbol):
+                # マッチした場合、文字を消費
+                # start_char は既に _advance() で消費済み
+                # symbol の残りの長さを消費
+                for _ in range(len(symbol) - 1):
+                    self._advance()
 
-    def _is_next(self, expected):
+                token_type = self._operator_symbols[symbol]
+                self._add_token(token_type, symbol)  # 演算子の字句を保存
+                return True
+        return False
+
+    def _identifier(self):
+        while self._peek().isalnum() or self._peek() == "_":
+            self._advance()
+
+        text = self._source[self._start : self._current]
+
+        # キーワードかどうかをチェック
+        token_type = self._keywords.get(text)
+
+        if token_type is None:
+            # 演算子キーワード（例: 'mod'）もここで識別される可能性がある
+            # OperatorRegistry に登録されているシンボルと一致するか確認
+            op_info = operator_registry.get_operator(text)
+            if op_info and op_info.token_type:
+                try:
+                    token_type = getattr(TokenType, op_info.token_type)
+                except AttributeError:
+                    # TokenType に動的に追加されていない場合はアトムとして扱う
+                    token_type = TokenType.ATOM
+            elif text[0].isupper() or text[0] == "_":
+                token_type = TokenType.VARIABLE
+            else:
+                token_type = TokenType.ATOM
+
+        self._add_token(token_type)
+
+    def _number(self):
+        while self._peek().isdigit():
+            self._advance()
+        if self._peek() == "." and self._peek_next().isdigit():
+            self._advance()  # Consume the "."
+            while self._peek().isdigit():
+                self._advance()
+        self._add_token(
+            TokenType.NUMBER, float(self._source[self._start : self._current])
+        )
+
+    def _string(self):
+        while self._peek() != "'" and not self._is_at_end():
+            if self._peek() == "\n":
+                self._line += 1
+            self._advance()
+        if self._is_at_end():
+            self._report(self._line, "Unterminated string.")
+            return
+        self._advance()  # The closing '.
+        value = self._source[self._start + 1 : self._current - 1]
+        self._add_token(TokenType.STRING, value)
+
+    def _match(self, expected):
         if self._is_at_end():
             return False
-
         if self._source[self._current] != expected:
             return False
-
         self._current += 1
         return True
 
@@ -79,195 +192,28 @@ class Scanner:
             return "\0"
         return self._source[self._current + 1]
 
-    def _is_digit(self, c):
-        return c >= "0" and c <= "9"
+    def _is_at_end(self):
+        return self._current >= len(self._source)
 
-    def _is_alphanumeric(self, c):
-        return (
-            (c >= "a" and c <= "z")
-            or (c >= "A" and c <= "Z")
-            or (c >= "0" and c <= "9")
-            or (c == "_")
+    def _advance(self):
+        self._current += 1
+        return self._source[self._current - 1]
+
+    def _add_token(self, type, literal=None):
+        text = self._source[self._start : self._current]
+        if literal is None and type not in [
+            TokenType.LEFTPAREN,
+            TokenType.RIGHTPAREN,
+            TokenType.LEFTBRACKET,
+            TokenType.RIGHTBRACKET,
+            TokenType.COMMA,
+            TokenType.DOT,
+            TokenType.BAR,
+            TokenType.COLONMINUS,
+            TokenType.UNDERSCORE,
+            TokenType.EOF,
+        ]:
+            literal = text  # ATOM, VARIABLE, STRING, NUMBER などの場合に字句を保存
+        self._tokens.append(
+            Token(type, literal if literal is not None else text, literal, self._line)
         )
-
-    def _is_lowercase_alpha(self, c):
-        return c >= "a" and c <= "z"
-
-    def _is_uppercase_alpha(self, c):
-        return c >= "A" and c <= "Z"
-
-    def _is_whitespace(self, c):
-        return c == " " or c == "\r" or c == "\t"
-
-    def _str_to_number(self, strnum):
-        try:
-            return float(strnum)
-        except Exception:
-            self._report(self._line, f'"{strnum}" is not a number.')
-
-    def _is_keyword(self):
-        value = self._source[self._start : self._current]
-        token_type = self._keywords.get(value, TokenType.ATOM)
-        return token_type
-
-    def _process_atom(self):
-        while self._is_alphanumeric(self._peek()):
-            self._advance()
-
-        token_type = self._is_keyword()
-        self._add_token(token_type)
-
-    def _process_variable(self):
-        while self._is_alphanumeric(self._peek()):
-            self._advance()
-
-        self._add_token(TokenType.VARIABLE)
-
-    def _process_number(self):
-        while self._is_digit(self._peek()):
-            self._advance()
-
-        if self._peek() == "." and self._is_digit(self._peek_next()):
-            self._advance()
-            while self._is_digit(self._peek()):
-                self._advance()
-
-        value = self._str_to_number(self._source[self._start : self._current])
-        self._add_token_with_literal(TokenType.NUMBER, value)
-
-    def _process_string_literal(self):
-        while self._peek() != "'" and not self._is_at_end():
-            if self._peek() == "\n":
-                self._line += 1
-            self._advance()
-
-        if self._is_at_end():
-            self._report(self._line, "Unterminated string")
-
-        self._advance()
-
-        literal = self._source[self._start + 1 : self._current - 1]
-        self._add_token_with_literal(TokenType.ATOM, literal, literal)
-
-    def _scan_token(self):
-        c = self._advance()
-
-        if self._is_whitespace(c):
-            pass
-        elif c == "\n":
-            self._line += 1
-        elif c == "%":
-            while not self._peek() == "\n" and not self._is_at_end():
-                self._advance()
-        elif c == "/" and self._is_next("*"):
-            while not self._is_at_end():
-                c = self._advance()
-                if c == "*" and self._is_next("/"):
-                    break
-                if self._is_at_end():
-                    self._report(self._line, "Unterminated comment")
-        elif c == "'":
-            self._process_string_literal()
-        elif self._is_lowercase_alpha(c):
-            self._process_atom()
-        elif c == "_":
-            if not self._is_alphanumeric(self._peek_next()):
-                self._add_token(TokenType.UNDERSCORE)
-            else:
-                self._process_variable()
-        elif self._is_uppercase_alpha(c):
-            self._process_variable()
-        elif c == "-" and self._is_digit(self._peek()):
-            # TODO: refactor this logic to unary operator
-            self._process_number()
-        elif self._is_digit(c):
-            self._process_number()
-        elif c == "[":
-            self._add_token(TokenType.LEFTBRACKET)
-        elif c == "]":
-            self._add_token(TokenType.RIGHTBRACKET)
-        elif c == "|":
-            self._add_token(TokenType.BAR)
-        elif c == "!":
-            self._add_token(TokenType.CUT)
-        elif c == "(":
-            self._add_token(TokenType.LEFTPAREN)
-        elif c == ")":
-            self._add_token(TokenType.RIGHTPAREN)
-        elif c == "*":
-            self._add_token(TokenType.STAR)
-        elif c == "/":
-            self._add_token(TokenType.SLASH)
-        elif c == "+":
-            self._add_token(TokenType.PLUS)
-        elif c == "-":
-            self._add_token(TokenType.MINUS)
-        elif c == "=":
-            if self._is_next("="): # ==
-                self._add_token(TokenType.EQUALEQUAL)
-            elif self._is_next(":"): # =:=
-                if self._is_next("="):
-                    self._add_token(TokenType.EQUALCOLONEQUAL) # TokenType.EQUAL_ARITH or similar
-                else:
-                    # Rollback _is_next for ':'
-                    self._current -=1
-                    self._report(self._line, f"Expected `=` after `=:` for `=:=` operator, found `{self._peek()}`")
-            elif self._is_next("\\"): # =\=
-                if self._is_next("="):
-                    self._add_token(TokenType.EQUALSLASHEQUAL) # TokenType.NOT_EQUAL_ARITH or similar
-                else:
-                    # Rollback _is_next for '\'
-                    self._current -=1
-                    self._report(self._line, f"Expected `=` after `=\\` for `=\=` operator, found `{self._peek()}`")
-            elif self._is_next("<"): # =<
-                self._add_token(TokenType.EQUALLESS)
-            # Note: EQUALSLASH for =/= might need to be distinct from =\=
-            # For now, assuming EQUALSLASH was intended for =/=
-            elif self._is_next("/"): # =/=
-                 if self._is_next("="): # Check for =/=
-                    self._add_token(TokenType.EQUALSLASH) # Or a more specific =/= token
-                 else:
-                    # Rollback _is_next for '/'
-                    self._current -=1
-                    self._add_token(TokenType.EQUAL) # Fallback to just = if not =/=
-            else:  # 単独の = 演算子
-                self._add_token(TokenType.EQUAL)
-        elif c == "<":
-            if self._is_next("="): # <=
-                self._add_token(TokenType.LESSEQUAL)
-            else:
-                self._add_token(TokenType.LESS)
-        elif c == ">":
-            if self._is_next("="): # >=
-                self._add_token(TokenType.GREATEREQUAL)
-            else:
-                self._add_token(TokenType.GREATER)
-        elif c == ":":
-            if self._is_next("-"): # :-
-                self._add_token(TokenType.COLONMINUS)
-            # Removed the 'else' that reported "Expected - but found :",
-            # as a single ':' might be part of another operator like '=:'
-            # or could be an error if it's truly standalone and not expected.
-            # If a standalone ':' is an error, it should be caught after all valid multi-char ops are checked.
-            # For now, let it fall through to "Unexpected character" if not part of a known sequence.
-            else: # A single ':' is not a standard token on its own usually.
-                 self._report(self._line, f"Unexpected character after colon: {self._peek()}")
-
-        elif c == ".":
-            self._add_token(TokenType.DOT)
-        elif c == ",":
-            self._add_token(TokenType.COMMA)
-        else:
-            self._report(self._line, f"Unexpected character: {c}")
-
-    def tokenize(self):
-        logger.debug("Scanner.tokenize called")
-        while self._is_at_end() is not True:
-            self._start = self._current
-            self._scan_token()
-
-        self._add_token(TokenType.EOF)
-        logger.debug(
-            f"Scanner.tokenize returning (first 5): {self._tokens[:5]}{'...' if len(self._tokens) > 5 else ''}"
-        )
-        return self._tokens

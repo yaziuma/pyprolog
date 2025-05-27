@@ -1,13 +1,22 @@
 from prolog.runtime.interpreter import Runtime
-from prolog.core.types import Variable, Term, Rule, FALSE_TERM, TRUE_TERM, CUT_SIGNAL, Conjunction
+from prolog.core.types import (
+    Variable,
+    Term,
+    Rule,
+    FALSE_TERM,
+    TRUE_TERM,
+    CUT_SIGNAL,
+    Conjunction,
+)
 from prolog.parser.parser import Parser
 from prolog.parser.scanner import Scanner
 
+
 def test_support_for_numbers():
-    source = '''
+    source = """
     window(main, 2, 2.0, 20, 72).
     window(error, 15, 4.0, 20, 78).
-    '''
+    """
     tokens = Scanner(source).tokenize()
     rules = Parser(tokens)._parse_rule()
     assert rules is not None
@@ -43,27 +52,27 @@ def test_support_for_numbers():
 
     # Re-interpreting the test: perhaps it's about finding a rule where the 2nd and 3rd args ARE the same.
     # Let's add such a rule:
-    source_adjusted = '''
+    source_adjusted = """
     window(main, 2, 2.0, 20, 72). 
     window(test_eq, 5, 5, 10, 10). % Rule where 2nd and 3rd args are same
     window(error, 15, 4.0, 20, 78).
-    '''
+    """
     tokens_adj = Scanner(source_adjusted).tokenize()
     rules_adj = Parser(tokens_adj)._parse_rule()
     assert rules_adj is not None
     runtime_adj = Runtime(rules_adj)
-    goal_text = 'window(T, X, X, Z, W).' 
-    
-    T_var = Variable('T')
-    X_var = Variable('X')
-    Z_var = Variable('Z')
-    W_var = Variable('W')
+    goal_text = "window(T, X, X, Z, W)."
+
+    T_var = Variable("T")
+    X_var = Variable("X")
+    Z_var = Variable("Z")
+    W_var = Variable("W")
 
     expected_solutions = [
         # This solution comes from window(test_eq, 5, 5, 10, 10)
-        {'T': 'test_eq', 'X': 5.0, 'Z': 10.0, 'W': 10.0} 
+        {"T": "test_eq", "X": 5.0, "Z": 10.0, "W": 10.0}
     ]
-    
+
     solutions_found = 0
     for i, bindings_dict in enumerate(runtime_adj.query(goal_text)):
         solutions_found += 1
@@ -71,116 +80,121 @@ def test_support_for_numbers():
         assert X_var in bindings_dict
         assert Z_var in bindings_dict
         assert W_var in bindings_dict
-        
-        assert str(bindings_dict[T_var]) == str(expected_solutions[i]['T'])
+
+        assert str(bindings_dict[T_var]) == str(expected_solutions[i]["T"])
         # Values are stored as Number objects, convert to float for comparison
-        assert float(str(bindings_dict[X_var])) == float(expected_solutions[i]['X'])
-        assert float(str(bindings_dict[Z_var])) == float(expected_solutions[i]['Z'])
-        assert float(str(bindings_dict[W_var])) == float(expected_solutions[i]['W'])
-            
-    assert solutions_found == len(expected_solutions), \
+        assert float(str(bindings_dict[X_var])) == float(expected_solutions[i]["X"])
+        assert float(str(bindings_dict[Z_var])) == float(expected_solutions[i]["Z"])
+        assert float(str(bindings_dict[W_var])) == float(expected_solutions[i]["W"])
+
+    assert solutions_found == len(expected_solutions), (
         f"Expected {len(expected_solutions)} solutions for adjusted source, got {solutions_found}"
+    )
+
 
 def test_simple_arithmetics():
-    source = '''
+    source = """
     test(Y) :- Y is 5 + 2 * 3 - 1.
-    ''' 
-    tokens = Scanner(source).tokenize()
-    rules = Parser(tokens)._parse_rule()
-    assert rules is not None
-    runtime = Runtime(rules)
-    goal_text = "test(Res)." 
-    
-    Res_var = Variable('Res')
-    expected_solutions = [{'Res': 10.0}] # 5 + 6 - 1 = 10
-    
-    solutions_found = 0
-    for i, bindings_dict in enumerate(runtime.query(goal_text)):
-        solutions_found += 1
-        assert Res_var in bindings_dict
-        assert float(str(bindings_dict[Res_var])) == expected_solutions[i]['Res']
-    assert solutions_found == len(expected_solutions)
-
-def test_arithmetics_with_grouping():
-    source = '''
-    test(Z) :- Z is (5 + 2) * (3 - 1).
-    ''' 
+    """
     tokens = Scanner(source).tokenize()
     rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
     goal_text = "test(Res)."
-    
-    Res_var = Variable('Res')
-    expected_solutions = [{'Res': 14.0}] # (7) * (2) = 14
-    
+
+    Res_var = Variable("Res")
+    expected_solutions = [{"Res": 10.0}]  # 5 + 6 - 1 = 10
+
     solutions_found = 0
     for i, bindings_dict in enumerate(runtime.query(goal_text)):
         solutions_found += 1
         assert Res_var in bindings_dict
-        assert float(str(bindings_dict[Res_var])) == expected_solutions[i]['Res']
+        assert float(str(bindings_dict[Res_var])) == expected_solutions[i]["Res"]
     assert solutions_found == len(expected_solutions)
 
-def test_arithmetics_with_variables():
-    source = '''
-    c_to_f(C, F) :- F is C * 9 / 5 + 32.
-    '''
+
+def test_arithmetics_with_grouping():
+    source = """
+    test(Z) :- Z is (5 + 2) * (3 - 1).
+    """
     tokens = Scanner(source).tokenize()
     rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
-    
-    X_var = Variable('X') # Query variable
+    goal_text = "test(Res)."
+
+    Res_var = Variable("Res")
+    expected_solutions = [{"Res": 14.0}]  # (7) * (2) = 14
+
+    solutions_found = 0
+    for i, bindings_dict in enumerate(runtime.query(goal_text)):
+        solutions_found += 1
+        assert Res_var in bindings_dict
+        assert float(str(bindings_dict[Res_var])) == expected_solutions[i]["Res"]
+    assert solutions_found == len(expected_solutions)
+
+
+def test_arithmetics_with_variables():
+    source = """
+    c_to_f(C, F) :- F is C * 9 / 5 + 32.
+    """
+    tokens = Scanner(source).tokenize()
+    rules = Parser(tokens)._parse_rule()
+    assert rules is not None
+    runtime = Runtime(rules)
+
+    X_var = Variable("X")  # Query variable
 
     # Test case 1
-    goal_text1 = "c_to_f(100, X)." # 100 * 9 / 5 + 32 = 180 + 32 = 212
-    expected_solutions1 = [{'X': 212.0}]
+    goal_text1 = "c_to_f(100, X)."  # 100 * 9 / 5 + 32 = 180 + 32 = 212
+    expected_solutions1 = [{"X": 212.0}]
     solutions_found1 = 0
     for i, bindings_dict in enumerate(runtime.query(goal_text1)):
         solutions_found1 += 1
         assert X_var in bindings_dict
-        assert float(str(bindings_dict[X_var])) == expected_solutions1[i]['X']
+        assert float(str(bindings_dict[X_var])) == expected_solutions1[i]["X"]
     assert solutions_found1 == len(expected_solutions1)
 
     # Test case 2
-    goal_text2 = "c_to_f(0, X)." # 0 * 9 / 5 + 32 = 32
-    expected_solutions2 = [{'X': 32.0}]
+    goal_text2 = "c_to_f(0, X)."  # 0 * 9 / 5 + 32 = 32
+    expected_solutions2 = [{"X": 32.0}]
     solutions_found2 = 0
     for i, bindings_dict in enumerate(runtime.query(goal_text2)):
         solutions_found2 += 1
         assert X_var in bindings_dict
-        assert float(str(bindings_dict[X_var])) == expected_solutions2[i]['X']
+        assert float(str(bindings_dict[X_var])) == expected_solutions2[i]["X"]
     assert solutions_found2 == len(expected_solutions2)
 
+
 def test_arithmetics_with_variables_same_as_rule():
-    source = '''
+    source = """
     c_to_f(C, F) :- F is C * 9 / 5 + 32. 
-    '''
+    """
     # Here, the query variable 'F' has the same name as a variable in the rule's head.
     # This is fine, as standardization-apart should handle it.
     tokens = Scanner(source).tokenize()
     rules = Parser(tokens)._parse_rule()
     assert rules is not None
     runtime = Runtime(rules)
-    
-    F_var_query = Variable('F') # Query variable, named 'F'
+
+    F_var_query = Variable("F")  # Query variable, named 'F'
 
     # Test case 1
     goal_text1 = "c_to_f(100, F)."
-    expected_solutions1 = [{'F': 212.0}]
+    expected_solutions1 = [{"F": 212.0}]
     solutions_found1 = 0
     for i, bindings_dict in enumerate(runtime.query(goal_text1)):
         solutions_found1 += 1
-        assert F_var_query in bindings_dict # Check for the query variable
-        assert float(str(bindings_dict[F_var_query])) == expected_solutions1[i]['F']
+        assert F_var_query in bindings_dict  # Check for the query variable
+        assert float(str(bindings_dict[F_var_query])) == expected_solutions1[i]["F"]
     assert solutions_found1 == len(expected_solutions1)
 
     # Test case 2
     goal_text2 = "c_to_f(0, F)."
-    expected_solutions2 = [{'F': 32.0}]
+    expected_solutions2 = [{"F": 32.0}]
     solutions_found2 = 0
     for i, bindings_dict in enumerate(runtime.query(goal_text2)):
         solutions_found2 += 1
         assert F_var_query in bindings_dict
-        assert float(str(bindings_dict[F_var_query])) == expected_solutions2[i]['F']
+        assert float(str(bindings_dict[F_var_query])) == expected_solutions2[i]["F"]
     assert solutions_found2 == len(expected_solutions2)
