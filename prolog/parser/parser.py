@@ -277,25 +277,55 @@ class Parser:
         
         logger.debug(f"Parser._parse_term: Parsed LHS: {lhs_term}, type: {type(lhs_term)}")
 
+        # Check for comparison operators
+        comparison_token_map = {
+            TokenType.EQUALCOLONEQUAL: "=:= ",
+            TokenType.EQUALSLASHEQUAL: "=\\=",
+            TokenType.GREATER: ">",
+            TokenType.GREATEREQUAL: ">=",
+            TokenType.LESS: "<",
+            TokenType.EQUALLESS: "=<", # Standard Prolog is =<
+            TokenType.LESSEQUAL: "=<", # Also accept <= as =<
+            # TokenType.EQUALEQUAL: "==" # Typically not for arithmetic comparison in Prolog standard
+        }
+
+        peeked_token_type = self._peek().token_type
+        if peeked_token_type in comparison_token_map:
+            operator_token = self._advance() # Consume the comparison operator
+            # The RHS of a comparison is often an arithmetic expression
+            rhs_comparison_expr = self._parse_additive_expr() # Or _parse_term() if more general terms are allowed
+            if rhs_comparison_expr is None:
+                self._report(
+                    self._peek().line,
+                    f"Missing or invalid right-hand side for '{comparison_token_map[peeked_token_type]}' operator.",
+                )
+                return None
+            
+            comparison_term = Term(comparison_token_map[peeked_token_type].strip(), lhs_term, rhs_comparison_expr)
+            logger.debug(
+                f"Parser._parse_term: Parsed comparison term: {comparison_term}, type: {type(comparison_term)}"
+            )
+            return comparison_term
+
         # Check for '=' operator (unification)
         if self._token_matches(TokenType.EQUAL):
             self._advance()
-            rhs_term = self._parse_term()
-            if rhs_term is None:
+            rhs_unification_term = self._parse_term()
+            if rhs_unification_term is None:
                 self._report(
                     self._peek().line,
                     "Missing or invalid right-hand side for '=' operator.",
                 )
                 return None
 
-            equality_term = Term("=", lhs_term, rhs_term)
+            equality_term = Term("=", lhs_term, rhs_unification_term)
             logger.debug(
                 f"Parser._parse_term: Parsed equality term: {equality_term}, type: {type(equality_term)}"
             )
             return equality_term
 
         logger.debug(
-            f"Parser._parse_term: Parsed term (no '=' found after LHS): {lhs_term}, type: {type(lhs_term)}"
+            f"Parser._parse_term: Parsed term (no comparison or '=' found after LHS): {lhs_term}, type: {type(lhs_term)}"
         )
         return lhs_term
 

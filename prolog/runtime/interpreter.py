@@ -12,10 +12,12 @@ from prolog.core.types import (
 from prolog.parser.token_type import TokenType
 from prolog.util.logger import logger
 from prolog.core.binding_environment import BindingEnvironment
-
 # BuiltinCutとBuiltinFailをインポート
 from prolog.runtime.builtins import Cut as BuiltinCut, Fail as BuiltinFail
-
+from prolog.parser.types import Arithmetic, TermFunction # Import Arithmetic and TermFunction
+from prolog.runtime.math_interpreter import MathInterpreter # Import MathInterpreter
+from prolog.parser import types as prolog_parser_types # For Number instance check
+from prolog.core.errors import InterpreterError # For handling math errors
 
 class Runtime:
     def __init__(self, rules):
@@ -222,6 +224,81 @@ class Runtime:
             yield TRUE_TERM
             return
 
+        # Handle 'is' predicate for arithmetic evaluation
+        if isinstance(query_obj, Arithmetic):
+            var_to_unify = query_obj # Arithmetic object itself is the variable on LHS
+            expression_to_evaluate = query_obj.expression
+
+            math_interpreter = MathInterpreter(self.binding_env)
+            mark = self.binding_env.mark_trail()
+            try:
+                # _evaluate_expr should return a prolog_parser_types.Number or raise InterpreterError
+                evaluated_value_obj = math_interpreter._evaluate_expr(expression_to_evaluate)
+
+                if not isinstance(evaluated_value_obj, prolog_parser_types.Number):
+                    logger.error(f"Arithmetic expression did not evaluate to a Number: {expression_to_evaluate}")
+                    self.binding_env.backtrack(mark) 
+                    return 
+
+                if self.binding_env.unify(var_to_unify, evaluated_value_obj):
+                    yield TRUE_TERM
+            except InterpreterError as e:
+                logger.warning(f"Error during arithmetic evaluation for 'is': {e}")
+                pass 
+            finally:
+                self.binding_env.backtrack(mark)
+            return
+
+        # Handle comparison operators
+        comparison_operators = ["=:=\\", "=\\=\\", ">", ">=", "<", "=<"] # Note: =:= and =\= might be parsed differently
+        # Parser generates: "=:=", "=\\=", ">", ">=", "<", "=<"
+        # Let's use the parser's output directly.
+        parsed_comparison_operators = {
+            "=:=\\": lambda l, r: l == r,
+            "=\\=\\": lambda l, r: l != r,
+            ">": lambda l, r: l > r,
+            ">=": lambda l, r: l >= r,
+            "<": lambda l, r: l < r,
+            "=<": lambda l, r: l <= r,
+        }
+
+        if isinstance(query_obj, Term) and query_obj.pred in parsed_comparison_operators and len(query_obj.args) == 2:
+            lhs_expr = query_obj.args[0]
+            rhs_expr = query_obj.args[1]
+
+            math_interpreter = MathInterpreter(self.binding_env)
+            # Comparison operators do not usually change bindings, so marking trail might not be strictly necessary
+            # unless evaluation itself could have side effects or complex variable instantiations.
+            # For safety and consistency with 'is', we can manage the trail.
+            mark = self.binding_env.mark_trail()
+            try:
+                lhs_evaluated_obj = math_interpreter._evaluate_expr(lhs_expr)
+                rhs_evaluated_obj = math_interpreter._evaluate_expr(rhs_expr)
+
+                if not isinstance(lhs_evaluated_obj, prolog_parser_types.Number) or \
+                   not isinstance(rhs_evaluated_obj, prolog_parser_types.Number):
+                    logger.warning(f"Operands for comparison '{query_obj.pred}' did not evaluate to Numbers.")
+                    # This implies a type error or instantiation error handled by MathInterpreter
+                    self.binding_env.backtrack(mark)
+                    return # Evaluation failed to produce numbers
+
+                # Perform comparison using the .value attribute of prolog_parser_types.Number
+                comparison_succeeded = parsed_comparison_operators[query_obj.pred](
+                    lhs_evaluated_obj.value, rhs_evaluated_obj.value
+                )
+
+                if comparison_succeeded:
+                    yield TRUE_TERM
+                # If comparison fails, do nothing, implicitly fails and backtracks.
+            
+            except InterpreterError as e:
+                logger.warning(f"Error during comparison evaluation for '{query_obj.pred}': {e}")
+                # Error during evaluation (e.g., instantiation error, type error from MathInterpreter)
+                pass # Implicitly fails and backtracks
+            finally:
+                self.binding_env.backtrack(mark) # Backtrack any changes made during evaluation
+            return # End processing for comparison operator Term
+
         if isinstance(query_obj, BuiltinFail) or query_obj is FAIL_TERM:
             return
 
@@ -229,12 +306,16 @@ class Runtime:
             yield CUT_SIGNAL
             return
 
-        # TermFunction処理（もし実装されている場合）
-        if hasattr(query_obj, '_execute_func') and callable(getattr(query_obj, '_execute_func')):
+        # TermFunction処理
+        if isinstance(query_obj, TermFunction):
+            # hasattr と callable のチェックは isinstance(TermFunction) で代替されるか、
+            # TermFunction の仕様として _execute_func が存在し callable であることが保証されるべき。
+            # ここでは TermFunction なら _execute_func を持つと仮定する。
             try:
-                query_obj._execute_func()
+                query_obj._execute_func() # TermFunction should have this method
                 yield TRUE_TERM
-            except Exception:
+            except Exception as e:
+                logger.error(f"Error executing TermFunction {query_obj.pred}: {e}")
                 pass
             return
 
