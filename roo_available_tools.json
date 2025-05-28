@@ -1,0 +1,91 @@
+{
+  "source_file_url": "https://github.com/RooVetGit/Roo-Code/archive/refs/heads/main.zip",
+  "comment": "This list was automatically generated. Descriptions and parameters are placeholders.",
+  "tools": [
+    {
+      "name": "access_mcp_resource",
+      "description": "Description for access_mcp_resource - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "apply_diff",
+      "description": "Description for apply_diff - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "ask_followup_question",
+      "description": "Description for ask_followup_question - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "attempt_completion",
+      "description": "Description for attempt_completion - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "browser_action",
+      "description": "Description for browser_action - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "execute_command",
+      "description": "Description for execute_command - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "fetch_instructions",
+      "description": "Description for fetch_instructions - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "insert_content",
+      "description": "Description for insert_content - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "list_code_definition_names",
+      "description": "Description for list_code_definition_names - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "list_files",
+      "description": "Description for list_files - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "new_task",
+      "description": "Description for new_task - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "read_file",
+      "description": "Description for read_file - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "search_and_replace",
+      "description": "Description for search_and_replace - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "search_files",
+      "description": "Description for search_files - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "switch_mode",
+      "description": "Description for switch_mode - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "use_mcp_tool",
+      "description": "Description for use_mcp_tool - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "write_to_file",
+      "description": "Description for write_to_file - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    }
+  ]
+}
