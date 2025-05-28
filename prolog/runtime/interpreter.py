@@ -128,23 +128,76 @@ class Runtime:
 
     def _create_logical_evaluator(self, op_info: OperatorInfo):
         """論理演算子評価器の生成"""
-        def evaluator(args: List, env: BindingEnvironment) -> bool:
-            if len(args) != 2:
-                raise PrologError(f"Logical operator {op_info.symbol} requires 2 arguments")
+        def evaluator(args: List, env: BindingEnvironment) -> Iterator[BindingEnvironment]:
             
-            # 論理演算子の実装（例：==, \==）
-            if op_info.symbol == "==":
+            if op_info.symbol == ",":
+                # コンジャンクション（AND）: 両方のゴールが成功する必要
+                if len(args) != 2:
+                    raise PrologError("Conjunction requires exactly 2 arguments")
+                
+                left_goal, right_goal = args[0], args[1]
+                
+                # 左のゴールを実行
+                for left_env in self.execute(left_goal, env):
+                    # 左が成功した各環境で右のゴールを実行
+                    yield from self.execute(right_goal, left_env)
+            
+            elif op_info.symbol == ";":
+                # ディスジャンクション（OR）: どちらかのゴールが成功すればよい
+                if len(args) != 2:
+                    raise PrologError("Disjunction requires exactly 2 arguments")
+                
+                left_goal, right_goal = args[0], args[1]
+                
+                # 左のゴールを試行
+                success_found = False
+                for left_env in self.execute(left_goal, env):
+                    success_found = True
+                    yield left_env
+                
+                # 左が失敗した場合、右のゴールを試行
+                if not success_found:
+                    yield from self.execute(right_goal, env)
+            
+            elif op_info.symbol == "\\+":
+                # 否定（NOT）: ゴールが失敗すれば成功
+                if len(args) != 1:
+                    raise PrologError("Negation requires exactly 1 argument")
+                
+                goal = args[0]
+                
+                # ゴールを試行
+                success_found = False
+                for _ in self.execute(goal, env):
+                    success_found = True
+                    break
+                
+                # 失敗した場合のみ成功
+                if not success_found:
+                    yield env
+            
+            elif op_info.symbol == "==":
                 # 厳密同一性チェック
+                if len(args) != 2:
+                    raise PrologError("Identity operator requires exactly 2 arguments")
+                
                 left_deref = self.logic_interpreter.dereference(args[0], env)
                 right_deref = self.logic_interpreter.dereference(args[1], env)
-                return left_deref == right_deref
+                if left_deref == right_deref:
+                    yield env
+            
             elif op_info.symbol == "\\==":
                 # 厳密非同一性チェック
+                if len(args) != 2:
+                    raise PrologError("Non-identity operator requires exactly 2 arguments")
+                
                 left_deref = self.logic_interpreter.dereference(args[0], env)
                 right_deref = self.logic_interpreter.dereference(args[1], env)
-                return left_deref != right_deref
+                if left_deref != right_deref:
+                    yield env
             
-            raise NotImplementedError(f"Logical operator {op_info.symbol} not implemented")
+            else:
+                raise NotImplementedError(f"Logical operator {op_info.symbol} not implemented")
         
         return evaluator
 
@@ -156,6 +209,17 @@ class Runtime:
                 yield env
                 # カット信号をどう処理するかは実装依存
                 # ここでは単純に成功として扱う
+            elif op_info.symbol == "->":
+                # IF-THEN: 条件が成功すれば結果を実行
+                if len(args) != 2:
+                    raise PrologError("If-then requires exactly 2 arguments")
+                
+                condition, then_part = args[0], args[1]
+                
+                # 条件を試行
+                for cond_env in self.execute(condition, env):
+                    yield from self.execute(then_part, cond_env)
+                    break  # 最初の成功のみ
             else:
                 raise NotImplementedError(f"Control operator {op_info.symbol} not implemented")
         
@@ -214,8 +278,8 @@ class Runtime:
                 
                 try:
                     # 演算子タイプに応じた評価
-                    if op_info.operator_type in [OperatorType.ARITHMETIC, OperatorType.COMPARISON, OperatorType.LOGICAL]:
-                        if functor_name in ["=", "is"]:
+                    if op_info.operator_type == OperatorType.ARITHMETIC:
+                        if functor_name == "is":
                             # ジェネレータ型評価器
                             yield from evaluator(goal.args, env)
                         else:
@@ -223,6 +287,14 @@ class Runtime:
                             success = evaluator(goal.args, env)
                             if success:
                                 yield env
+                    elif op_info.operator_type == OperatorType.COMPARISON:
+                        # ブール型評価器
+                        success = evaluator(goal.args, env)
+                        if success:
+                            yield env
+                    elif op_info.operator_type == OperatorType.LOGICAL:
+                        # 統合設計：論理演算子は全てジェネレータ型
+                        yield from evaluator(goal.args, env)
                     else:
                         # 制御・IO演算子（ジェネレータ型）
                         yield from evaluator(goal.args, env)

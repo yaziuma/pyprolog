@@ -65,7 +65,7 @@ class OperatorRegistry:
         logger.info(f"OperatorRegistry initialized with {len(self._operators)} operators")
 
     def _initialize_builtin_operators(self):
-        """組み込み演算子の初期化"""
+        """組み込み演算子の初期化（論理演算子を含む）"""
         builtin_ops = [
             # 算術演算子 (優先度: ISO Prolog準拠)
             OperatorInfo("**", 200, Associativity.RIGHT, OperatorType.ARITHMETIC, 2, None, "POWER"),
@@ -90,14 +90,22 @@ class OperatorRegistry:
             OperatorInfo("==", 700, Associativity.NON, OperatorType.LOGICAL, 2, None, "IDENTICAL"),
             OperatorInfo("\\==", 700, Associativity.NON, OperatorType.LOGICAL, 2, None, "NOT_IDENTICAL"),
             
+            # 論理制御演算子（コンジャンクション・ディスジャンクション）
+            OperatorInfo(",", 1000, Associativity.RIGHT, OperatorType.LOGICAL, 2, None, "COMMA"),      # AND
+            OperatorInfo(";", 1100, Associativity.RIGHT, OperatorType.LOGICAL, 2, None, "SEMICOLON"), # OR
+            OperatorInfo("->", 1050, Associativity.RIGHT, OperatorType.CONTROL, 2, None, "IF_THEN"),  # IF-THEN
+            
+            # 否定演算子
+            OperatorInfo("\\+", 900, Associativity.NON, OperatorType.LOGICAL, 1, None, "NOT"),        # NOT
+            
             # 特殊演算子
             OperatorInfo("is", 700, Associativity.NON, OperatorType.ARITHMETIC, 2, None, "IS"),
             OperatorInfo("!", 200, Associativity.NON, OperatorType.CONTROL, 0, None, "CUT"),
             
             # IO演算子
-            OperatorInfo("write", 0, Associativity.NON, OperatorType.IO, 1, None, "WRITE"),
-            OperatorInfo("nl", 0, Associativity.NON, OperatorType.IO, 0, None, "NL"),
-            OperatorInfo("tab", 0, Associativity.NON, OperatorType.IO, 1, None, "TAB"),
+            OperatorInfo("write", 1, Associativity.NON, OperatorType.IO, 1, None, "WRITE"),
+            OperatorInfo("nl", 1, Associativity.NON, OperatorType.IO, 0, None, "NL"),
+            OperatorInfo("tab", 1, Associativity.NON, OperatorType.IO, 1, None, "TAB"),
         ]
         
         for op in builtin_ops:
