@@ -6,7 +6,7 @@ from prolog.runtime.math_interpreter import MathInterpreter
 from prolog.runtime.logic_interpreter import LogicInterpreter
 from prolog.core.operators import operator_registry, OperatorType, OperatorInfo
 from prolog.core.errors import PrologError
-from typing import Union, Callable
+from typing import Callable
 
 # ログ設定
 import logging

@@ -1,6 +1,6 @@
 # tests/test_interpreter/test_unification.py
 from prolog.runtime.interpreter import Runtime
-from prolog.core.types import Variable, Term, Rule, Atom
+from prolog.core.types import Variable
 from prolog.parser.parser import Parser
 from prolog.parser.scanner import Scanner
 

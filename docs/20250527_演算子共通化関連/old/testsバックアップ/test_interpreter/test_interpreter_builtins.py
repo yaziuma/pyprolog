@@ -1,9 +1,6 @@
 from prolog.runtime.interpreter import Runtime
 from prolog.core.types import (
     Variable,
-    Term,
-    Rule,
-    Atom,
 )
 from prolog.parser.parser import Parser
 from prolog.parser.scanner import Scanner
@@ -64,9 +61,9 @@ def test_query_with_builtins():
 
         # Determine the comparison values (stripping quotes if needed)
         # bound_value_for_x_cmp is how the actual value from Prolog is, for comparison
-        if "'" in bound_value_for_x and not "'" in expected_val_raw:
+        if "'" in bound_value_for_x and "'" not in expected_val_raw:
             bound_value_for_x_cmp = bound_value_for_x.strip("'")
-        elif not "'" in bound_value_for_x and "'" in expected_val_raw:
+        elif "'" not in bound_value_for_x and "'" in expected_val_raw:
             bound_value_for_x_cmp = bound_value_for_x
         else:  # Both have quotes or neither have quotes
             bound_value_for_x_cmp = bound_value_for_x.strip("'")
