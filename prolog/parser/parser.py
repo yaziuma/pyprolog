@@ -8,13 +8,19 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def default_error_handler(token: Token, message: str):
     logger.error(f"Parse error at '{token.lexeme}': {message}")
 
+
 class Parser:
     """演算子統合設計を活用したパーサー"""
-    
-    def __init__(self, tokens: List[Token], error_handler: Callable[[Token, str], None] = default_error_handler):
+
+    def __init__(
+        self,
+        tokens: List[Token],
+        error_handler: Callable[[Token, str], None] = default_error_handler,
+    ):
         self._tokens = tokens
         self._current = 0
         self._error_handler = error_handler
@@ -23,20 +29,20 @@ class Parser:
     def parse(self) -> List[Union[Rule, Fact]]:
         """プログラム全体を解析"""
         rules = []
-        
+
         while not self._is_at_end():
             if self._peek_token_type() == TokenType.EOF:
                 break
-                
+
             rule = self._parse_rule()
             if rule:
                 rules.append(rule)
-                
+
             if not self._match(TokenType.DOT):
                 if not self._is_at_end():
                     self._error(self._peek(), "Expected '.' after rule or fact")
                 break
-        
+
         logger.info(f"Parsed {len(rules)} rules/facts")
         return rules
 
@@ -55,7 +61,9 @@ class Parser:
                 head_term = Term(Atom(str(head_term)), [])
             else:
                 # 予期しない型の場合はエラー処理またはNoneを返す
-                self._error(self._previous(), f"Unexpected head term type: {type(head_term)}")
+                self._error(
+                    self._previous(), f"Unexpected head term type: {type(head_term)}"
+                )
                 return None
 
         if self._match(TokenType.COLONMINUS):
@@ -66,7 +74,7 @@ class Parser:
                 if term is None:
                     return None
                 body_terms.append(term)
-                
+
                 if self._match(TokenType.COMMA):
                     continue
                 elif self._check(TokenType.DOT):
@@ -83,7 +91,7 @@ class Parser:
             body = self._build_conjunction(body_terms)
             if isinstance(body, Atom):
                 body = Term(body, [])
-                
+
             return Rule(head_term, body)
         else:
             return Fact(head_term)
@@ -92,13 +100,13 @@ class Parser:
         """項リストからコンジャンクションを構築（統合設計版）"""
         if len(terms) == 1:
             return terms[0]
-        
+
         # 演算子統合設計：カンマ演算子として構築
         result = terms[-1]
         for i in range(len(terms) - 2, -1, -1):
             # 統合設計：通常の Term として構築
             result = Term(Atom(","), [terms[i], result])
-        
+
         return result
 
     def _parse_term(self):
@@ -117,7 +125,7 @@ class Parser:
                 break
 
             symbol = token.lexeme
-            
+
             # 統合設計：operator_registryで演算子判定
             if not operator_registry.is_operator(symbol):
                 break
@@ -222,7 +230,7 @@ class Parser:
     def _consume(self, token_type: TokenType, message: str) -> Token:
         if self._check(token_type):
             return self._advance()
-        
+
         self._error(self._peek(), message)
         return Token(token_type, "", None, 0)  # ダミートークン
 
@@ -254,7 +262,7 @@ class Parser:
 
     def _peek_token_type(self) -> TokenType:
         token = self._peek()
-        return getattr(token, 'token_type', TokenType.EOF)
+        return getattr(token, "token_type", TokenType.EOF)
 
     def _error(self, token: Token, message: str):
         self._error_handler(token, message)

@@ -8,7 +8,6 @@ from prolog.core.types import (
     String,
     Rule,
     Fact,
-    PrologType,
 )
 from prolog.core.operators import operator_registry, Associativity
 

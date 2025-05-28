@@ -1,4 +1,4 @@
-from prolog.core.types import Term, Variable, FALSE_TERM, Rule
+from prolog.core.types import Term, Variable, FALSE_TERM
 from prolog.runtime.interpreter import Runtime
 from prolog.parser.parser import Parser
 from prolog.parser.scanner import Scanner
