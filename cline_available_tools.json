@@ -1,0 +1,106 @@
+{
+  "source_file_url": "https://github.com/cline/cline/archive/refs/heads/main.zip",
+  "comment": "This list was automatically generated. Descriptions and parameters are placeholders.",
+  "tools": [
+    {
+      "name": "access_mcp_resource",
+      "description": "Description for access_mcp_resource - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "ask_followup_question",
+      "description": "Description for ask_followup_question - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "attempt_completion",
+      "description": "Description for attempt_completion - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "browser_action",
+      "description": "Description for browser_action - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "execute_command",
+      "description": "Description for execute_command - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "list_code_definition_names",
+      "description": "Description for list_code_definition_names - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "list_files",
+      "description": "Description for list_files - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "load_mcp_documentation",
+      "description": "Description for load_mcp_documentation - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "new_rule",
+      "description": "Description for new_rule - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "new_task",
+      "description": "Description for new_task - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "plan_mode_respond",
+      "description": "Description for plan_mode_respond - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "read_file",
+      "description": "Description for read_file - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "replace_in_file",
+      "description": "Description for replace_in_file - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "report_bug",
+      "description": "Description for report_bug - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "scroll_down",
+      "description": "Description for scroll_down - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "scroll_up",
+      "description": "Description for scroll_up - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "search_files",
+      "description": "Description for search_files - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "tool_use",
+      "description": "Description for tool_use - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "use_mcp_tool",
+      "description": "Description for use_mcp_tool - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
+      "name": "write_to_file",
+      "description": "Description for write_to_file - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    }
+  ]
+}
