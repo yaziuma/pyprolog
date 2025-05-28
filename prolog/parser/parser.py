@@ -1,172 +1,154 @@
+# prolog/parser/parser.py
 from prolog.parser.token import Token
 from prolog.parser.token_type import TokenType
 from prolog.core.types import Term, Variable, Atom, Number, String, Rule, Fact
 from prolog.core.operators import operator_registry, Associativity
+from typing import List, Optional, Callable, Union
+import logging
 
+logger = logging.getLogger(__name__)
 
-# エラーハンドラーのデフォルト実装
-def default_error_handler(token, message):
-    if hasattr(token, "token_type") and token.token_type == TokenType.EOF:
-        print(f"Error at end: {message}")
-    else:
-        lexeme = getattr(token, "lexeme", str(token))
-        print(f"Error at '{lexeme}': {message}")
-
+def default_error_handler(token: Token, message: str):
+    logger.error(f"Parse error at '{token.lexeme}': {message}")
 
 class Parser:
-    def __init__(self, tokens, error_handler=default_error_handler):
+    """演算子統合設計を活用したパーサー"""
+    
+    def __init__(self, tokens: List[Token], error_handler: Callable[[Token, str], None] = default_error_handler):
         self._tokens = tokens
         self._current = 0
         self._error_handler = error_handler
+        logger.debug(f"Parser initialized with {len(tokens)} tokens")
 
-    def parse(self):
-        """統合設計：プログラム全体を解析"""
+    def parse(self) -> List[Union[Rule, Fact]]:
+        """プログラム全体を解析"""
         rules = []
+        
         while not self._is_at_end():
             if self._peek_token_type() == TokenType.EOF:
                 break
+                
             rule = self._parse_rule()
             if rule:
                 rules.append(rule)
+                
             if not self._match(TokenType.DOT):
                 if not self._is_at_end():
-                    self._error(self._peek(), "Expected '.' after rule or fact.")
+                    self._error(self._peek(), "Expected '.' after rule or fact")
                 break
+        
+        logger.info(f"Parsed {len(rules)} rules/facts")
         return rules
 
-    def _parse_expression_with_precedence(self, max_allowed_op_precedence: int):
-        """統合設計：演算子優先度を考慮した式解析"""
-        left = self._parse_primary()
-        if left is None:
+    def _parse_rule(self) -> Optional[Union[Rule, Fact]]:
+        """単一ルール/ファクトの解析"""
+        head_term = self._parse_term()
+        if head_term is None:
             return None
 
-        while not self._is_at_end():
-            peek_token = self._peek()
-
-            if not hasattr(peek_token, "lexeme"):
-                break
-
-            current_op_symbol = peek_token.lexeme
-            
-            # 統合設計：operator_registry を使用
-            if not operator_registry.is_operator(current_op_symbol):
-                break
-
-            op_info = operator_registry.get_operator(current_op_symbol)
-            if not op_info:
-                self._error(peek_token, f"Operator '{current_op_symbol}' not found in registry")
+        # Termに変換 (Atom以外もTermにラップする)
+        if not isinstance(head_term, Term):
+            if isinstance(head_term, Atom):
+                head_term = Term(head_term, [])
+            elif isinstance(head_term, (Number, String, Variable)):
+                # Atom以外の型をfunctorとしてTermを作成する場合は、Atomに変換する
+                head_term = Term(Atom(str(head_term)), [])
+            else:
+                # 予期しない型の場合はエラー処理またはNoneを返す
+                self._error(self._previous(), f"Unexpected head term type: {type(head_term)}")
                 return None
 
-            if op_info.precedence > max_allowed_op_precedence:
-                break
-
-            self._advance()  # 演算子を消費
-
-            # 統合設計：結合性を考慮
-            if op_info.associativity == Associativity.LEFT:
-                next_max_precedence = op_info.precedence - 1
-            elif op_info.associativity == Associativity.RIGHT:
-                next_max_precedence = op_info.precedence
-            else:  # NON_ASSOCIATIVE
-                next_max_precedence = op_info.precedence - 1
-
-            right = self._parse_expression_with_precedence(next_max_precedence)
-            if right is None:
-                self._error(self._peek(), f"Expected right operand for '{current_op_symbol}'")
-                return None
-
-            left = Term(Atom(current_op_symbol), [left, right])
-
-        return left
-    
-    # 既存メソッドは統合設計に合わせて調整...
-    def _parse_rule(self):
-        """単一のルールまたはファクトを解析"""
-        parsed_head_candidate = self._parse_term()
-
-        if parsed_head_candidate is None:
-            return None
-
-        head_term: Term
-        if isinstance(parsed_head_candidate, Atom):
-            head_term = Term(parsed_head_candidate, [])
-        elif isinstance(parsed_head_candidate, Term):
-            head_term = parsed_head_candidate
-        else:
-            self._error(
-                self._previous() if self._current > 0 else self._tokens[0],
-                f"Rule or Fact head must be a structure or an atom, not {type(parsed_head_candidate)}.",
-            )
-            return None
 
         if self._match(TokenType.COLONMINUS):
+            # ルール
             body_terms = []
             while not self._check(TokenType.DOT) and not self._is_at_end():
-                term_in_body = self._parse_term()
-                if term_in_body is None:
+                term = self._parse_term()
+                if term is None:
                     return None
-                body_terms.append(term_in_body)
+                body_terms.append(term)
+                
                 if self._match(TokenType.COMMA):
                     continue
                 elif self._check(TokenType.DOT):
                     break
                 else:
-                    self._error(self._peek(), "Expected ',' or '.' in rule body.")
+                    self._error(self._peek(), "Expected ',' or '.' in rule body")
                     return None
 
             if not body_terms:
-                self._error(self._peek(), "Rule body cannot be empty after ':-'.")
+                self._error(self._peek(), "Rule body cannot be empty")
                 return None
 
-            if len(body_terms) == 1:
-                raw_body = body_terms[0]
-            else:
-                raw_body = self._build_conjunction(body_terms)
-
-            if raw_body is None:
-                self._error(self._peek(), "Failed to construct rule body.")
-                return None
-
-            final_body: Term
-            if isinstance(raw_body, Atom):
-                final_body = Term(raw_body, [])
-            elif isinstance(raw_body, Term):
-                final_body = raw_body
-            else:
-                self._error(
-                    self._previous() if self._current > 0 else self._tokens[0],
-                    f"Rule body goal must be a structure or an atom, not {type(raw_body)}.",
-                )
-                return None
-
-            return Rule(head_term, final_body)
+            body = self._build_conjunction(body_terms)
+            if isinstance(body, Atom):
+                body = Term(body, [])
+                
+            return Rule(head_term, body)
         else:
+            # ファクト
             return Fact(head_term)
 
-    def _build_conjunction(self, terms):
-        """項のリストからコンジャンクションのTermを構築"""
-        if not terms:
-            return None
-
+    def _build_conjunction(self, terms: List) -> Union[Term, Atom]:
+        """項リストからコンジャンクションを構築"""
         if len(terms) == 1:
             return terms[0]
-
-        result_conj = terms[-1]
+        
+        result = terms[-1]
         for i in range(len(terms) - 2, -1, -1):
-            arg1 = terms[i]
-            arg2 = result_conj
-            result_conj = Term(Atom(","), [arg1, arg2])
-        return result_conj
+            result = Term(Atom(","), [terms[i], result])
+        return result
 
     def _parse_term(self):
-        """単一の項を解析 (演算子優先順位法を利用)"""
+        """項の解析（統合設計：演算子優先度活用）"""
         return self._parse_expression_with_precedence(1200)
 
+    def _parse_expression_with_precedence(self, max_precedence: int):
+        """演算子優先度を考慮した式解析（統合設計の核心）"""
+        left = self._parse_primary()
+        if left is None:
+            return None
+
+        while not self._is_at_end():
+            token = self._peek()
+            if not hasattr(token, "lexeme"):
+                break
+
+            symbol = token.lexeme
+            
+            # 統合設計：operator_registryで演算子判定
+            if not operator_registry.is_operator(symbol):
+                break
+
+            op_info = operator_registry.get_operator(symbol)
+            if not op_info or op_info.precedence > max_precedence:
+                break
+
+            self._advance()  # 演算子消費
+
+            # 統合設計：結合性を考慮した優先度計算
+            if op_info.associativity == Associativity.LEFT:
+                next_max_prec = op_info.precedence - 1
+            elif op_info.associativity == Associativity.RIGHT:
+                next_max_prec = op_info.precedence
+            else:  # NON_ASSOCIATIVE
+                next_max_prec = op_info.precedence - 1
+
+            right = self._parse_expression_with_precedence(next_max_prec)
+            if right is None:
+                self._error(self._peek(), f"Expected right operand for '{symbol}'")
+                return None
+
+            left = Term(Atom(symbol), [left, right])
+
+        return left
+
     def _parse_primary(self):
-        """最も基本的な要素を解析"""
+        """基本要素の解析"""
         if self._match(TokenType.ATOM):
             atom_name = self._previous().lexeme
             if self._match(TokenType.LEFTPAREN):
+                # 複合項
                 args = []
                 if not self._check(TokenType.RIGHTPAREN):
                     while True:
@@ -177,80 +159,70 @@ class Parser:
                         if self._match(TokenType.COMMA):
                             continue
                         break
-                self._consume(TokenType.RIGHTPAREN, "Expected ')' after arguments.")
+                self._consume(TokenType.RIGHTPAREN, "Expected ')' after arguments")
                 return Term(Atom(atom_name), args)
             else:
                 return Atom(atom_name)
 
         elif self._match(TokenType.NUMBER):
-            literal = self._previous().literal
-            if not isinstance(literal, (int, float)):
-                self._error(
-                    self._previous(),
-                    "Internal error: Number literal is not int or float.",
-                )
-                return None
-            return Number(literal)
+            return Number(self._previous().literal)
 
         elif self._match(TokenType.VARIABLE):
             return Variable(self._previous().lexeme)
 
         elif self._match(TokenType.STRING):
-            literal = self._previous().literal
-            if not isinstance(literal, str):
-                self._error(
-                    self._previous(), "Internal error: String literal is not str."
-                )
-                return None
-            return String(literal)
+            return String(self._previous().literal)
 
         elif self._match(TokenType.LEFTPAREN):
             expr = self._parse_term()
             if expr is None:
                 return None
-            self._consume(TokenType.RIGHTPAREN, "Expected ')' after expression.")
+            self._consume(TokenType.RIGHTPAREN, "Expected ')' after expression")
             return expr
 
         elif self._match(TokenType.LEFTBRACKET):
-            elements = []
-            if not self._check(TokenType.RIGHTBRACKET):
-                while True:
-                    el = self._parse_term()
-                    if el is None:
-                        return None
-                    elements.append(el)
-                    if self._match(TokenType.COMMA):
-                        continue
-                    break
+            return self._parse_list()
 
-            tail = None
-            if self._match(TokenType.BAR):
-                tail = self._parse_term()
-                if tail is None:
-                    return None
-
-            self._consume(TokenType.RIGHTBRACKET, "Expected ']' after list elements.")
-
-            if tail is None:
-                current_list_term = Atom("[]")
-            else:
-                current_list_term = tail
-
-            for element in reversed(elements):
-                current_list_term = Term(Atom("."), [element, current_list_term])
-            return current_list_term
-
-        self._error(self._peek(), "Expected expression.")
+        self._error(self._peek(), "Expected expression")
         return None
 
+    def _parse_list(self):
+        """リストの解析"""
+        elements = []
+        if not self._check(TokenType.RIGHTBRACKET):
+            while True:
+                elem = self._parse_term()
+                if elem is None:
+                    return None
+                elements.append(elem)
+                if self._match(TokenType.COMMA):
+                    continue
+                break
+
+        tail = None
+        if self._match(TokenType.BAR):
+            tail = self._parse_term()
+            if tail is None:
+                return None
+
+        self._consume(TokenType.RIGHTBRACKET, "Expected ']' after list")
+
+        # リストを内部表現に変換
+        if tail is None:
+            tail = Atom("[]")
+
+        result = tail
+        for element in reversed(elements):
+            result = Term(Atom("."), [element, result])
+        return result
+
+    # ユーティリティメソッド
     def _consume(self, token_type: TokenType, message: str) -> Token:
         if self._check(token_type):
             return self._advance()
+        
         self._error(self._peek(), message)
-        # ダミーのTokenを返す（エラー回復のため）
-        return Token(
-            token_type, "", None, self._peek().line if not self._is_at_end() else 0
-        )
+        return Token(token_type, "", None, 0)  # ダミートークン
 
     def _match(self, *token_types: TokenType) -> bool:
         for token_type in token_types:
@@ -279,19 +251,8 @@ class Parser:
         return self._tokens[self._current - 1]
 
     def _peek_token_type(self) -> TokenType:
-        """Tokenの型を安全に取得"""
         token = self._peek()
-        if hasattr(token, "token_type"):
-            return token.token_type
-        elif hasattr(token, "type"):
-            return token.token_type
-        else:
-            # フォールバック
-            return TokenType.EOF
+        return getattr(token, 'token_type', TokenType.EOF)
 
-    def _error(self, token: Token, message: str) -> None:
+    def _error(self, token: Token, message: str):
         self._error_handler(token, message)
-
-
-class ParseError(RuntimeError):
-    pass
