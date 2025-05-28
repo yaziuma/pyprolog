@@ -3,10 +3,7 @@ from prolog.core.types import (
     Variable,
     Term,
     Rule,
-    FALSE_TERM,
-    TRUE_TERM,
-    CUT_SIGNAL,
-    Conjunction,
+    Atom,
 )
 from prolog.parser.parser import Parser
 from prolog.parser.scanner import Scanner

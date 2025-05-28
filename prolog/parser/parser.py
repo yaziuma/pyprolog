@@ -41,7 +41,7 @@ class Parser:
         return rules
 
     def _parse_rule(self) -> Optional[Union[Rule, Fact]]:
-        """単一ルール/ファクトの解析"""
+        """ルール解析（統合設計対応版）"""
         head_term = self._parse_term()
         if head_term is None:
             return None
@@ -58,9 +58,8 @@ class Parser:
                 self._error(self._previous(), f"Unexpected head term type: {type(head_term)}")
                 return None
 
-
         if self._match(TokenType.COLONMINUS):
-            # ルール
+            # ルール本体の解析
             body_terms = []
             while not self._check(TokenType.DOT) and not self._is_at_end():
                 term = self._parse_term()
@@ -80,23 +79,26 @@ class Parser:
                 self._error(self._peek(), "Rule body cannot be empty")
                 return None
 
+            # 統合設計：コンジャンクションも通常の Term として構築
             body = self._build_conjunction(body_terms)
             if isinstance(body, Atom):
                 body = Term(body, [])
                 
             return Rule(head_term, body)
         else:
-            # ファクト
             return Fact(head_term)
 
     def _build_conjunction(self, terms: List) -> Union[Term, Atom]:
-        """項リストからコンジャンクションを構築"""
+        """項リストからコンジャンクションを構築（統合設計版）"""
         if len(terms) == 1:
             return terms[0]
         
+        # 演算子統合設計：カンマ演算子として構築
         result = terms[-1]
         for i in range(len(terms) - 2, -1, -1):
+            # 統合設計：通常の Term として構築
             result = Term(Atom(","), [terms[i], result])
+        
         return result
 
     def _parse_term(self):
