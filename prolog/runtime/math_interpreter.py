@@ -40,12 +40,13 @@ class MathInterpreter:
 
         if isinstance(expression, Term):
             functor_name = expression.functor.name
+            arity = len(expression.args)
 
-            # 統合設計：operator_registry で演算子判定
-            op_info = operator_registry.get_operator(functor_name)
+            # 統合設計：operator_registry で演算子判定 (アリティを指定)
+            op_info = operator_registry.get_operator(functor_name, arity)
 
             if op_info and op_info.operator_type == OperatorType.ARITHMETIC:
-                if op_info.arity == 2 and len(expression.args) == 2:
+                if op_info.arity == 2 and arity == 2: # アリティチェックを明示的に
                     left_val = self.evaluate(expression.args[0], env)
                     right_val = self.evaluate(expression.args[1], env)
                     return self.evaluate_binary_op(functor_name, left_val, right_val)
