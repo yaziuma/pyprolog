@@ -138,7 +138,8 @@ class BindingEnvironment:
         result = {}
         
         # 現在の環境の束縛を取得
-        for var_name, value in self.bindings.items():
+        # type: ignore[misc]
+        for var_name, value in self.bindings.items(): # type: ignore
             # 自分自身への束縛（X -> X）は除外
             if not (isinstance(value, Variable) and value.name == var_name):
                 result[var_name] = value
