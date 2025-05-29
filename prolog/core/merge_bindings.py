@@ -32,10 +32,27 @@ def merge_bindings(bindings1, bindings2=None):
     if isinstance(bindings2, BindingEnvironment):
         return bindings2.merge_with(bindings1)
 
-    # 両方が辞書の場合（従来の動作を維持）
+    # 両方が辞書の場合（従来の動作を維持 + 具体値優先ロジック）
     if isinstance(bindings1, dict) and isinstance(bindings2, dict):
         merged = bindings1.copy()
-        merged.update(bindings2)  # bindings2が優先
+        
+        for key, value2 in bindings2.items():
+            if key in merged:
+                value1 = merged[key]
+                # 具体値を優先するロジック
+                # Variable は prolog.core.types からインポートする必要がある
+                from prolog.core.types import Variable 
+                if isinstance(value1, Variable) and not isinstance(value2, Variable):
+                    merged[key] = value2  # bindings2の具体値を優先
+                elif isinstance(value2, Variable) and not isinstance(value1, Variable):
+                    # value1（具体値）をそのまま維持
+                    pass
+                else:
+                    # 両方ともVariable、または両方とも具体値の場合はbindings2が優先
+                    merged[key] = value2
+            else:
+                merged[key] = value2
+        
         return merged
 
     # 片方が辞書の場合
