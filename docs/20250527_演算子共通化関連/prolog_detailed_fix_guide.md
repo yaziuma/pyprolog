@@ -623,11 +623,43 @@ Phase 0と1が完全に成功した場合のみ、以下のリファクタリン
 ## チェックリスト
 
 ### ✅ Phase 0 チェックリスト
-- [ ] BindingEnvironment.unify メソッド追加
-- [ ] merge_bindings.py のイテレーション修正
-- [ ] 演算子 arity の修正  
-- [ ] Parser の引数解析修正
-- [ ] 12件のテスト失敗を0件に削減
+- [x] **Step 1: `prolog/core/binding_environment.py` の修正**
+    - [x] `BindingEnvironment.bind` メソッドの修正 (指示書には記載なし、既存のものを維持)
+    - [x] `BindingEnvironment.unify` メソッドの追加
+    - [x] `BindingEnvironment.get_value` メソッドの修正 (指示書には記載なし、既存のものを維持)
+    - [x] `BindingEnvironment.to_dict` メソッドの追加
+    - [x] `BindingEnvironment.merge_with` メソッドの追加
+    - [x] テスト実行: `python -m pytest tests/core/test_binding_environment.py -v`
+        - [x] 実績: 11 passed
+- [x] **Step 2: `prolog/core/merge_bindings.py` の修正**
+    - [x] `bindings_to_dict` 関数の修正
+    - [x] `dict_to_binding_environment` 関数の修正
+    - [x] `merge_bindings` 関数の簡素化
+    - [x] `unify_with_bindings` 関数の修正
+    - [x] テスト実行: `python -m pytest tests/core/test_merge_bindings.py -v`
+        - [x] 実績: 2 failed, 14 passed
+            - `test_merge_variable_with_concrete_value` FAILED
+            - `test_unification_with_bindings` FAILED
+- [x] **Step 3: `prolog/core/operators.py` の修正 (および `prolog/runtime/math_interpreter.py` の関連修正)**
+    - [x] `_initialize_builtin_operators` メソッドの修正
+    - [x] `register_operator` メソッドの修正
+    - [x] `get_operator_by_arity` メソッドの追加と `get_operator` メソッドの修正
+    - [x] (`prolog/runtime/math_interpreter.py` の `evaluate` メソッドを修正し、`get_operator` 呼び出し時にアリティを渡すように変更)
+    - [x] テスト実行: `python -m pytest tests/runtime/test_math_interpreter.py::TestMathInterpreter::test_unary_operations -v`
+        - [x] 実績: 1 passed
+- [x] **Step 4: `prolog/parser/parser.py` の修正**
+    - [x] `_parse_primary` メソッドの修正
+    - [x] `_parse_list` メソッドの修正
+    - [x] テスト実行: `python -m pytest tests/parser/test_parser.py::TestParser::test_parse_complex_terms -v` (テストケース名を修正)
+        - [x] 実績: 1 passed
+- [x] **最終確認**
+    - [x] 全体テスト実行: `python -m pytest tests -v`
+        - [x] 実績: 2 failed, 207 passed, 23 skipped
+            - `tests/core/test_merge_bindings.py::TestMergeBindings::test_merge_variable_with_concrete_value` FAILED
+            - `tests/core/test_merge_bindings.py::TestMergeBindings::test_unification_with_bindings` FAILED
+- [ ] **残課題**
+    - [ ] `test_merge_variable_with_concrete_value` の失敗原因調査と修正（テスト期待値 or コードロジック）
+    - [ ] `test_unification_with_bindings` の失敗原因調査と修正（`BindingEnvironment.unify` の拡張）
 
 ### ✅ Phase 1 チェックリスト
 - [ ] LogicInterpreter テストの有効化

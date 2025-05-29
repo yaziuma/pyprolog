@@ -154,15 +154,17 @@ class Parser:
         return left
 
     def _parse_primary(self):
-        """基本要素の解析"""
+        """基本要素の解析（引数解析修正版）"""
         if self._match(TokenType.ATOM):
             atom_name = self._previous().lexeme
             if self._match(TokenType.LEFTPAREN):
-                # 複合項
+                # 複合項の引数解析
                 args = []
                 if not self._check(TokenType.RIGHTPAREN):
                     while True:
-                        arg = self._parse_term()
+                        # 引数解析時はコンマ演算子の優先度より高い優先度で解析
+                        # コンマの優先度は1000なので、それより低い999を指定
+                        arg = self._parse_expression_with_precedence(999)
                         if arg is None:
                             return None
                         args.append(arg)
@@ -197,11 +199,12 @@ class Parser:
         return None
 
     def _parse_list(self):
-        """リストの解析"""
+        """リストの解析（引数解析修正版）"""
         elements = []
         if not self._check(TokenType.RIGHTBRACKET):
             while True:
-                elem = self._parse_term()
+                # リスト要素解析時もコンマ演算子の優先度より高い優先度で解析
+                elem = self._parse_expression_with_precedence(999)
                 if elem is None:
                     return None
                 elements.append(elem)
@@ -211,7 +214,8 @@ class Parser:
 
         tail = None
         if self._match(TokenType.BAR):
-            tail = self._parse_term()
+            # リストの尾部も同様に解析
+            tail = self._parse_expression_with_precedence(999)
             if tail is None:
                 return None
 

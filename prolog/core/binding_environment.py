@@ -1,12 +1,11 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Union, TYPE_CHECKING
 
 # from prolog.core.types import Variable, Term, Atom, Number, String, PrologType
 # 上記のフルインポートは循環参照のリスクがあるため、型ヒントでは文字列リテラルを使用
-from typing import TYPE_CHECKING
+# from typing import TYPE_CHECKING # この行は Union を追加した行と重複するため削除
 
 if TYPE_CHECKING:
-    from prolog.core.types import PrologType, Variable  # Variable はここでは不要かも
-
+    from prolog.core.types import PrologType, Variable
 
 class BindingEnvironment:
     def __init__(self, parent: Optional["BindingEnvironment"] = None):
@@ -60,6 +59,93 @@ class BindingEnvironment:
             level += 1
         return "Env(" + "; ".join(items) + ")"
 
+    def unify(self, term1, term2):
+        """
+        簡単な単一化メソッド（merge_bindings.py との互換性のため）
+        
+        Args:
+            term1: 単一化する項1（文字列の場合は変数名として扱う）
+            term2: 単一化する項2
+            
+        Returns:
+            bool: 単一化が成功したかどうか
+        """
+        # 文字列キー（変数名）の場合は bind として処理
+        if isinstance(term1, str):
+            try:
+                self.bind(term1, term2)
+                return True
+            except Exception:
+                return False
+        elif isinstance(term2, str):
+            try:
+                self.bind(term2, term1)
+                return True
+            except Exception:
+                return False
+        
+        # PrologType同士の場合は等価性チェック
+        elif term1 == term2:
+            return True
+        
+        # より複雑な単一化は将来実装
+        else:
+            return False
+
+    def merge_with(self, other):
+        """
+        他の環境またはバインディング辞書とマージ
+        
+        Args:
+            other: マージする対象（BindingEnvironmentまたはdict）
+            
+        Returns:
+            BindingEnvironment: マージされた新しい環境
+        """
+        merged = self.copy()
+        
+        if isinstance(other, BindingEnvironment):
+            # 他の環境の束縛をコピー
+            for var_name, value in other.bindings.items():
+                merged.bind(var_name, value)
+            
+            # 親環境も考慮（再帰的にマージ）
+            if other.parent and not merged.parent:
+                merged.parent = other.parent
+            elif other.parent and merged.parent:
+                merged.parent = merged.parent.merge_with(other.parent)
+                
+        elif isinstance(other, dict):
+            # 辞書の場合は直接束縛
+            for var_name, value in other.items():
+                merged.bind(var_name, value)
+        
+        return merged
+
+    def to_dict(self):
+        """
+        バインディング環境を辞書に変換
+        
+        Returns:
+            dict: バインディング辞書
+        """
+        result = {}
+        
+        # 現在の環境の束縛を取得
+        for var_name, value in self.bindings.items():
+            # 自分自身への束縛（X -> X）は除外
+            if not (isinstance(value, Variable) and value.name == var_name):
+                result[var_name] = value
+        
+        # 親環境の束縛も取得（子が優先）
+        if self.parent:
+            parent_dict = self.parent.to_dict()
+            for var_name, value in parent_dict.items():
+                if var_name not in result:
+                    result[var_name] = value
+        
+        return result
 
 # __repr__ で Variable を使うため、ここでインポート (TYPE_CHECKING の外)
+# unify, to_dict でも Variable を使うため、この位置で正しい
 from prolog.core.types import Variable

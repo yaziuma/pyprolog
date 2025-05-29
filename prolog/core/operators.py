@@ -76,7 +76,7 @@ class OperatorRegistry:
         )
 
     def _initialize_builtin_operators(self):
-        """組み込み演算子の初期化（論理演算子を含む）"""
+        """組み込み演算子の初期化（単項演算子対応版）"""
         builtin_ops = [
             # 算術演算子 (優先度: ISO Prolog準拠)
             OperatorInfo(
@@ -85,9 +85,19 @@ class OperatorRegistry:
                 Associativity.RIGHT,
                 OperatorType.ARITHMETIC,
                 2,
-                None,
+                None, # TokenType は register_operator で設定される想定、または不要
                 "POWER",
             ),
+            
+            # 単項演算子を先に定義（高い優先度）
+            OperatorInfo(
+                "-", 200, Associativity.NON, OperatorType.ARITHMETIC, 1, None, "UNARY_MINUS"
+            ),
+            OperatorInfo(
+                "+", 200, Associativity.NON, OperatorType.ARITHMETIC, 1, None, "UNARY_PLUS"
+            ),
+            
+            # 二項算術演算子
             OperatorInfo(
                 "*", 400, Associativity.LEFT, OperatorType.ARITHMETIC, 2, None, "STAR"
             ),
@@ -106,7 +116,8 @@ class OperatorRegistry:
             OperatorInfo(
                 "-", 500, Associativity.LEFT, OperatorType.ARITHMETIC, 2, None, "MINUS"
             ),
-            # 比較演算子
+            
+            # 比較演算子 (token_type は None のまま、name を調整)
             OperatorInfo(
                 "=:=",
                 700,
@@ -114,7 +125,7 @@ class OperatorRegistry:
                 OperatorType.COMPARISON,
                 2,
                 None,
-                "ARITH_EQ",
+                "ARITH_EQ", # 指示書では ARITH_EQUAL だが既存に合わせる
             ),
             OperatorInfo(
                 "=\\=",
@@ -123,7 +134,7 @@ class OperatorRegistry:
                 OperatorType.COMPARISON,
                 2,
                 None,
-                "ARITH_NEQ",
+                "ARITH_NEQ", # 指示書では ARITH_NOT_EQUAL だが既存に合わせる
             ),
             OperatorInfo(
                 "<", 700, Associativity.NON, OperatorType.COMPARISON, 2, None, "LESS"
@@ -135,7 +146,7 @@ class OperatorRegistry:
                 OperatorType.COMPARISON,
                 2,
                 None,
-                "LESS_EQ",
+                "LESS_EQ", # 指示書では LESS_EQUAL だが既存に合わせる
             ),
             OperatorInfo(
                 ">", 700, Associativity.NON, OperatorType.COMPARISON, 2, None, "GREATER"
@@ -147,20 +158,20 @@ class OperatorRegistry:
                 OperatorType.COMPARISON,
                 2,
                 None,
-                "GREATER_EQ",
+                "GREATER_EQ", # 指示書では GREATER_EQUAL だが既存に合わせる
             ),
-            # 論理演算子
-            OperatorInfo(
-                "=", 700, Associativity.NON, OperatorType.LOGICAL, 2, None, "UNIFY"
-            ),
-            OperatorInfo(
+            # 論理演算子 (token_type は None のまま、name を調整)
+            OperatorInfo( # 単一化演算子
+                "=", 700, Associativity.NON, OperatorType.LOGICAL, 2, None, "UNIFY" # 指示書では EQUAL
+            ), 
+            OperatorInfo( # Not unifiable
                 "\\=",
                 700,
                 Associativity.NON,
-                OperatorType.LOGICAL,
+                OperatorType.LOGICAL, # 指示書では UNIFICATION
                 2,
-                None,
-                "NOT_UNIFY",
+                None, 
+                "NOT_UNIFY", # 指示書では NOT_UNIFIABLE
             ),
             OperatorInfo(
                 "==", 700, Associativity.NON, OperatorType.LOGICAL, 2, None, "IDENTICAL"
@@ -175,34 +186,34 @@ class OperatorRegistry:
                 "NOT_IDENTICAL",
             ),
             # 論理制御演算子（コンジャンクション・ディスジャンクション）
-            OperatorInfo(
-                ",", 1000, Associativity.RIGHT, OperatorType.LOGICAL, 2, None, "COMMA"
-            ),  # AND
-            OperatorInfo(
+            OperatorInfo( # Conjunction (and)
+                ",", 1000, Associativity.RIGHT, OperatorType.LOGICAL, 2, None, "COMMA" # 指示書では CONJUNCTION
+            ),  
+            OperatorInfo( # Disjunction (or)
                 ";",
                 1100,
-                Associativity.RIGHT,
+                Associativity.RIGHT, # 指示書では LEFT
                 OperatorType.LOGICAL,
                 2,
                 None,
-                "SEMICOLON",
-            ),  # OR
-            OperatorInfo(
+                "SEMICOLON", # 指示書では DISJUNCTION
+            ),  
+            OperatorInfo( # If-then
                 "->",
                 1050,
-                Associativity.RIGHT,
+                Associativity.RIGHT, # 指示書では LEFT
                 OperatorType.CONTROL,
                 2,
                 None,
                 "IF_THEN",
-            ),  # IF-THEN
+            ),
             # 否定演算子
-            OperatorInfo(
+            OperatorInfo( # NOT
                 "\\+", 900, Associativity.NON, OperatorType.LOGICAL, 1, None, "NOT"
-            ),  # NOT
+            ),
             # 特殊演算子
-            OperatorInfo(
-                "is", 700, Associativity.NON, OperatorType.ARITHMETIC, 2, None, "IS"
+            OperatorInfo( # 'is'/2 は評価演算子
+                "is", 700, Associativity.NON, OperatorType.ARITHMETIC, 2, None, "IS" # 指示書では EVALUATION
             ),
             OperatorInfo(
                 "!", 200, Associativity.NON, OperatorType.CONTROL, 0, None, "CUT"
@@ -219,11 +230,29 @@ class OperatorRegistry:
             self.register_operator(op)
 
     def register_operator(self, operator_info: OperatorInfo):
-        """演算子を登録"""
+        """演算子を登録（重複対応版）"""
         logger.debug(f"Registering operator: {operator_info.symbol}")
 
+        # 同じ記号で異なるarityの演算子をサポート
+        key = f"{operator_info.symbol}_{operator_info.arity}"
+        self._operators[key] = operator_info
+        
+        # 後方互換性のため、記号のみのキーも保持（最後に登録されたものが優先）
         self._operators[operator_info.symbol] = operator_info
-        self._token_type_map[operator_info.symbol] = operator_info.token_type
+        
+        # TokenType が None でない場合のみ token_type_map に登録
+        if operator_info.token_type is not None:
+            self._token_type_map[operator_info.symbol] = operator_info.token_type
+        elif operator_info.symbol not in self._token_type_map:
+             # TokenType が None で、かつシンボルがまだマップにない場合、
+             # プレースホルダーやデフォルト値を設定するか、エラーを出すか検討。
+             # ここでは、既存の動作になるべく影響を与えないよう、何もしないか、
+             # シンボル名をそのまま使うなどの対応が考えられる。
+             # 指示書では TokenType が None の場合があるので、エラーにしない。
+             # 必要であれば、ここでデフォルトのトークンタイプ名を設定。
+             # 例: self._token_type_map[operator_info.symbol] = operator_info.symbol.upper()
+             pass
+
 
         # 優先度グループに追加
         if operator_info.precedence not in self._precedence_groups:
@@ -235,8 +264,15 @@ class OperatorRegistry:
             self._type_groups[operator_info.operator_type] = []
         self._type_groups[operator_info.operator_type].append(operator_info)
 
-    def get_operator(self, symbol: str) -> Optional[OperatorInfo]:
-        """演算子情報を取得"""
+    def get_operator_by_arity(self, symbol: str, arity: int) -> Optional[OperatorInfo]:
+        """指定されたarityの演算子情報を取得"""
+        key = f"{symbol}_{arity}"
+        return self._operators.get(key, self._operators.get(symbol))
+
+    def get_operator(self, symbol: str, arity: Optional[int] = None) -> Optional[OperatorInfo]:
+        """演算子情報を取得（arity指定対応）"""
+        if arity is not None:
+            return self.get_operator_by_arity(symbol, arity)
         return self._operators.get(symbol)
 
     def get_operators_by_type(self, op_type: OperatorType) -> List[OperatorInfo]:
