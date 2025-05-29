@@ -654,12 +654,14 @@ Phase 0と1が完全に成功した場合のみ、以下のリファクタリン
         - [x] 実績: 1 passed
 - [x] **最終確認**
     - [x] 全体テスト実行: `python -m pytest tests -v`
-        - [x] 実績: 2 failed, 207 passed, 23 skipped
-            - `tests/core/test_merge_bindings.py::TestMergeBindings::test_merge_variable_with_concrete_value` FAILED
-            - `tests/core/test_merge_bindings.py::TestMergeBindings::test_unification_with_bindings` FAILED
-- [ ] **残課題**
-    - [ ] `test_merge_variable_with_concrete_value` の失敗原因調査と修正（テスト期待値 or コードロジック）
-    - [ ] `test_unification_with_bindings` の失敗原因調査と修正（`BindingEnvironment.unify` の拡張）
+        - [x] 実績: 209 passed, 23 skipped (以前の失敗2件は解消済み)
+- [x] **残課題の修正** (ユーザー指示による追加修正)
+    - [x] `BindingEnvironment.unify` メソッドの改善 (Variableオブジェクト対応)
+    - [x] `merge_bindings` 関数に具体値優先ロジックを追加
+    - [x] テスト実行: `python -m pytest tests/core/test_merge_bindings.py -v`
+        - [x] 実績: 16 passed (失敗していた2件が解消)
+    - [x] 全体テスト再実行: `python -m pytest tests -v`
+        - [x] 実績: 209 passed, 23 skipped
 
 ### ✅ Phase 1 チェックリスト
 - [ ] LogicInterpreter テストの有効化
