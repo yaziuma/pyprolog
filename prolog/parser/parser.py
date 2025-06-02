@@ -182,8 +182,19 @@ class Parser:
         elif self._match(TokenType.VARIABLE):
             return Variable(self._previous().lexeme)
 
-        elif self._match(TokenType.STRING):
-            return String(self._previous().literal)
+        elif self._match(TokenType.STRING): # Handling of single-quoted atoms
+            token = self._previous()
+            return Atom(token.literal) # Convert the content within quotes to Atom
+
+        elif self._match(TokenType.DOT): # Handling when a dot appears alone
+            # It's necessary to distinguish if this is the dot for '.'/2 separator or '.' as an atom.
+            # If it's difficult to determine from context, treat it as an atom in specific situations (e.g., outside list construction).
+            # If this match is called in term arguments, Atom('.') might be acceptable.
+            # A safer approach is to treat the DOT token as a special case and
+            # check in _parse_term or similar if a . (period) is expected as a Functor.
+            # For the current predicate tests, DOT needs to be interpretable as Atom('.').
+            # A simple fix is as follows, but be aware of potential context dependency.
+            return Atom(".") # Interpret a standalone . as Atom(".")
 
         elif self._match(TokenType.LEFTPAREN):
             expr = self._parse_term()

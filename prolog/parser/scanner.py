@@ -104,9 +104,17 @@ class Scanner:
             self._line += 1
         elif char == "%":
             self._skip_comment()
+        elif char == '-': # Handle potential negative numbers or operators starting with '-'
+            if self._peek().isdigit():
+                self._number() # self._start is at '-', _current is at the first digit. _number handles it.
+            else: # Operator starting with '-'
+                  # _current is already advanced past '-', so _scan_operator which looks at current-1 is fine.
+                if not self._scan_operator(char): # Pass char for context/logging if needed
+                    self._report(self._line, f"Unexpected operator or character sequence starting with: {char}")
         else:
-            # 演算子チェック（統合設計活用）
-            if not self._scan_operator(char):
+            # Default: Other characters, likely operators or unexpected.
+            # _current is already advanced past char, so _scan_operator which looks at current-1 is fine.
+            if not self._scan_operator(char): # Pass char for context/logging if needed
                 self._report(self._line, f"Unexpected character: {char}")
 
     def _scan_operator(self, start_char: str) -> bool:
@@ -176,6 +184,7 @@ class Scanner:
 
         self._advance()  # 終端'を消費
         value = self._source[self._start + 1 : self._current - 1]
+        # Change to tokenize single-quoted literals as STRING - reverting a change made during previous type checking
         self._add_token(TokenType.STRING, value)
 
     def _skip_comment(self):

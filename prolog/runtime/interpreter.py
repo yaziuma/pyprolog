@@ -1,5 +1,5 @@
 # prolog/runtime/interpreter.py
-from prolog.core.types import Term, Variable, Number, Rule, Fact
+from prolog.core.types import Term, Variable, Number, Rule, Fact, Atom 
 from prolog.core.binding_environment import BindingEnvironment
 from prolog.parser.scanner import Scanner
 from prolog.parser.parser import Parser
@@ -7,6 +7,11 @@ from prolog.runtime.math_interpreter import MathInterpreter
 from prolog.runtime.logic_interpreter import LogicInterpreter
 from prolog.core.operators import operator_registry, OperatorType, OperatorInfo
 from prolog.core.errors import PrologError
+# Import new predicate classes
+from prolog.runtime.builtins import (
+    VarPredicate, AtomPredicate, NumberPredicate,
+    FunctorPredicate, ArgPredicate, UnivPredicate # Added term manipulation predicates
+)
 from typing import List, Iterator, Dict, Any, Union, Optional, Callable
 import logging
 
@@ -193,11 +198,11 @@ class Runtime:
                 if len(args) != 1:
                     raise PrologError("Negation requires exactly 1 argument")
 
-                goal = args[0]
+                goal_to_negate = args[0] 
 
                 # ゴールを試行
                 success_found = False
-                for _ in self.execute(goal, env):
+                for _ in self.execute(goal_to_negate, env): 
                     success_found = True
                     break
 
@@ -285,17 +290,16 @@ class Runtime:
                 yield env
 
             elif op_info.symbol == "tab":
-                if len(args) > 1:
+                if len(args) > 1: 
                     raise PrologError("tab requires 0 or 1 arguments")
 
                 if len(args) == 1:
-                    # 引数指定の場合
                     count_term = self.logic_interpreter.dereference(args[0], env)
                     if isinstance(count_term, Number):
                         print(" " * int(count_term.value), end="")
                     else:
-                        print("\t", end="")
-                else:
+                        print("\t", end="") 
+                else: 
                     print("\t", end="")
                 yield env
             else:
@@ -318,93 +322,100 @@ class Runtime:
                 else str(goal.functor)
             )
 
-            # 統合設計：operator_registry で演算子判定
             op_info = operator_registry.get_operator(functor_name)
 
             if op_info and functor_name in self._operator_evaluators:
-                # 演算子として評価
                 evaluator = self._operator_evaluators[functor_name]
-
                 try:
-                    # 演算子タイプに応じた評価
                     if op_info.operator_type == OperatorType.ARITHMETIC:
                         if functor_name == "is":
-                            # ジェネレータ型評価器
                             yield from evaluator(goal.args, env)
                         else:
-                            # ブール型評価器
                             success = evaluator(goal.args, env)
                             if success:
                                 yield env
                     elif op_info.operator_type == OperatorType.COMPARISON:
-                        # ブール型評価器
                         success = evaluator(goal.args, env)
                         if success:
                             yield env
                     elif op_info.operator_type == OperatorType.LOGICAL:
-                        # 統合設計：論理演算子は全てジェネレータ型
                         yield from evaluator(goal.args, env)
                     else:
-                        # 制御・IO演算子（ジェネレータ型）
                         yield from evaluator(goal.args, env)
-
                 except Exception as e:
                     logger.debug(f"Operator evaluation failed: {e}")
-                    # 演算子評価失敗時は通常の述語として処理を続行
                     yield from self.logic_interpreter.solve_goal(goal, env)
+            
+            # Type-checking built-ins
+            elif functor_name == "var" and len(goal.args) == 1:
+                dereferenced_arg = self.logic_interpreter.dereference(goal.args[0], env)
+                var_pred = VarPredicate(dereferenced_arg)
+                yield from var_pred.execute(self, env)
+            elif functor_name == "atom" and len(goal.args) == 1:
+                dereferenced_arg = self.logic_interpreter.dereference(goal.args[0], env)
+                atom_pred = AtomPredicate(dereferenced_arg)
+                yield from atom_pred.execute(self, env)
+            elif functor_name == "number" and len(goal.args) == 1:
+                dereferenced_arg = self.logic_interpreter.dereference(goal.args[0], env)
+                num_pred = NumberPredicate(dereferenced_arg)
+                yield from num_pred.execute(self, env)
+            
+            # Term manipulation built-ins
+            elif functor_name == "functor" and len(goal.args) == 3:
+                functor_pred = FunctorPredicate(goal.args[0], goal.args[1], goal.args[2])
+                yield from functor_pred.execute(self, env)
+            elif functor_name == "arg" and len(goal.args) == 3:
+                arg_pred = ArgPredicate(goal.args[0], goal.args[1], goal.args[2])
+                yield from arg_pred.execute(self, env)
+            elif functor_name == "=.." and len(goal.args) == 2:
+                univ_pred = UnivPredicate(goal.args[0], goal.args[1])
+                yield from univ_pred.execute(self, env)
+            
             else:
-                # 通常の述語として処理
+                # Normal predicate
                 yield from self.logic_interpreter.solve_goal(goal, env)
         else:
-            # Termでない場合（通常はありえない）
             yield from self.logic_interpreter.solve_goal(goal, env)
 
+
     def query(self, query_string: str) -> List[Dict[Variable, Any]]:
-        """クエリ実行（既存API互換性維持）"""
         logger.debug(f"Executing query: {query_string}")
-
         try:
-            # 統合設計：Scanner と Parser を使用
             tokens = Scanner(query_string).scan_tokens()
-
             if not query_string.strip().endswith("."):
                 query_string += "."
                 tokens = Scanner(query_string).scan_tokens()
 
             parsed_structures = Parser(tokens).parse()
-
             if not parsed_structures:
                 logger.warning("Query parsing failed")
                 return []
 
-            # ゴール抽出
+            query_goal: Optional[Term] = None
             if isinstance(parsed_structures[0], Fact):
                 query_goal = parsed_structures[0].head
-            elif isinstance(parsed_structures[0], Rule):
-                query_goal = parsed_structures[0].head
-            else:
-                logger.error(
-                    f"Unexpected parsed structure: {type(parsed_structures[0])}"
-                )
+            elif isinstance(parsed_structures[0], Rule): # Should not happen for a query
+                query_goal = parsed_structures[0].head 
+            elif isinstance(parsed_structures[0], Term):
+                 query_goal = parsed_structures[0]
+            
+            if query_goal is None:
+                logger.error(f"Could not extract a valid goal from parsed: {parsed_structures[0]}")
                 return []
-
-            # 統合実行エンジンで実行
+            
             solutions = []
             initial_env = BindingEnvironment()
+            query_vars_names = self._extract_variables_names(query_goal)
 
-            for env in self.execute(query_goal, initial_env):
+
+            for env_solution in self.execute(query_goal, initial_env):
                 result = {}
-                query_vars = self._extract_variables(query_goal)
-
-                for var_name in query_vars:
-                    var_obj = Variable(var_name)
-                    value = env.get_value(var_name)
-                    if value is not None:
-                        result[var_obj] = self.logic_interpreter.dereference(value, env)
-
-                if result or not query_vars:
-                    solutions.append(result)
-
+                for var_name_str in query_vars_names:
+                    var_obj = Variable(var_name_str)
+                    value_dereferenced = self.logic_interpreter.dereference(var_obj, env_solution)
+                    result[var_obj] = value_dereferenced
+                solutions.append(result)
+            
             logger.debug(f"Query completed with {len(solutions)} solutions")
             return solutions
 
@@ -412,55 +423,66 @@ class Runtime:
             logger.error(f"Query execution error: {e}", exc_info=True)
             return []
 
-    def _extract_variables(self, term) -> List[str]:
-        """項から変数名を抽出"""
+    def _extract_variables_names(self, term) -> List[str]: # Changed name for clarity
         variables = set()
-
-        def extract_recursive(current_term):
-            if isinstance(current_term, Variable):
-                variables.add(current_term.name)
-            elif isinstance(current_term, Term):
-                for arg in current_term.args:
-                    extract_recursive(arg)
-
-        extract_recursive(term)
+        queue = [term]
+        while queue:
+            current = queue.pop(0)
+            if isinstance(current, Variable):
+                variables.add(current.name)
+            elif isinstance(current, Term):
+                if isinstance(current.functor, Variable): # Functor can be variable in some contexts
+                    variables.add(current.functor.name)
+                queue.extend(current.args)
         return list(variables)
 
     def add_rule(self, rule_string: str) -> bool:
-        """動的ルール追加"""
         try:
             if not rule_string.strip().endswith("."):
                 rule_string += "."
-
             tokens = Scanner(rule_string).scan_tokens()
-            parsed_rules = Parser(tokens).parse()
-
-            if parsed_rules:
-                self.rules.extend(parsed_rules)
-                self.logic_interpreter.rules = self.rules
-                logger.info(f"Added {len(parsed_rules)} rule(s)")
-                return True
+            parsed_items = Parser(tokens).parse()
+            added_count = 0
+            if parsed_items:
+                for item in parsed_items:
+                    if isinstance(item, (Rule, Fact)):
+                        self.rules.append(item)
+                        added_count +=1
+                    else:
+                        logger.warning(f"Skipping non-rule/fact from add_rule: {item}")
+                if added_count > 0:
+                    self.logic_interpreter.rules = self.rules
+                    logger.info(f"Added {added_count} rule(s)/fact(s) from string.")
+                else:
+                    logger.warning("No rules/facts parsed from add_rule string.")
+                return added_count > 0
+            logger.warning("No rules/facts parsed from add_rule string.")
             return False
-
         except Exception as e:
-            logger.error(f"Failed to add rule: {e}")
+            logger.error(f"Failed to add rule: {e}", exc_info=True)
             return False
 
     def consult(self, filename: str) -> bool:
-        """ファイルからルールを読み込み"""
         try:
             with open(filename, "r", encoding="utf-8") as f:
                 source = f.read()
 
             tokens = Scanner(source).scan_tokens()
-            new_rules = Parser(tokens).parse()
-
-            self.rules.extend(new_rules)
-            self.logic_interpreter.rules = self.rules
-
-            logger.info(f"Consulted {len(new_rules)} rules from {filename}")
+            new_rules_or_terms = Parser(tokens).parse()
+            added_count = 0
+            for item in new_rules_or_terms:
+                if isinstance(item, (Rule, Fact)):
+                    self.rules.append(item)
+                    added_count +=1
+                else:
+                    logger.warning(f"Skipping non-rule/fact during consult: {item}")
+            
+            if added_count > 0:
+                self.logic_interpreter.rules = self.rules
+                logger.info(f"Consulted {added_count} rules/facts from {filename}")
+            else:
+                logger.info(f"No rules or facts consulted from {filename}")
             return True
-
         except Exception as e:
-            logger.error(f"Failed to consult {filename}: {e}")
+            logger.error(f"Failed to consult {filename}: {e}", exc_info=True)
             return False
