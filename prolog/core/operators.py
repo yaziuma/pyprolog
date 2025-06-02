@@ -310,7 +310,8 @@ class OperatorRegistry:
         evaluator: Optional[Callable] = None,
     ):
         """ユーザー定義演算子を追加"""
-        token_type = f"USER_{symbol.upper().replace(' ', '_').replace('/', '_SLASH_').replace('\\', '_BACKSLASH_')}"
+        processed_symbol = symbol.upper().replace(' ', '_').replace('/', '_SLASH_').replace('\\\\', '_BACKSLASH_')
+        token_type = f"USER_{processed_symbol}"
         op_info = OperatorInfo(
             symbol, precedence, associativity, op_type, arity, evaluator, token_type
         )

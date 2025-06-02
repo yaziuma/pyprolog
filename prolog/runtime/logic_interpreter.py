@@ -63,9 +63,12 @@ class LogicInterpreter:
         if isinstance(term_or_rule, Rule):
             renamed_head = rename_recursive(term_or_rule.head)
             renamed_body = rename_recursive(term_or_rule.body)
-            # Rule の head と body は Term であることが期待される
-            if not isinstance(renamed_head, Term) or not isinstance(renamed_body, Term):
-                raise PrologError("Internal error: Renamed head or body is not a Term.")
+            # Rule の head は Term であることが期待される
+            # Rule の body は Term または Atom (例: 'true') であることが許容される
+            if not isinstance(renamed_head, Term):
+                raise PrologError("Internal error: Renamed head of Rule is not a Term.")
+            if not isinstance(renamed_body, (Term, Atom)): # Allow Atom for body
+                raise PrologError(f"Internal error: Renamed body of Rule is not a Term or Atom, got {type(renamed_body)}.")
             return Rule(renamed_head, renamed_body)
         elif isinstance(term_or_rule, Fact):
             renamed_head = rename_recursive(term_or_rule.head)
