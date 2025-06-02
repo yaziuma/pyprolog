@@ -184,8 +184,8 @@ class Scanner:
 
         self._advance()  # 終端'を消費
         value = self._source[self._start + 1 : self._current - 1]
-        # Single-quoted literals are Atoms in standard Prolog.
-        self._add_token(TokenType.ATOM, value)
+        # Change to tokenize single-quoted literals as STRING - reverting a change made during previous type checking
+        self._add_token(TokenType.STRING, value)
 
     def _skip_comment(self):
         """コメントをスキップ"""

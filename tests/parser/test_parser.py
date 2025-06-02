@@ -48,13 +48,13 @@ class TestParser:
         assert isinstance(fact1.head.args[0], Number)
         assert fact1.head.args[0].value == 42.0
         
-        # 文字列
+        # 文字列（単一引用符はAtomに変換される）
         fact2 = results[1]
         assert isinstance(fact2, Fact)
         assert fact2.head.functor.name == "string"
         assert len(fact2.head.args) == 1
-        assert isinstance(fact2.head.args[0], String)
-        assert fact2.head.args[0].value == "hello"
+        assert isinstance(fact2.head.args[0], Atom)
+        assert fact2.head.args[0].name == "hello"
 
     def test_parse_simple_terms(self):
         """単純な項の解析テスト"""
