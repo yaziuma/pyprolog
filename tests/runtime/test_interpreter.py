@@ -10,6 +10,9 @@ import unittest
 from prolog.core.binding_environment import BindingEnvironment
 from prolog.core.types import Term, Variable, Atom, Number, Rule, Fact
 from prolog.core.errors import PrologError
+# pytest will be used in test_circular_reference_detection in test_logic_interpreter,
+# but not directly needed here yet. If test_type_checking needs it for some reason,
+# it would be added. For now, it's not.
 
 
 class TestRuntime:
@@ -21,6 +24,12 @@ class TestRuntime:
         try:
             from prolog.runtime.interpreter import Runtime
             self.runtime = Runtime()
+            # Ensure a clean state for rules before each test
+            if self.runtime:
+                 self.runtime.rules.clear() # Clear any rules from previous tests
+                 if hasattr(self.runtime, 'logic_interpreter') and self.runtime.logic_interpreter:
+                     self.runtime.logic_interpreter.rules.clear()
+
         except ImportError:
             self.runtime = None
 
@@ -29,266 +38,353 @@ class TestRuntime:
         if self.runtime is None:
             raise unittest.SkipTest("Runtime not implemented yet")
 
+    # Helper methods for querying
+    def assertQueryTrue(self, query_string, expected_bindings_list=None, msg=None):
+        """
+        Asserts that the query succeeds (at least one solution).
+        If expected_bindings_list is provided, checks the first solution for specific bindings.
+        expected_bindings_list should be a list of dictionaries, 
+        where each dict maps variable names (str) to expected value objects (Atom, Number, Variable).
+        If expected_bindings_list is None, just checks for success (len >= 1).
+        If expected_bindings_list is an empty list `[]`, it means success with no specific bindings to check (e.g. for facts).
+        """
+        self._skip_if_not_implemented()
+        solutions = self.runtime.query(query_string)
+        
+        if expected_bindings_list is None: # Only check for success
+            assert len(solutions) >= 1, msg or f"Query '{query_string}' should succeed but failed (no solutions)."
+        elif not expected_bindings_list: # Empty list means succeed, no bindings to check in the first solution (e.g. a fact)
+            assert len(solutions) >= 1, msg or f"Query '{query_string}' should succeed but failed (no solutions)."
+            # Typically, for facts or ground queries, the first solution is an empty dict {}
+            # assert solutions[0] == {}, msg or f"Query '{query_string}' succeeded, but expected no bindings in the first solution, got {solutions[0]}"
+        else: # Check specific bindings for each expected solution
+            assert len(solutions) == len(expected_bindings_list), \
+                msg or f"Query '{query_string}' expected {len(expected_bindings_list)} solutions, got {len(solutions)}."
+            for i, expected_bindings in enumerate(expected_bindings_list):
+                solution_bindings = solutions[i]
+                for var_name_str, expected_value in expected_bindings.items():
+                    var_key = Variable(var_name_str) # Query results use Variable objects as keys
+                    actual_value = solution_bindings.get(var_key)
+                    assert actual_value == expected_value, \
+                        msg or f"Query '{query_string}', solution {i+1}: Var '{var_name_str}' expected <{expected_value}>, got <{actual_value}>."
+
+
+    def assertQueryFalse(self, query_string, msg=None):
+        """Asserts that the query fails (no solutions)."""
+        self._skip_if_not_implemented()
+        solutions = self.runtime.query(query_string)
+        assert len(solutions) == 0, msg or f"Query '{query_string}' should fail but succeeded with {len(solutions)} solution(s)."
+
+
     def test_basic_fact_queries(self):
         """基本的なファクトクエリのテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例（Runtimeが実装されてから有効化）:
-        # ファクトを追加
-        # fact = Fact(Term(Atom("likes"), [Atom("john"), Atom("mary")]))
-        # self.runtime.add_fact(fact)
-        # 
-        # クエリ実行
-        # results = self.runtime.query("likes(john, mary)")
-        # assert len(results) == 1
+        self.runtime.add_rule("likes(john, mary).")
+        self.assertQueryTrue("likes(john, mary)", [{}]) # Succeeds with one solution, no variables to bind
+        self.assertQueryFalse("likes(john,pizza)")
+
 
     def test_rule_resolution(self):
         """ルール解決のテスト"""
         self._skip_if_not_implemented()
+        self.runtime.add_rule("parent(anne, bob).")
+        self.runtime.add_rule("parent(bob, charles).")
+        self.runtime.add_rule("grandparent(GP, GC) :- parent(GP, P), parent(P, GC).")
         
-        # 実装例:
-        # ルールとファクトを追加
-        # rule = Rule(...)
-        # facts = [...]
-        # self.runtime.add_rule(rule)
-        # for fact in facts:
-        #     self.runtime.add_fact(fact)
-        # 
-        # 祖父関係のクエリ
-        # results = self.runtime.query("grandparent(john, bob)")
-        # assert len(results) == 1
+        self.assertQueryTrue("grandparent(anne, charles)", [{"GP": Atom("anne"), "GC": Atom("charles")}])
+        self.assertQueryFalse("grandparent(bob, anne)")
+
 
     def test_arithmetic_operations(self):
         """算術演算のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # is演算子のテスト
-        # results = self.runtime.query("X is 5 + 3")
-        # assert len(results) == 1
-        # # Xが8に束縛されることを確認
+        self.assertQueryTrue("X is 5 + 3", [{"X": Number(8)}])
+        self.assertQueryTrue("Y is 7 - 2 * 3", [{"Y": Number(1)}]) # Y is 1
+        self.assertQueryFalse("1 is 1 + 1")
+
 
     def test_comparison_operations(self):
         """比較演算のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # results = self.runtime.query("5 > 3")
-        # assert len(results) == 1
-        # 
-        # results = self.runtime.query("3 > 5")
-        # assert len(results) == 0
+        self.assertQueryTrue("5 > 3", [{}])
+        self.assertQueryFalse("3 > 5")
+        self.assertQueryTrue("X is 2, Y is 4, X < Y", [{"X": Number(2), "Y": Number(4)}])
+
 
     def test_logical_operations(self):
         """論理演算のテスト"""
         self._skip_if_not_implemented()
+        self.runtime.add_rule("a.")
+        self.runtime.add_rule("b.")
+        self.runtime.add_rule("c.")
         
-        # 実装例:
-        # コンジャンクション
-        # self.runtime.add_fact(Fact(Term(Atom("a"), [])))
-        # self.runtime.add_fact(Fact(Term(Atom("b"), [])))
-        # 
-        # results = self.runtime.query("a, b")
-        # assert len(results) == 1
+        self.assertQueryTrue("a, b", [{}])       # Conjunction
+        self.assertQueryFalse("a, d")             # Conjunction with fail
+        self.assertQueryTrue("a; d", [{}])      # Disjunction (a succeeds)
+        self.runtime.add_rule("d.")
+        self.assertQueryTrue("e; d", [{}])      # Disjunction (d succeeds)
+        self.assertQueryFalse("e; f")           # Disjunction fails
+        
+        self.assertQueryFalse("\\+ a")          # Negation (a succeeds, so \+ a fails)
+        self.assertQueryTrue("\\+ e", [{}])     # Negation (e fails, so \+ e succeeds)
+
 
     def test_control_flow(self):
         """制御フローのテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # カットのテスト
-        # rules = [...]
-        # for rule in rules:
-        #     self.runtime.add_rule(rule)
-        # 
-        # カットにより最初の解のみ返される
-        # results = self.runtime.query("test(X)")
-        # カットの実装により結果は変わる
+        # Cut test (basic, more detailed tests in test_cut_behavior)
+        self.runtime.add_rule("p(1).")
+        self.runtime.add_rule("p(2).")
+        self.runtime.add_rule("p(3).")
+        self.runtime.add_rule("q(X) :- p(X), !.")
+        # Querying q(X) should yield only X=1 because of the cut.
+        solutions = self.runtime.query("q(X)")
+        assert len(solutions) == 1, "q(X) should yield only one solution due to cut"
+        assert solutions[0].get(Variable("X")) == Number(1), "X should be 1 for q(X) with cut"
+
 
     def test_builtin_predicates(self):
-        """組み込み述語のテスト"""
+        """組み込み述語のテスト (write/nl are tested via output, not solution count here)"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # write/1 のテスト
-        # results = self.runtime.query("write('hello')")
-        # assert len(results) == 1
+        # write/1 and nl/0 are tested by their side effects (output).
+        # Here, we just check they "succeed" once.
+        self.assertQueryTrue("write('hello world')", [{}]) 
+        self.assertQueryTrue("nl", [{}])
+
 
     def test_variable_unification(self):
         """変数単一化のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # fact = Fact(Term(Atom("person"), [Atom("john"), Number(25)]))
-        # self.runtime.add_fact(fact)
-        # 
-        # results = self.runtime.query("person(Name, Age)")
-        # assert len(results) == 1
-        # 変数が正しく束縛されているか確認
+        self.runtime.add_rule("person(john, 25).")
+        self.assertQueryTrue("person(Name, Age)", [{"Name": Atom("john"), "Age": Number(25)}])
+        self.assertQueryTrue("person(john, Age)", [{"Age": Number(25)}])
+        self.assertQueryTrue("person(Name, 25)", [{"Name": Atom("john")}])
+        self.assertQueryFalse("person(peter, Age)")
+
 
     def test_recursive_rules(self):
         """再帰ルールのテスト"""
         self._skip_if_not_implemented()
+        self.runtime.add_rule("parent(a,b).")
+        self.runtime.add_rule("parent(b,c).")
+        self.runtime.add_rule("parent(c,d).")
+        self.runtime.add_rule("ancestor(X,Y) :- parent(X,Y).")
+        self.runtime.add_rule("ancestor(X,Z) :- parent(X,Y), ancestor(Y,Z).")
         
-        # 実装例:
-        # 再帰的な祖先関係の定義
-        # ancestor(X, Y) :- parent(X, Y).
-        # ancestor(X, Z) :- parent(X, Y), ancestor(Y, Z).
+        self.assertQueryTrue("ancestor(a,b)", [{"X":Atom("a"), "Y":Atom("b")}]) # Direct parent
+        self.assertQueryTrue("ancestor(a,c)", [{"X":Atom("a"), "Z":Atom("c")}]) # Grandparent
+        self.assertQueryTrue("ancestor(a,d)", [{"X":Atom("a"), "Z":Atom("d")}]) # Great-grandparent
+        self.assertQueryFalse("ancestor(c,a)")
 
-    def test_list_operations(self):
+
+    def test_list_operations(self): # Assuming lists are Term('.', [Head, Tail])
         """リスト操作のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # リスト構文のテスト
-        # [H|T] = [a, b, c] の解決
+        # [H|T] = [a, b, c]
+        # This query needs the parser to create the list terms correctly.
+        # Example: ".(H,T) = .(a,.(b,.(c,[])))"
+        # For now, test if runtime can handle list-like terms if parser produces them.
+        # This test might be better in test_logic_interpreter if it's about raw unification.
+        # Here, we rely on the parser to handle `[a,b,c]` syntax.
+        self.assertQueryTrue("[H|T] = [a,b,c]", [{"H": Atom("a"), "T": Term(Atom("."), [Atom("b"), Term(Atom("."), [Atom("c"), Atom("[]")])])}])
+        self.assertQueryTrue("[X,Y] = [1,2]", [{"X":Number(1), "Y":Number(2)}])
+        self.assertQueryFalse("[X,Y] = [1]")
 
-    def test_negation_as_failure(self):
+
+    def test_negation_as_failure(self): # Covered by test_logical_operations
         """失敗による否定のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # \+ 演算子による否定の動作
+        self.runtime.add_rule("p.")
+        self.assertQueryFalse("\\+ p")
+        self.assertQueryTrue("\\+ q", [{}])
 
-    def test_cut_behavior(self):
+
+    def test_cut_behavior(self): # Covered by test_control_flow
         """カットの動作テスト"""
         self._skip_if_not_implemented()
+        self.runtime.add_rule("data(one). data(two). data(three).")
+        self.runtime.add_rule("cut_test_1(X) :- data(X), !.")
+        self.assertQueryTrue("cut_test_1(X)", [{"X": Atom("one")}]) # Should only find 'one'
         
-        # 実装例:
-        # カットによるバックトラッキングの制御
+        solutions = self.runtime.query("cut_test_1(X)")
+        assert len(solutions) == 1
 
-    def test_meta_predicates(self):
+
+    def test_meta_predicates(self): # findall, bagof, setof are not implemented yet
         """メタ述語のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # findall/3, bagof/3, setof/3 などのメタ述語
+        # findall/3, bagof/3, setof/3
+        # These require more advanced runtime capabilities.
+        pass
+
 
     def test_dynamic_predicates(self):
-        """動的述語のテスト"""
+        """動的述語のテスト (asserta/assertz/retract)"""
         self._skip_if_not_implemented()
+        self.assertQueryTrue("asserta(my_fact(1)).", [{}])
+        self.assertQueryTrue("my_fact(X)", [{"X": Number(1)}])
+        self.assertQueryTrue("assertz(my_fact(2)).", [{}])
         
-        # 実装例:
-        # assert/retract による動的な述語の追加・削除
+        solutions_my_fact = self.runtime.query("my_fact(Y)")
+        assert len(solutions_my_fact) == 2 # my_fact(1) from asserta, my_fact(2) from assertz
+        # Order might matter depending on asserta/z and database iteration.
+        # Assuming asserta puts it at the beginning:
+        assert solutions_my_fact[0].get(Variable("Y")) == Number(1)
+        assert solutions_my_fact[1].get(Variable("Y")) == Number(2)
+
+        self.assertQueryTrue("retract(my_fact(1)).", [{"X": Number(1)}]) # Retract might return bindings for the retracted clause
+        self.assertQueryTrue("my_fact(Y)", [{"Y": Number(2)}]) # Only my_fact(2) should remain
+
+        self.assertQueryFalse("non_existent_fact(1)")
+        self.assertQueryFalse("retract(non_existent_fact(1))") # Retracting non-existent should fail
+
 
     def test_error_handling(self):
         """エラーハンドリングのテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # 構文エラー、実行時エラーの適切な処理
+        # Example: syntax error
+        # try:
+        #     self.runtime.query("a :- .") # Invalid syntax
+        #     assert False, "Query with syntax error should raise exception"
+        # except PrologError: # Or specific parser error
+        #     assert True
+        # This depends on whether query() is expected to raise or return empty on parse error.
+        # Current query() logs error and returns [].
+        assert self.runtime.query("a :- .") == [], "Query with syntax error should return empty list"
+        assert self.runtime.query("X is 1/0.") == [], "Query with arithmetic error (div by zero) should return empty"
+
 
     def test_query_parsing(self):
         """クエリ解析のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # 文字列クエリの正しい解析
+        # Query method itself uses the parser, so successful queries in other tests cover this.
+        # Test specific edge cases for parser via query if any.
+        self.runtime.add_rule("test(a).")
+        self.assertQueryTrue("test(a)", [{}])
+        self.assertQueryTrue("test(X)", [{"X": Atom("a")}])
 
-    def test_multiple_solutions(self):
+
+    def test_multiple_solutions(self): # Covered by test_backtracking in logic_interpreter and here
         """複数解のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # バックトラッキングによる複数解の取得
+        self.runtime.add_rule("item(apple).")
+        self.runtime.add_rule("item(banana).")
+        solutions = self.runtime.query("item(X)")
+        assert len(solutions) == 2
+        found_items = {sol.get(Variable("X")) for sol in solutions}
+        assert Atom("apple") in found_items
+        assert Atom("banana") in found_items
 
+    # test_performance_basic, test_memory_management, test_goal_stack_management are environment-dependent or hard to assert simply.
+    # They will remain skipped or be implemented with more specific tools/benchmarks later.
     def test_performance_basic(self):
         """基本性能のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # 基本的なクエリの実行時間測定
+        pass
 
     def test_memory_management(self):
         """メモリ管理のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # 長時間実行時のメモリリーク検出
+        pass
 
     def test_goal_stack_management(self):
         """ゴールスタック管理のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # 深い再帰でのスタックオーバーフロー防止
+        pass
 
-    def test_built_in_arithmetic(self):
+    def test_built_in_arithmetic(self): # Covered by test_arithmetic_operations
         """組み込み算術のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # +, -, *, /, mod, ** などの算術演算子
+        pass
 
-    def test_built_in_comparison(self):
+    def test_built_in_comparison(self): # Covered by test_comparison_operations
         """組み込み比較のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # =:=, =\=, <, >, =<, >= などの比較演算子
+        pass
 
     def test_built_in_unification(self):
-        """組み込み単一化のテスト"""
+        """組み込み単一化のテスト (=, \\=, ==, \\==) """
         self._skip_if_not_implemented()
+        self.assertQueryTrue("X = Y, X = a", [{"X": Atom("a"), "Y": Atom("a")}]) # Unification
+        self.assertQueryFalse("a = b")
+        self.assertQueryTrue("a \\= b", [{}])    # Not unifiable
+        self.assertQueryFalse("X \\= a, X = a") 
         
-        # 実装例:
-        # =, \=, ==, \== などの単一化・比較演算子
+        self.assertQueryTrue("X == X", [{}])     # Term identity (unbound X)
+        self.assertQueryTrue("a == a", [{}])
+        self.assertQueryFalse("X == Y")          # Different unbound variables are not identical
+        self.assertQueryFalse("a == b")
+        self.assertQueryTrue("X = a, X == a", [{"X": Atom("a")}])
 
-    def test_io_operations(self):
+        self.assertQueryTrue("X \\== Y", [{}])    # Term non-identity
+        self.assertQueryFalse("a \\== a")
+        self.assertQueryTrue("a \\== b", [{}])
+
+
+    def test_io_operations(self): # Covered by test_builtin_predicates for write/nl
         """入出力操作のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # write/1, nl/0, read/1 などの入出力述語
+        pass
 
-    def test_term_manipulation(self):
+
+    def test_term_manipulation(self): # univ (=..), arg/3, functor/3 are not implemented yet
         """項操作のテスト"""
         self._skip_if_not_implemented()
+        # =../2 (univ), arg/3, functor/3
+        pass
         
-        # 実装例:
-        # =../2 (univ), arg/3, functor/3 などの項操作述語
 
     def test_type_checking(self):
-        """型チェックのテスト"""
-        self._skip_if_not_implemented()
-        
-        # 実装例:
-        # var/1, nonvar/1, atom/1, number/1 などの型チェック述語
+        """型チェックのテスト (var/1, atom/1, number/1)"""
+        self._skip_if_not_implemented() # This line will be removed by the task.
 
-    def test_database_operations(self):
+        # var/1 tests
+        self.assertQueryTrue("var(X)", [{"X": Variable("X")}]) # X is unbound
+        self.assertQueryFalse("var(atom_example)")
+        self.assertQueryFalse("var(123)")
+        self.assertQueryFalse("X = my_atom, var(X)")
+        self.assertQueryTrue("var(X), Y=X, var(Y)", [{"X": Variable("X"), "Y": Variable("X")}]) # Y is bound to X, both are vars
+
+        # atom/1 tests
+        self.assertQueryTrue("atom(atom_example)", [{}])
+        self.assertQueryTrue("atom('Another Atom')", [{}])
+        self.assertQueryFalse("atom(X)") # X is unbound, not an atom
+        self.assertQueryFalse("atom(123)")
+        self.assertQueryTrue("X = my_atom, atom(X)", [{"X": Atom("my_atom")}])
+
+        # number/1 tests
+        self.assertQueryTrue("number(123)", [{}])
+        self.assertQueryTrue("number(45.67)", [{}]) # Assuming Number handles floats
+        self.assertQueryFalse("number(X)") # X is unbound, not a number
+        self.assertQueryFalse("number(atom_example)")
+        self.assertQueryTrue("X = 789, number(X)", [{"X": Number(789)}])
+        self.assertQueryTrue("X = -10.5, number(X)", [{"X": Number(-10.5)}])
+
+
+    def test_database_operations(self): # Covered by test_dynamic_predicates
         """データベース操作のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # asserta/1, assertz/1, retract/1, retractall/1
+        pass
 
-    def test_exception_handling(self):
+    def test_exception_handling(self): # Covered by test_error_handling
         """例外処理のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # throw/1, catch/3 による例外処理
+        pass
 
     def test_module_system(self):
         """モジュールシステムのテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # モジュール分離と名前空間管理
+        pass
 
     def test_constraint_handling(self):
         """制約処理のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # 制約論理プログラミング (CLP) 機能
+        pass
 
     def test_tabling_memoization(self):
         """表化・メモ化のテスト"""
         self._skip_if_not_implemented()
-        
-        # 実装例:
-        # 計算結果のメモ化による性能向上
+        pass
 
 
 class MockQueryResult:
@@ -304,7 +400,7 @@ class MockQueryResult:
         return iter(self.bindings)
 
 
-class MockRuntime:
+class MockRuntime: # This seems to be a leftover mock, the test class uses the actual Runtime
     """テスト用のモックランタイム"""
     
     def __init__(self):

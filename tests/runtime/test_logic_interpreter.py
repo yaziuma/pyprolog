@@ -20,7 +20,7 @@ class TestLogicInterpreter:
         """各テストの前処理"""
         self.rules = []
         self.env = BindingEnvironment()
-
+        
         # LogicInterpreter の実際の初期化
         try:
             from prolog.runtime.logic_interpreter import LogicInterpreter
@@ -118,7 +118,7 @@ class TestLogicInterpreter:
         assert isinstance(renamed1.body.functor, Atom)
         assert isinstance(renamed1.body.args[0], Variable)
         assert isinstance(renamed1.body.args[1], Variable)
-
+        
         # Original variable names
         original_x_name = rule.head.args[0].name # "X"
         original_y_name = rule.body.args[1].name # "Y"
@@ -137,23 +137,23 @@ class TestLogicInterpreter:
         renamed2_head_x_name = renamed2.head.args[0].name
         renamed2_body_x_name = renamed2.body.args[0].name
         renamed2_body_y_name = renamed2.body.args[1].name
-
+        
         # Assertions for renamed2 (similar to renamed1)
         assert renamed2_head_x_name == renamed2_body_x_name
         assert renamed2_head_x_name != original_x_name
         assert renamed2_body_y_name != original_y_name
-
+        
         # Assertions for difference between renamed1 and renamed2
         assert renamed1_head_x_name != renamed2_head_x_name, "Renamed 'X' in first call should be different from renamed 'X' in second call"
         assert renamed1_body_y_name != renamed2_body_y_name, "Renamed 'Y' in first call should be different from renamed 'Y' in second call"
 
     def test_variable_renaming_consistency(self):
         """変数リネームの一貫性テスト：ルール内で同じ変数は同じ新名にリネームされる"""
-        rule = Rule(Term(Atom("p"), [Variable("X"), Variable("Y")]),
+        rule = Rule(Term(Atom("p"), [Variable("X"), Variable("Y")]), 
                     Term(Atom("q"), [Variable("X"), Variable("Z"), Variable("X")]))
         
         renamed_rule = self.logic_interpreter._rename_variables(rule)
-
+        
         assert isinstance(renamed_rule, Rule)
         assert isinstance(renamed_rule.head, Term)
         assert isinstance(renamed_rule.body, Term)
@@ -176,7 +176,7 @@ class TestLogicInterpreter:
         # Check consistency for X
         assert r_head_X.name == r_body_X1.name, "All instances of X in head and body should rename to the same variable name"
         assert r_head_X.name == r_body_X2.name, "All instances of X in head and body should rename to the same variable name"
-
+        
         # Check X, Y, Z were renamed to something different from original (implicit by _V counter)
         # and that distinct original variables get distinct new names.
         assert r_head_X.name != Variable("X").name # Original name comparison
@@ -194,15 +194,15 @@ class TestLogicInterpreter:
         
         # Ensure a clean state for this test by clearing existing rules and adding only the current fact.
         # self.rules is the list instance passed to LogicInterpreter.
-        self.rules.clear()
+        self.rules.clear() 
         self.rules.append(fact)
-
+        
         goal = Term(Atom("parent"), [Atom("john"), Atom("mary")])
-
+        
         # Re-initialize environment for this test to be clean
         current_env = BindingEnvironment()
         results = list(self.logic_interpreter.solve_goal(goal, current_env))
-
+        
         assert len(results) == 1, "Should find exactly one solution for a matching fact"
         assert isinstance(results[0], BindingEnvironment), "Result should be a BindingEnvironment instance"
         # Optionally, check if the environment is empty or contains specific (non-)bindings if relevant
@@ -219,15 +219,15 @@ class TestLogicInterpreter:
         goal_success = Term(Atom("capital"), [Atom("france"), Variable("X")])
         env_success = BindingEnvironment()
         results_success = list(self.logic_interpreter.solve_goal(goal_success, env_success))
-
+        
         assert len(results_success) == 1, "Should find one solution for capital(france, X)"
         assert results_success[0].get_value("X") == Atom("paris"), "X should be bound to 'paris'"
-
+        
         # Test failing goal (no matching fact for this query)
         goal_fail = Term(Atom("capital"), [Atom("germany"), Variable("Y")])
         env_fail = BindingEnvironment()
         results_fail = list(self.logic_interpreter.solve_goal(goal_fail, env_fail))
-
+        
         assert len(results_fail) == 0, "Should find no solutions for capital(germany, Y)"
 
     def test_backtracking(self):
@@ -241,9 +241,9 @@ class TestLogicInterpreter:
         # Use a fresh environment for each test scenario if bindings are involved
         current_env = BindingEnvironment()
         results = list(self.logic_interpreter.solve_goal(goal, current_env))
-
+        
         assert len(results) == 2, "Should find two solutions for 'likes(john, X)'"
-
+        
         bindings = sorted([str(res.get_value("X")) for res in results if res.get_value("X") is not None])
         expected_bindings = sorted([str(Atom("pizza")), str(Atom("sushi"))])
         assert bindings == expected_bindings, "Bindings for X should be 'pizza' and 'sushi'"
@@ -258,7 +258,7 @@ class TestLogicInterpreter:
         goal = Term(Atom("test_rule"), [Atom("a")])
         current_env = BindingEnvironment()
         results = list(self.logic_interpreter.solve_goal(goal, current_env))
-
+        
         assert len(results) == 1, "Should find one solution for rule with 'true' body"
         assert isinstance(results[0], BindingEnvironment), "Result should be a BindingEnvironment"
 
@@ -271,12 +271,12 @@ class TestLogicInterpreter:
         env.bind("Y", Variable("Z"))
         env.bind("Z", Atom("final_value"))
         assert self.logic_interpreter.dereference(Variable("X"), env) == Atom("final_value"), "Dereference X -> Y -> Z -> final_value"
-
+        
         # Test 2: Dereferencing an unbound variable
         # Create a new environment or clear bindings for X, Y, Z for this specific sub-test if needed,
         # but dereferencing "A" which is unbound should be fine with existing bindings for X,Y,Z.
         assert self.logic_interpreter.dereference(Variable("A"), env) == Variable("A"), "Dereferencing unbound variable 'A' should return 'A'"
-
+        
         # Test 3: Dereferencing a non-variable (Atom)
         assert self.logic_interpreter.dereference(Atom("hello"), env) == Atom("hello"), "Dereferencing an Atom should return the Atom itself"
 
@@ -309,7 +309,7 @@ class TestLogicInterpreter:
             # dereference(Y) resolves Y to Term(data, core, A)
             deref_Y_from_X = self.logic_interpreter.dereference(deref_X.args[0], env) # deref_X.args[0] is Y
             assert deref_Y_from_X == Term(Atom("data"), [Atom("core"), Variable("A")])
-
+            
             if isinstance(deref_Y_from_X, Term) and len(deref_Y_from_X.args) > 1:
                  # dereference(A) resolves A to Atom("value")
                 deref_A_from_Y = self.logic_interpreter.dereference(deref_Y_from_X.args[1], env) # deref_Y_from_X.args[1] is A
@@ -323,14 +323,14 @@ class TestLogicInterpreter:
         env.bind("C", Atom("val_C")) # C -> val_C, so B -> val_C
         
         original_term = Term(Atom("myterm"), [Variable("A"), Variable("B"), Atom("fixed"), Variable("UNBOUND")])
-
+        
         # Manually dereference arguments and reconstruct the term
         dereferenced_args = []
         for arg in original_term.args:
             dereferenced_args.append(self.logic_interpreter.dereference(arg, env))
-
+            
         reconstructed_term = Term(original_term.functor, dereferenced_args)
-
+        
         expected_term = Term(Atom("myterm"), [Atom("val_A"), Atom("val_C"), Atom("fixed"), Variable("UNBOUND")])
         assert reconstructed_term == expected_term, "Reconstructed term with dereferenced args does not match expected"
 
@@ -351,15 +351,15 @@ class TestLogicInterpreter:
         deref_X = self.logic_interpreter.dereference(X, env)
         expected_term_for_X = Term(Atom("data"), [A, B, C])
         assert deref_X == expected_term_for_X, "Dereferencing X should yield the term data(A,B,C)"
-
+        
         # Test 2: Show how individual arguments would dereference if done manually.
         # This demonstrates understanding of how dereference works with term components.
         assert isinstance(deref_X, Term), "deref_X should be a Term"
-
+        
         d_arg0 = self.logic_interpreter.dereference(deref_X.args[0], env) # This is Variable("A")
         d_arg1 = self.logic_interpreter.dereference(deref_X.args[1], env) # This is Variable("B")
         d_arg2 = self.logic_interpreter.dereference(deref_X.args[2], env) # This is Variable("C")
-
+        
         assert d_arg0 == Atom("val_A"), "Dereferenced A from term should be val_A"
         assert d_arg1 == B, "Dereferenced B from term should remain B (unbound)"
         assert d_arg2 == Atom("val_C"), "Dereferenced C from term should be val_C"
@@ -377,7 +377,7 @@ class TestLogicInterpreter:
         assert s1, "Unification X=Y should succeed"
         # After X=Y, either X is bound to Y or Y to X. Let's assume e1 has X -> VY
         # Dereferencing X in e1 yields VY. Dereferencing Y in e1 yields VY.
-
+        
         s2, e2 = self.logic_interpreter.unify(VY, VX, e1) # This becomes unify(VY, VY) after deref
         assert s2, "Unification Y=X (after X=Y) should succeed"
 
@@ -385,12 +385,12 @@ class TestLogicInterpreter:
         env_circ = BindingEnvironment()
         # Manually create circular binding: X maps to Variable("Y"), Y maps to Variable("X")
         # Note: BindingEnvironment stores values, so Variable("Y") is the value for key "X"
-        env_circ.bindings[VX.name] = VY
+        env_circ.bindings[VX.name] = VY 
         env_circ.bindings[VY.name] = VX
-
+        
         with pytest.raises(RecursionError):
             self.logic_interpreter.dereference(VX, env_circ)
-
+        
         with pytest.raises(RecursionError): # Also test starting with Y
             self.logic_interpreter.dereference(VY, env_circ)
 
@@ -402,15 +402,15 @@ class TestLogicInterpreter:
         X = Variable("X")
         Y = Variable("Y")
         Z = Variable("Z")
-
+        
         term1_X_Y = Term(Atom("p"), [X, Y])
         term2_fixed_Z = Term(Atom("p"), [Atom("val_X"), Z]) # X=val_X, Y=Z
-
+        
         # This unification should succeed
         # Important: pass a copy to unify if you want to compare the original later
         env_before_first_unify = env_initial.copy()
         success_first, env_after_first_unify = self.logic_interpreter.unify(term1_X_Y, term2_fixed_Z, env_before_first_unify)
-
+        
         assert success_first, "Initial unification p(X,Y) = p(val_X,Z) should succeed"
         # env_after_first_unify now has X=val_X, Y=Z, A=original_A_value
 
@@ -418,14 +418,14 @@ class TestLogicInterpreter:
         # term_X_const1 will resolve X to val_X. Unification will proceed:
         # unify Atom("val_X") with Atom("val_X") -> success
         # unify Atom("const1") with Atom("const2") -> fail
-        term_X_const1 = Term(Atom("id_check"), [X, Atom("const1")])
+        term_X_const1 = Term(Atom("id_check"), [X, Atom("const1")]) 
         term_valX_const2 = Term(Atom("id_check"), [Atom("val_X"), Atom("const2")])
-
+        
         # Pass the actual env_after_first_unify. On failure, unify should return this same environment instance.
         success_fail, env_returned_after_fail = self.logic_interpreter.unify(term_X_const1, term_valX_const2, env_after_first_unify)
-
+        
         assert not success_fail, "Second unification id_check(X, const1) = id_check(val_X, const2) should fail"
-
+        
         # Crucial check: the environment returned by the failed unify should be the same instance
         # as the one passed in, with no modifications from the failed attempt.
         assert env_returned_after_fail is env_after_first_unify, "Environment instance should be the same as passed in on failure"
@@ -448,13 +448,13 @@ class TestLogicInterpreter:
         term2 = Term(Atom("p"), [Atom("b"), Term(Atom("q"), [Z, W])])
         
         success, new_env = self.logic_interpreter.unify(term1, term2, env)
-
+        
         assert success, "Unification of complex nested terms should succeed"
-
+        
         # Check bindings using dereference for robustness
         assert self.logic_interpreter.dereference(X, new_env) == Atom("b"), "X should be bound to b"
         assert self.logic_interpreter.dereference(W, new_env) == Atom("a"), "W should be bound to a"
-
+        
         # Check Y and Z: unify(Y, Z) implies Y is bound to Z (as Y is t1, Z is t2)
         # So, dereferencing Y should yield Z. Z itself remains Z (as it's unbound initially).
         assert self.logic_interpreter.dereference(Y, new_env) == Z, "Y should be bound to Z"
@@ -486,11 +486,11 @@ class TestLogicInterpreter:
         # Test case 4: Unifying list with variable then variable with list
         X = Variable("X")
         concrete_list_v = Term(Atom("."), [Atom("v"), Atom("[]")])
-
+        
         s4a, e4a = self.logic_interpreter.unify(X, concrete_list_v, BindingEnvironment())
         assert s4a, "Unification X = [v] failed"
         assert self.logic_interpreter.dereference(X, e4a) == concrete_list_v, "X should be bound to [v]"
-
+        
         Y = Variable("Y")
         s4b, e4b = self.logic_interpreter.unify(concrete_list_v, Y, BindingEnvironment())
         assert s4b, "Unification [v] = Y failed"
@@ -534,7 +534,7 @@ class TestLogicInterpreter:
 
 class MockRuntime:
     """テスト用のモックランタイム（改良版）"""
-
+    
     def __init__(self):
         self.facts = []
         self.rules = []
@@ -542,7 +542,7 @@ class MockRuntime:
     def execute(self, goal, env):
         """ゴール実行のモック実装"""
         from prolog.core.types import Atom, Term
-
+        
         # 簡単なモック実装
         if isinstance(goal, Atom):
             if goal.name == "true":
@@ -553,7 +553,7 @@ class MockRuntime:
             if goal.functor.name == "true":
                 yield env
             # その他のゴールは失敗として扱う
-
+        
     def add_fact(self, fact):
         """ファクトを追加"""
         self.facts.append(fact)
