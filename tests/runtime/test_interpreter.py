@@ -49,7 +49,9 @@ class TestRuntime:
         If expected_bindings_list is an empty list `[]`, it means success with no specific bindings to check (e.g. for facts).
         """
         self._skip_if_not_implemented()
+        print(f"PYTHON_PRINT_ASSERT: Querying: '{query_string}'", flush=True)
         solutions = self.runtime.query(query_string)
+        print(f"PYTHON_PRINT_ASSERT: Solutions for '{query_string}': {solutions} (length: {len(solutions)})", flush=True)
         
         if expected_bindings_list is None: # Only check for success
             assert len(solutions) >= 1, msg or f"Query '{query_string}' should succeed but failed (no solutions)."
@@ -91,8 +93,9 @@ class TestRuntime:
         self.runtime.add_rule("parent(bob, charles).")
         self.runtime.add_rule("grandparent(GP, GC) :- parent(GP, P), parent(P, GC).")
         
-        self.assertQueryTrue("grandparent(anne, charles)", [{"GP": Atom("anne"), "GC": Atom("charles")}])
+        self.assertQueryTrue("grandparent(GP, GC)", [{"GP": Atom("anne"), "GC": Atom("charles")}]) # Query with variables
         self.assertQueryFalse("grandparent(bob, anne)")
+        self.assertQueryTrue("grandparent(anne, charles)", [{}]) # Query with atoms, expect success no bindings
 
 
     def test_arithmetic_operations(self):
@@ -327,12 +330,108 @@ class TestRuntime:
         pass
 
 
-    def test_term_manipulation(self): # univ (=..), arg/3, functor/3 are not implemented yet
-        """項操作のテスト"""
+    def test_term_manipulation(self):
+        """項操作のテスト (=../2, arg/3, functor/3)"""
         self._skip_if_not_implemented()
-        # =../2 (univ), arg/3, functor/3
-        pass
-        
+
+        # --- functor/3 tests ---
+        # Analysis mode
+        self.assertQueryTrue("functor(f(a,b), F, A)", [{"F": Atom("f"), "A": Number(2)}])
+        self.assertQueryTrue("functor(atom, F, A)", [{"F": Atom("atom"), "A": Number(0)}])
+        self.assertQueryTrue("functor(123, F, A)", [{"F": Number(123), "A": Number(0)}]) # Numbers are atomic, functor is the number itself, arity 0
+        self.assertQueryTrue("functor([a], F, A)", [{"F": Atom("."), "A": Number(2)}]) # List [a] is .(a, [])
+        self.assertQueryTrue("functor([], F, A)", [{"F": Atom("[]"), "A": Number(0)}]) # Empty list is an atom
+
+        # Construction mode
+        # For functor construction, we check the structure of T separately
+        # as variable names like '_G123' are not predictable.
+        solutions = self.runtime.query("functor(T, foo, 2)")
+        assert len(solutions) == 1
+        assert isinstance(solutions[0].get(Variable("T")), Term)
+        assert solutions[0].get(Variable("T")).functor == Atom("foo")
+        assert len(solutions[0].get(Variable("T")).args) == 2
+
+        self.assertQueryTrue("functor(T, atom, 0)", [{"T": Atom("atom")}])
+
+        solutions_list_cell = self.runtime.query("functor(T, '.', 2)")
+        assert len(solutions_list_cell) == 1
+        assert isinstance(solutions_list_cell[0].get(Variable("T")), Term)
+        assert solutions_list_cell[0].get(Variable("T")).functor == Atom(".")
+        assert len(solutions_list_cell[0].get(Variable("T")).args) == 2
+
+        self.assertQueryTrue("functor(T, [], 0)", [{"T": Atom("[]")}]) # Construct empty list
+        self.assertQueryTrue("functor(T, 123, 0)", [{"T": Number(123)}]) # Construct a number
+
+        # Error/failure cases for functor/3
+        self.assertQueryFalse("functor(T, foo, -1)") # Invalid arity (negative)
+        self.assertQueryFalse("functor(T, foo, bar)") # Invalid arity (not an integer)
+        # self.assertQueryFalse("functor(T, variable_as_functor, 2)") # This should actually succeed if variable_as_functor is an atom.
+        # If VariableAsFunctor (capital V) was intended, it would be a Variable, and then should fail if not instantiated.
+        # Assuming 'variable_as_functor' is parsed as an atom, construction should succeed.
+        solutions_var_functor = self.runtime.query("functor(T, variable_as_functor, 2)")
+        assert len(solutions_var_functor) == 1
+        assert isinstance(solutions_var_functor[0].get(Variable("T")), Term)
+        assert solutions_var_functor[0].get(Variable("T")).functor == Atom("variable_as_functor")
+        assert len(solutions_var_functor[0].get(Variable("T")).args) == 2
+
+        self.assertQueryFalse("functor(T, f(a), 2)") # Functor must be atom or number, not a compound term
+        self.assertQueryFalse("functor(f(a), 'g', 1)") # Analysis mode, but functor/arity don't match
+        self.assertQueryFalse("functor(f(a), F, 0)")   # Analysis mode, arity mismatch
+        self.assertQueryFalse("functor(1, 1, 1)")      # Arity must be 0 for atomic terms
+
+
+        # --- arg/3 tests ---
+        # Normal cases
+        self.assertQueryTrue("arg(1, f(a,b), X)", [{"X": Atom("a")}])
+        self.assertQueryTrue("arg(2, f(a,b), X)", [{"X": Atom("b")}])
+        self.assertQueryTrue("arg(1, foo(bar, baz, qux), Arg)", [{"Arg": Atom("bar")}])
+        self.assertQueryTrue("arg(3, foo(bar, baz, qux), Arg)", [{"Arg": Atom("qux")}])
+        self.assertQueryTrue("arg(1, [x,y], H)", [{"H": Atom("x")}]) # H = x for list [x,y] = .(x, .(y,[]))
+
+        # Error/failure cases for arg/3
+        self.assertQueryFalse("arg(0, f(a,b), X)")    # Index out of bounds (1-based)
+        self.assertQueryFalse("arg(3, f(a,b), X)")    # Index out of bounds
+        self.assertQueryFalse("arg(1, atom, X)")      # Not a compound term (atom)
+        self.assertQueryFalse("arg(1, 123, X)")       # Not a compound term (number)
+        self.assertQueryFalse("arg(1, [], X)")        # Not a compound term (empty list atom)
+        self.assertQueryFalse("arg(N, f(a,b), a)")    # N must be instantiated
+        self.assertQueryFalse("arg(1, f(a,b), c)")    # Argument does not unify
+
+
+        # --- =../2 (univ) tests ---
+        # Analysis mode
+        self.assertQueryTrue("f(a,b) =.. L", [{"L": Term(Atom("."), [Atom("f"), Term(Atom("."), [Atom("a"), Term(Atom("."), [Atom("b"), Atom("[]")])])])}]) # L = [f,a,b]
+        self.assertQueryTrue("atom =.. L", [{"L": Term(Atom("."), [Atom("atom"), Atom("[]")])}]) # L = [atom]
+        self.assertQueryTrue("123 =.. L", [{"L": Term(Atom("."), [Number(123), Atom("[]")])}]) # L = [123]
+        self.assertQueryTrue("[a,b] =.. L", [{"L": Term(Atom("."), [Atom("."), Term(Atom("."), [Atom("a"), Term(Atom("."), [Term(Atom("."), [Atom("b"), Atom("[]")]), Atom("[]")])])])}]) # L = ['.', a, [b]]
+        self.assertQueryTrue("[] =.. L", [{"L": Term(Atom("."), [Atom("[]"), Atom("[]")])}]) # L = [[]]
+
+        # Construction mode
+        # T =.. [foo, a, b]  => T = foo(a,b)
+        self.assertQueryTrue("T =.. [foo, a, b]", [{"T": Term(Atom("foo"), [Atom("a"), Atom("b")])}])
+        # T =.. [atom]  => T = atom
+        self.assertQueryTrue("T =.. [atom]", [{"T": Atom("atom")}])
+        # T =.. [123] => T = 123
+        self.assertQueryTrue("T =.. [123]", [{"T": Number(123)}])
+        # T =.. ['.', a, [b]] => T = [a,b] (same as .(a,.(b,[])))
+        list_term = Term(Atom("."), [Atom("a"), Term(Atom("."), [Atom("b"), Atom("[]")])])
+        self.assertQueryTrue("T =.. ['.', a, [b]]", [{"T": list_term}]) # Changed query string
+        # T =.. [[]] => T = []
+        self.assertQueryTrue("T =.. [[]]", [{"T": Atom("[]")}])
+
+
+        # Error/failure cases for =../2
+        self.assertQueryFalse("T =.. []") # Empty list is not allowed for construction
+        self.assertQueryFalse("T =.. [f(a), b]") # Functor must be an atom or number
+        self.assertQueryFalse("T =.. [Var, b]") # Functor must be an instantiated atom or number, not a variable
+        self.assertQueryFalse("T =.. not_a_list") # Right side must be a list
+        self.assertQueryFalse("T =.. [foo | not_a_list_tail]") # Right side must be a proper list
+        self.assertQueryFalse("f(X) =.. [f,a,b]") # Arity mismatch (Term has arity 1, List implies arity 2)
+        self.assertQueryFalse("f(a,b) =.. [f,a]")   # Arity mismatch
+        self.assertQueryFalse("atom =.. [atom, extra]") # Arity mismatch (atom has arity 0)
+        self.assertQueryFalse("1 =.. [1,2,3]")       # Arity mismatch (number has arity 0)
+        self.assertQueryFalse("T =.. [foo,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,aa,ab,ac,ad,ae,af,ag,ah,ai,aj,ak,al,am,an,ao,ap,aq,ar,as,at,au,av,aw,ax,ay,az,ba]") # Arity too large (implementation defined limit, usually 255 or so) - this specific test might depend on MAX_ARITY in your implementation. Assuming it's less than this.
+
 
     def test_type_checking(self):
         """型チェックのテスト (var/1, atom/1, number/1)"""
