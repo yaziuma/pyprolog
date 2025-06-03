@@ -320,3 +320,88 @@ class AppendPredicate(BuiltinPredicate):
                 recursive_predicate = AppendPredicate(t1_var, self.args[1], t3_var)
                 yield from recursive_predicate.execute(runtime, env_clause2_after_l3)
         return # End of AppendPredicate
+
+
+class FindallPredicate(BuiltinPredicate):
+    def __init__(self, template_arg: PrologType, goal_arg: PrologType, list_arg: PrologType):
+        super().__init__(template_arg, goal_arg, list_arg)
+
+    def execute(self, runtime: "Runtime", env: BindingEnvironment) -> Iterator[BindingEnvironment]:
+        template = self.args[0]
+        goal_to_prove = runtime.logic_interpreter.dereference(self.args[1], env) # Dereference goal in current env
+        result_list_arg = self.args[2]
+
+        # 2.a: Check if Goal is a callable term
+        if isinstance(goal_to_prove, Variable): # Uninstantiated variable
+            raise PrologError(f"instantiation_error: Goal in findall/3 cannot be an unbound variable. Got: {goal_to_prove}")
+
+        # Standard Prolog: `[]` is not callable. Other atoms are callable (arity 0). Terms are callable.
+        if isinstance(goal_to_prove, Atom) and goal_to_prove.name == "[]":
+            raise PrologError(f"type_error(callable, {goal_to_prove}): Goal '[]' in findall/3 is not a callable term.")
+        elif not isinstance(goal_to_prove, (Atom, Term)): # Numbers, strings (if distinct type) etc.
+            raise PrologError(f"type_error(callable, {goal_to_prove}): Goal in findall/3 must be a callable term.")
+        # At this point, goal_to_prove is an Atom (not '[]') or a Term.
+
+        collected_templates: List[PrologType] = []
+
+        # Create a pristine environment for proving the goal, independent of findall's own environment,
+        # but able to see rules.
+        # However, variables in `goal_to_prove` should be interpreted relative to `env` initially if they are shared.
+        # The standard findall behavior is that `goal_to_prove` is called as if it's a normal goal.
+        # Variables in `goal_to_prove` that are bound *outside* findall are part of the goal.
+        # Variables *local* to `goal_to_prove` and `template` are the ones that vary per solution.
+
+        # It's crucial that variables in `template` that are *not* part of `goal_to_prove`
+        # (i.e., "free" variables in the template) are preserved as variables in each instantiated template.
+        # The `instantiate_term_for_findall` helper needs to handle this correctly.
+        # It should copy `template` and then apply only the bindings relevant to variables *within* that copied template
+        # that were bound by the `goal_to_prove`'s solution.
+
+        try:
+            # Iterate over all solutions for the goal
+            # Each solution from runtime.execute will be a BindingEnvironment
+            # We need to use the original `env` because `goal_to_prove` might contain variables
+            # bound in `env` that are part of the query.
+            for solution_env in runtime.execute(goal_to_prove, env):
+                # For each solution, instantiate the template.
+                # This requires a careful instantiation that:
+                # 1. Takes a *copy* of the original template.
+                # 2. Applies bindings from `solution_env` to this copy.
+                # 3. Variables in the template that were not bound by the goal remain as (copied) variables.
+                # This is often done by "refreshing" or "skolemizing" variables from the template
+                # that are *not* bound by the goal's solution, to ensure they are unique across results if needed,
+                # or more simply, just applying the bindings from solution_env to a fresh copy of template.
+                # A common approach: substitute known bindings from solution_env into a copy of template.
+
+                # The logic_interpreter.instantiate_term should handle this:
+                # It should take the template, and an environment (solution_env),
+                # and return a new term with variables from template substituted if they are in solution_env.
+                # Variables in template not in solution_env should remain as they are (or copies).
+                instantiated_template = runtime.logic_interpreter.instantiate_term(template, solution_env)
+                collected_templates.append(instantiated_template)
+
+        except CutException:
+            # findall/3 is transparent to cuts *within* Goal.
+            # If a cut is encountered inside Goal, it prunes choices for Goal, but findall continues.
+            # If a cut is trying to escape Goal (which it shouldn't if prove handles it),
+            # that would be an issue for the interpreter design.
+            # For now, assume prove handles cuts internally and findall just collects all results it's given.
+            # If CutException propagates here, it might be an error or specific design choice.
+            # Standard behavior: cut inside findall/3 does not affect choice points outside findall/3.
+            # It *does* affect the solutions generated for Goal.
+            pass # Let collected_templates be what we have so far if cut happened.
+        except PrologError as e:
+            # 2.e: If proving Goal raises an exception, findall/3 should re-throw that exception.
+            raise e # Re-throw other Prolog errors.
+
+        # 2.c & 2.d: Convert collected_templates to a Prolog list
+        prolog_solutions_list: PrologType = Atom("[]")
+        for item in reversed(collected_templates):
+            prolog_solutions_list = Term(Atom("."), [item, prolog_solutions_list])
+
+        # Unify the resulting Prolog list with the List argument
+        unified, final_env = runtime.logic_interpreter.unify(result_list_arg, prolog_solutions_list, env)
+        if unified:
+            yield final_env
+        # If unification fails, findall/3 fails (no solutions yielded).
+        return
