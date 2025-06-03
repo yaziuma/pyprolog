@@ -209,7 +209,11 @@ class OperatorRegistry:
             ),
             # 否定演算子
             OperatorInfo( # NOT
-                "\\+", 900, Associativity.NON, OperatorType.LOGICAL, 1, None, "NOT"
+                "\+", 900, Associativity.NON, OperatorType.LOGICAL, 1, None, "NOT" # Changed from "\\+" to "\+"
+            ),
+            # Univ演算子
+            OperatorInfo(
+                "=..", 700, Associativity.NON, OperatorType.STRUCTURAL, 2, None, "UNIV" # xfx (NON for simplicity here)
             ),
             # 特殊演算子
             OperatorInfo( # 'is'/2 は評価演算子

@@ -24,7 +24,7 @@ class Scanner:
         self._line = 1
         self._report = report
 
-        # 演算子トークンの初期化
+        # 演算子トークンの初期化をキーワード定義より前に移動
         ensure_operator_tokens()
 
         self._keywords = {
@@ -33,6 +33,11 @@ class Scanner:
             "retract": TokenType.RETRACT,
             "asserta": TokenType.ASSERTA,
             "assertz": TokenType.ASSERTZ,
+            "write": TokenType.ATOM, # 'write' をATOMとして扱う
+            "nl": TokenType.ATOM,    # 'nl' もATOMとして扱う
+            # "is": TokenType.OPERATOR_XFX_700, # 'is' は operator_registry 経由で処理
+            # "cut": TokenType.CUT, # '!' は _scan_token で直接 TokenType.CUT を生成
+            #  'functor', 'arg', '=..' などもここに追加可能だが、これらは通常のアトムとして扱われる
         }
 
         # 演算子マッピングの動的構築
@@ -96,8 +101,11 @@ class Scanner:
         elif char == ":":
             if self._match("-"):
                 self._add_token(TokenType.COLONMINUS)
-            else:
-                self._report(self._line, f"Unexpected character: {char}")
+            # else: # ':' 単独の場合、演算子としてスキャンさせる
+            elif not self._scan_operator(char):
+                 self._report(self._line, f"Unexpected character: {char}")
+        elif char == "!": # '!' を CUT トークンとして処理
+            self._add_token(TokenType.CUT)
         elif char in [" ", "\r", "\t"]:
             pass  # 空白無視
         elif char == "\n":

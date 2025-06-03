@@ -115,41 +115,62 @@ class Parser:
 
     def _parse_expression_with_precedence(self, max_precedence: int):
         """演算子優先度を考慮した式解析（統合設計の核心）"""
-        left = self._parse_primary()
-        if left is None:
-            return None
+        token = self._peek()
+        left = None
 
-        while not self._is_at_end():
-            token = self._peek()
-            if not hasattr(token, "lexeme"):
-                break
-
-            symbol = token.lexeme
-
-            # 統合設計：operator_registryで演算子判定
-            if not operator_registry.is_operator(symbol):
-                break
-
-            op_info = operator_registry.get_operator(symbol)
-            if not op_info or op_info.precedence > max_precedence:
-                break
-
-            self._advance()  # 演算子消費
-
-            # 統合設計：結合性を考慮した優先度計算
-            if op_info.associativity == Associativity.LEFT:
-                next_max_prec = op_info.precedence - 1
-            elif op_info.associativity == Associativity.RIGHT:
-                next_max_prec = op_info.precedence
-            else:  # NON_ASSOCIATIVE
-                next_max_prec = op_info.precedence - 1
-
-            right = self._parse_expression_with_precedence(next_max_prec)
-            if right is None:
-                self._error(self._peek(), f"Expected right operand for '{symbol}'")
+        # 前置単項演算子の処理 (例: \+)
+        # TokenType.NOT が \+ に対応すると仮定 (scanner と operator_registry で設定)
+        if token.token_type == TokenType.NOT: # \+ (not)
+            op_symbol = token.lexeme # Should be "\+"
+            # 演算子情報を取得して優先度を確認
+            op_info = operator_registry.get_operator(op_symbol, arity=1)
+            if not op_info:
+                self._error(token, f"Operator information for '{op_symbol}' not found.")
                 return None
 
-            left = Term(Atom(symbol), [left, right])
+            # 現在の最大優先度と比較して、この前置演算子を処理すべきか判断
+            if op_info.precedence <= max_precedence: # 通常、前置演算子の優先度は高い(数値が小さい)
+                self._advance() # 演算子トークンを消費
+                # オペランドを、この単項演算子の優先度でパース (fy の場合、同じ優先度を許容)
+                operand = self._parse_expression_with_precedence(op_info.precedence)
+                if operand is None:
+                    self._error(self._peek(), f"Expected operand after prefix operator '{op_symbol}'")
+                    return None
+                left = Term(Atom(op_symbol), [operand])
+            else: # この前置演算子は現在のコンテキストでは処理されない (優先度が高すぎる)
+                left = self._parse_primary()
+        else: # 前置単項演算子で始まらない場合
+            left = self._parse_primary()
+
+        if left is None:
+            return None # _parse_primary or operand parsing failed and reported error
+
+        # 後置/二項演算子のループ
+        while not self._is_at_end():
+            bin_token = self._peek()
+            bin_symbol = bin_token.lexeme
+
+            # 二項演算子としての情報を取得 (arity=2)
+            # 注意: '-' や '+' のような記号は単項にも二項にもなりうるため、arity指定が重要
+            bin_op_info = operator_registry.get_operator(bin_symbol, arity=2)
+
+            if not bin_op_info or bin_op_info.precedence > max_precedence:
+                break # この二項演算子は処理しない (優先度が低いか、ループ終了)
+
+            # 結合性に基づいて次の優先度を計算
+            if bin_op_info.associativity == Associativity.LEFT:
+                next_max_prec = bin_op_info.precedence -1
+            elif bin_op_info.associativity == Associativity.RIGHT:
+                next_max_prec = bin_op_info.precedence
+            else: # NON_ASSOCIATIVE (xfx など)
+                next_max_prec = bin_op_info.precedence - 1
+
+            self._advance()  # 二項演算子トークンを消費
+            right = self._parse_expression_with_precedence(next_max_prec)
+            if right is None:
+                self._error(self._peek(), f"Expected right operand for '{bin_symbol}'")
+                return None
+            left = Term(Atom(bin_symbol), [left, right])
 
         return left
 
@@ -205,6 +226,9 @@ class Parser:
 
         elif self._match(TokenType.LEFTBRACKET):
             return self._parse_list()
+
+        elif self._match(TokenType.CUT): # Handle CUT token
+            return Atom("!")
 
         self._error(self._peek(), "Expected expression")
         return None
