@@ -160,6 +160,35 @@ class LogicInterpreter:
                 return self.dereference(bound_value, env)
         return term
 
+    def deep_dereference_term(self, term: PrologType, env: BindingEnvironment) -> PrologType:
+        """
+        Recursively dereferences all variables within a given term structure.
+        """
+        # First, dereference the term itself (if it's a variable)
+        # This initial dereference is important if term is a variable bound to another variable, etc.
+        current_term = self.dereference(term, env)
+
+        if isinstance(current_term, Variable):
+            # If it's still a variable after initial dereferencing, it means it's unbound in this context
+            # or bound to itself (which dereference handles).
+            return current_term
+        elif isinstance(current_term, Term):
+            # Recursively dereference arguments
+            new_args = [self.deep_dereference_term(arg, env) for arg in current_term.args]
+            # Functor itself could theoretically be a variable if we allowed higher-order, but not currently.
+            # Assuming functor is Atom or similar, not needing dereferencing here.
+            return Term(current_term.functor, new_args)
+        elif isinstance(current_term, ListTerm):
+            # This type is not fully used/fleshed out in the current codebase snippets,
+            # but providing a basic handling.
+            new_elements = [self.deep_dereference_term(el, env) for el in current_term.elements]
+            new_tail = None
+            if current_term.tail is not None:
+                new_tail = self.deep_dereference_term(current_term.tail, env)
+            return ListTerm(new_elements, new_tail)
+        # Atoms, Numbers, Strings are returned as is
+        return current_term
+
     def solve_goal(
         self, goal: PrologType, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
@@ -202,20 +231,42 @@ class LogicInterpreter:
                 current_head = renamed_entry.head
             else:
                 raise PrologError("Internal error: Renamed DB entry is not Rule or Fact.")
-            logger.debug(f"LOGIC_INTERP: Current head to unify against: {current_head}")
+            logger.debug(f"LOGIC_INTERP: Current head to unify against from db_entry: {current_head}")
 
-            unified, new_env_after_unify = self.unify(actual_goal, current_head, env)
-            # logger.debug(f"LOGIC_INTERP: Unification result: {unified}, new_env: {new_env_after_unify.bindings if unified else 'N/A'}") # Redundant due to unify logs
+            # PATCH for potential parser issue where a rule H:-B might be stored as Fact(Term(':-', [H,B]))
+            # In such a case, current_head (from renamed_entry.head) would be Term(':-', [H,B])
+            effective_head = current_head
+            is_rule_from_fact_structure = False
+            rule_body_from_fact_structure = None
+
+            if isinstance(renamed_entry, Fact) and \
+               isinstance(current_head, Term) and \
+               current_head.functor.name == ":-" and \
+               len(current_head.args) == 2:
+
+                logger.warning(f"LOGIC_INTERP (PATCH DETECTED): Fact's head is a ':-' term: {current_head}. Treating as rule.")
+                effective_head = current_head.args[0] # The actual head H
+                rule_body_from_fact_structure = current_head.args[1] # The actual body B
+                is_rule_from_fact_structure = True
+
+            unified, new_env_after_unify = self.unify(actual_goal, effective_head, env)
 
             if unified:
-                if isinstance(renamed_entry, Fact):
-                    logger.critical(f"LOGIC_INTERP: Unified Fact {actual_goal} with {current_head}. Yielding env: {new_env_after_unify.bindings}")
+                if is_rule_from_fact_structure:
+                    logger.critical(f"LOGIC_INTERP (PATCH USED): Unified {actual_goal} with {effective_head} (from Fact). Solving body: {rule_body_from_fact_structure}")
+                    try:
+                        yield from self.runtime.execute(rule_body_from_fact_structure, new_env_after_unify)
+                    except CutException:
+                        logger.debug(f"CutException propagated from patched rule body: {rule_body_from_fact_structure}. Re-raising.")
+                        raise
+                elif isinstance(renamed_entry, Fact): # Genuine Fact
+                    logger.critical(f"LOGIC_INTERP: Unified Fact {actual_goal} with {effective_head}. Yielding env: {new_env_after_unify.bindings}")
                     yield new_env_after_unify
-                elif isinstance(renamed_entry, Rule):
-                    logger.critical(f"LOGIC_INTERP: Unified Rule Head {actual_goal} with {current_head}. Solving body: {renamed_entry.body} with env: {new_env_after_unify.bindings}")
+                elif isinstance(renamed_entry, Rule): # Properly parsed Rule
+                    logger.critical(f"LOGIC_INTERP: Unified Rule Head {actual_goal} with {effective_head}. Solving body: {renamed_entry.body} with env: {new_env_after_unify.bindings}")
                     try:
                         yield from self.runtime.execute(renamed_entry.body, new_env_after_unify)
-                    except CutException: # ルールボディ内でカットが発生した場合、このルールの選択肢をカット
+                    except CutException:
                         logger.debug(f"CutException propagated from rule body: {renamed_entry.body}. Re-raising.")
                         raise
         logger.debug(f"LOGIC_INTERP: Finished iterating DB for goal {actual_goal}. No more (or no) solutions found from this path.")

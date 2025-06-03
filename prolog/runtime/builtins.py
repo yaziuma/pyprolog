@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from prolog.core.merge_bindings import merge_bindings
-from prolog.core.types import Term, Variable, Atom, Number, String
+from prolog.core.types import Term, Variable, Atom, Number, String, Fact, Rule # Added Fact, Rule
 from prolog.core.errors import PrologError
 
 
@@ -460,3 +460,98 @@ class UnivPredicate:
 
     def __str__(self): return f"{self.term_arg} =.. {self.list_arg}"
     def __repr__(self): return f"UnivPredicate({repr(self.term_arg)},{repr(self.list_arg)})"
+
+
+# Dynamic Database Predicates (asserta/assertz)
+# These are simplified versions and do not handle variable renaming (skolemization)
+# or full clause parsing robustly. They assume the argument is a Term representing
+# the clause, or an Atom for a simple fact.
+
+class DynamicAssertAPredicate:
+    def __init__(self, clause_term):
+        self.clause_term = clause_term
+        self.pred = "asserta"
+
+    def execute(self, runtime, bindings):
+        # Dereference the argument to get the actual clause structure
+        # Standard Prolog would expect a callable term (Atom or Term for head, or Term ':-'(H,B) for rule)
+        # If self.clause_term is a variable, it must be instantiated to a callable term.
+
+        clause_to_process = runtime.logic_interpreter.dereference(self.clause_term, bindings)
+
+        if isinstance(clause_to_process, Variable):
+            raise PrologError(f"{self.pred}/1: Argument must be a callable term, not an uninstantiated variable '{clause_to_process.name}'.")
+
+        final_clause = None
+        if isinstance(clause_to_process, Term):
+            if clause_to_process.functor.name == ':-' and len(clause_to_process.args) == 2:
+                rule_head = clause_to_process.args[0]
+                # Ensure head is a Term, converting Atom if necessary
+                if isinstance(rule_head, Atom):
+                    rule_head = Term(rule_head, [])
+                elif not isinstance(rule_head, Term):
+                    raise PrologError(f"{self.pred}/1: Invalid rule head in ':-' structure: {clause_to_process.args[0]}")
+
+                rule_body = clause_to_process.args[1]
+                # Body can be any callable term. If Atom, LogicInterpreter.solve_goal will wrap it.
+                if not isinstance(rule_body, (Term, Atom, Variable)): # Variable in body is fine
+                     raise PrologError(f"{self.pred}/1: Invalid rule body in ':-' structure: {rule_body}")
+
+                final_clause = Rule(rule_head, rule_body)
+            else: # Assumed to be a fact (a simple term)
+                final_clause = Fact(clause_to_process)
+        elif isinstance(clause_to_process, Atom): # A simple atom, e.g., asserta(my_atom).
+            final_clause = Fact(Term(clause_to_process, []))
+        else:
+            raise PrologError(f"{self.pred}/1: Argument must be a callable term (Atom or Term), got {type(clause_to_process)}")
+
+        # Add to database (no variable renaming/skolemization in this basic version)
+        runtime.rules.insert(0, final_clause)
+        if hasattr(runtime, 'logic_interpreter') and runtime.logic_interpreter:
+            runtime.logic_interpreter.rules = runtime.rules # Ensure logic_interpreter sees the new rule list
+
+        yield bindings # asserta/1 succeeds once
+
+    def __str__(self): return f"{self.pred}({self.clause_term})"
+    def __repr__(self): return f"DynamicAssertAPredicate({repr(self.clause_term)})"
+
+
+class DynamicAssertZPredicate:
+    def __init__(self, clause_term):
+        self.clause_term = clause_term
+        self.pred = "assertz"
+
+    def execute(self, runtime, bindings):
+        clause_to_process = runtime.logic_interpreter.dereference(self.clause_term, bindings)
+
+        if isinstance(clause_to_process, Variable):
+            raise PrologError(f"{self.pred}/1: Argument must be a callable term, not an uninstantiated variable '{clause_to_process.name}'.")
+
+        final_clause = None
+        if isinstance(clause_to_process, Term):
+            if clause_to_process.functor.name == ':-' and len(clause_to_process.args) == 2:
+                rule_head = clause_to_process.args[0]
+                if isinstance(rule_head, Atom):
+                    rule_head = Term(rule_head, [])
+                elif not isinstance(rule_head, Term):
+                    raise PrologError(f"{self.pred}/1: Invalid rule head in ':-' structure: {clause_to_process.args[0]}")
+
+                rule_body = clause_to_process.args[1]
+                if not isinstance(rule_body, (Term, Atom, Variable)):
+                     raise PrologError(f"{self.pred}/1: Invalid rule body in ':-' structure: {rule_body}")
+                final_clause = Rule(rule_head, rule_body)
+            else:
+                final_clause = Fact(clause_to_process)
+        elif isinstance(clause_to_process, Atom):
+            final_clause = Fact(Term(clause_to_process, []))
+        else:
+            raise PrologError(f"{self.pred}/1: Argument must be a callable term (Atom or Term), got {type(clause_to_process)}")
+
+        runtime.rules.append(final_clause)
+        if hasattr(runtime, 'logic_interpreter') and runtime.logic_interpreter:
+            runtime.logic_interpreter.rules = runtime.rules
+
+        yield bindings
+
+    def __str__(self): return f"{self.pred}({self.clause_term})"
+    def __repr__(self): return f"DynamicAssertZPredicate({repr(self.clause_term)})"

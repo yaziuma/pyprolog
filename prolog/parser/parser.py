@@ -176,8 +176,24 @@ class Parser:
 
     def _parse_primary(self):
         """基本要素の解析（引数解析修正版）"""
-        if self._match(TokenType.ATOM):
-            atom_name = self._previous().lexeme
+        if self._match(TokenType.ATOM, TokenType.ASSERTA, TokenType.ASSERTZ, TokenType.RETRACT): # Added ASSERTA, ASSERTZ, RETRACT
+            # Note: Retract might need different handling if it's to behave like an operator.
+            # For now, treat like a standard predicate call.
+            token = self._previous()
+            atom_name = token.lexeme # e.g., "asserta", "p"
+
+            # Convert specific TokenTypes to their canonical atom names for the Term functor
+            # This is mainly for asserta, assertz, retract if they are parsed with their own TokenTypes
+            # For a normal ATOM, atom_name is already correct.
+            # For asserta, this ensures the Functor is Atom('asserta'), not Atom(token.literal of asserta(...))
+            # This logic might be better if these keywords were just scanned as ATOM and then identified in Runtime.execute
+            # However, current setup has distinct TokenTypes.
+            if token.token_type in [TokenType.ASSERTA, TokenType.ASSERTZ, TokenType.RETRACT]:
+                 functor_atom = Atom(atom_name) # Use the keyword itself as functor name
+            else: # TokenType.ATOM
+                 functor_atom = Atom(atom_name)
+
+
             if self._match(TokenType.LEFTPAREN):
                 # 複合項の引数解析
                 args = []
@@ -193,9 +209,11 @@ class Parser:
                             continue
                         break
                 self._consume(TokenType.RIGHTPAREN, "Expected ')' after arguments")
-                return Term(Atom(atom_name), args)
+                return Term(functor_atom, args) # Use functor_atom
             else:
-                return Atom(atom_name)
+                # If it's one of the special predicates but no '(', it's an atom.
+                # e.g. query "asserta." should be Atom('asserta')
+                return functor_atom # Use functor_atom
 
         elif self._match(TokenType.NUMBER):
             return Number(self._previous().literal)
