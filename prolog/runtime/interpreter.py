@@ -11,7 +11,7 @@ from prolog.runtime.builtins import (
     VarPredicate, AtomPredicate, NumberPredicate,
     FunctorPredicate, ArgPredicate, UnivPredicate,
     DynamicAssertAPredicate, DynamicAssertZPredicate,
-    MemberPredicate, AppendPredicate
+    MemberPredicate, AppendPredicate, FindallPredicate
 )
 from typing import List, Iterator, Dict, Any, Union, Optional, Callable
 import logging
@@ -296,6 +296,12 @@ class Runtime:
             except CutException: # append/3 is not typically a source of CutException by itself
                 logger.debug("CutException from append/3. Re-raising.") # Though unlikely
                 raise
+        elif functor_name == "findall" and len(processed_goal.args) == 3:
+            findall_pred = FindallPredicate(processed_goal.args[0], processed_goal.args[1], processed_goal.args[2])
+            # FindallPredicate's execute method handles internal exceptions and re-throws PrologErrors
+            # It also handles CutException internally as per standard behavior (cut affects Goal, not findall itself)
+            for item in findall_pred.execute(self, env):
+                yield item
         else:
             logger.critical(f"EXECUTE Term: Attempting Normal Predicate solve_goal for: {processed_goal}")
             try:
@@ -351,8 +357,14 @@ class Runtime:
 
             logger.critical(f"QUERY: Completed with {len(solutions)} solutions")
             return solutions
-        except Exception as e:
-            logger.error(f"Query execution error: {e}", exc_info=True)
+
+        except PrologError as pe: # Catch PrologError specifically
+            logger.warning(f"PrologError during query execution: {pe}", exc_info=True) # Log as warning or info
+            raise pe # Re-throw PrologError so tests can catch it
+
+        except Exception as e: # Catch other, unexpected exceptions
+            logger.error(f"Unexpected query execution error: {e}", exc_info=True)
+            # For unexpected errors, maintain returning empty solutions.
             return solutions
 
     def _extract_variables_names(self, term) -> List[str]:

@@ -48,7 +48,9 @@ class Parser:
 
     def _parse_rule(self) -> Optional[Union[Rule, Fact]]:
         """ルール解析（統合設計対応版）"""
-        head_term = self._parse_term()
+        # Parse the head term with a precedence just below that of ':-' (1200)
+        # This ensures that ':-' is not consumed as part of the head term itself.
+        head_term = self._parse_expression_with_precedence(1199)
         if head_term is None:
             return None
 
@@ -176,20 +178,17 @@ class Parser:
 
     def _parse_primary(self):
         """基本要素の解析（引数解析修正版）"""
-        if self._match(TokenType.ATOM, TokenType.ASSERTA, TokenType.ASSERTZ, TokenType.RETRACT): # Added ASSERTA, ASSERTZ, RETRACT
+        if self._match(TokenType.ATOM, TokenType.ASSERTA, TokenType.ASSERTZ, TokenType.RETRACT, TokenType.FAIL, TokenType.TRUE): # Added FAIL, TRUE
             # Note: Retract might need different handling if it's to behave like an operator.
             # For now, treat like a standard predicate call.
             token = self._previous()
-            atom_name = token.lexeme # e.g., "asserta", "p"
+            atom_name = token.lexeme # e.g., "asserta", "p", "fail"
 
             # Convert specific TokenTypes to their canonical atom names for the Term functor
-            # This is mainly for asserta, assertz, retract if they are parsed with their own TokenTypes
+            # This is mainly for asserta, assertz, retract, fail, true if they are parsed with their own TokenTypes
             # For a normal ATOM, atom_name is already correct.
-            # For asserta, this ensures the Functor is Atom('asserta'), not Atom(token.literal of asserta(...))
-            # This logic might be better if these keywords were just scanned as ATOM and then identified in Runtime.execute
-            # However, current setup has distinct TokenTypes.
-            if token.token_type in [TokenType.ASSERTA, TokenType.ASSERTZ, TokenType.RETRACT]:
-                 functor_atom = Atom(atom_name) # Use the keyword itself as functor name
+            if token.token_type in [TokenType.ASSERTA, TokenType.ASSERTZ, TokenType.RETRACT, TokenType.FAIL, TokenType.TRUE]:
+                 functor_atom = Atom(atom_name) # Use the keyword itself as functor name (e.g. Atom('fail'))
             else: # TokenType.ATOM
                  functor_atom = Atom(atom_name)
 
