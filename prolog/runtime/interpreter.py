@@ -11,7 +11,8 @@ from prolog.runtime.builtins import (
     VarPredicate, AtomPredicate, NumberPredicate,
     FunctorPredicate, ArgPredicate, UnivPredicate,
     DynamicAssertAPredicate, DynamicAssertZPredicate,
-    MemberPredicate, AppendPredicate, FindallPredicate
+    MemberPredicate, AppendPredicate, FindallPredicate,
+    GetCharPredicate
 )
 from .io_manager import IOManager
 from typing import List, Iterator, Dict, Any, Union, Optional, Callable
@@ -303,6 +304,10 @@ class Runtime:
             # FindallPredicate's execute method handles internal exceptions and re-throws PrologErrors
             # It also handles CutException internally as per standard behavior (cut affects Goal, not findall itself)
             for item in findall_pred.execute(self, env):
+                yield item
+        elif functor_name == "get_char" and len(processed_goal.args) == 1:
+            get_char_pred = GetCharPredicate(processed_goal.args[0])
+            for item in get_char_pred.execute(self, env):
                 yield item
         else:
             logger.critical(f"EXECUTE Term: Attempting Normal Predicate solve_goal for: {processed_goal}")

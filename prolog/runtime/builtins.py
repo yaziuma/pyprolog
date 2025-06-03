@@ -405,3 +405,64 @@ class FindallPredicate(BuiltinPredicate):
             yield final_env
         # If unification fails, findall/3 fails (no solutions yielded).
         return
+
+
+class GetCharPredicate(BuiltinPredicate):
+    """
+    Built-in predicate get_char/1.
+    Reads the next character from the current input stream and unifies it with Arg.
+    """
+    def __init__(self, arg: 'PrologType'):
+        super().__init__(arg)
+        if len(self.args) != 1:
+            # This check is mostly for consistency, as Runtime.execute usually checks arity.
+            raise PrologError(f"get_char/1 expects 1 argument, got {len(self.args)}")
+
+    def execute(self, runtime: "Runtime", env: BindingEnvironment) -> Iterator[BindingEnvironment]:
+        # 1. Get a character string from the IOManager
+        # Assuming read_char_from_current() returns a single character string,
+        # or an empty string for EOF.
+        char_str = runtime.io_manager.read_char_from_current()
+
+        # 2. Determine the target Prolog Atom based on the character string
+        target_atom: Atom
+        if char_str == "":  # EOF
+            target_atom = Atom('end_of_file')
+        elif len(char_str) == 1: # Standard case: single character
+            target_atom = Atom(char_str)
+        else:
+            # This case should ideally not happen if read_char_from_current adheres to
+            # returning a single char or empty string. If it can return more,
+            # the behavior of get_char/1 might need further specification for such cases.
+            # For now, let's treat unexpected multi-character strings as an error or take the first.
+            # Standard get_char/1 expects to read one char.
+            # If read_char_from_current might return more (e.g. from a buffered non-interactive stream),
+            # this predicate would need to handle that (e.g. by only taking the first char and perhaps
+            # leaving the rest in an internal buffer for subsequent reads - complex).
+            # Simplest for now: if it's not EOF and not a single char, it's an issue or undefined.
+            # Let's assume for now read_char_from_current() guarantees single char or empty.
+            # If for some reason it doesn't, this is a point of potential failure/unexpected behavior.
+            # For robustness, if it could return None or other non-string types:
+            if char_str is None: # Defensive, if read_char could return None
+                 target_atom = Atom('end_of_file') # Treat None like EOF
+            else: # Should be multi-character string if not "" or len 1
+                 # This path indicates an unexpected return from read_char_from_current
+                 # For now, we'll be strict and expect single chars or EOF marker.
+                 # Standard get_char would typically not be in this state from a conforming stream.
+                 # If the underlying stream gives more than one char, get_char usually takes one.
+                 # To be safe and simple for now, if it's not empty, take the first char.
+                 # This part might need refinement based on stream behavior.
+                 target_atom = Atom(char_str[0])
+
+
+        # 3. Get the argument to get_char/1 (the Prolog variable or term)
+        prolog_arg = self.args[0]
+
+        # 4. Attempt to unify the argument with the target_atom
+        # unify returns a tuple: (bool_success, resulting_environment)
+        unified, next_env = runtime.logic_interpreter.unify(prolog_arg, target_atom, env)
+
+        # 5. Yield successful unifications
+        if unified:
+            yield next_env
+        # If unification fails, the predicate simply fails (yields nothing).
