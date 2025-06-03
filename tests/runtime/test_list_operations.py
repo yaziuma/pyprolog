@@ -261,7 +261,8 @@ class TestListOperations:
         # 5. Type errors and improper lists (current behavior)
         # Current AppendPredicate is basic, might not raise Prolog-specific errors but should fail (no solutions).
         self.assertQueryFalse("append(a, [b], L3)")  # L1 not a list
-        self.assertQueryFalse("append([a], b, L3)")  # L2 not a list
+        # Standard Prolog: append([a], b, L) gives L = [a|b].
+        self.assertQueryTrue("append([a], b, L3)", [{"L3": Term(Atom("."), [Atom("a"), Atom("b")])}]) # L2 not a list but L1 is proper
 
         # L3 is not a list, but L1 or L2 are variables.
         # append(L1,L2,not_a_list)

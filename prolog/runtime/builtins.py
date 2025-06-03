@@ -285,10 +285,14 @@ class AppendPredicate(BuiltinPredicate):
         env_clause2 = env.copy()
 
         # Create fresh variables for the components of List1 and List3 for this specific choice point
-        # Using simple names; their identity as new Variable objects is what matters for unification.
-        # LogicInterpreter's _rename_variables is for rules from DB, not strictly needed for internal vars here.
-        h1_var = Variable("_H1Append")
-        t1_var = Variable("_T1Append")
+        # Use unique names to avoid clashes with variables from outer scopes in the environment.
+        counter = runtime.logic_interpreter._unique_var_counter
+        h1_var = Variable(f"_HAppend_{counter}")
+        t1_var = Variable(f"_T1Append_{counter+1}")
+        # For list3_pattern, H must be the *same* variable instance as in list1_pattern
+        t3_var = Variable(f"_T3Append_{counter+2}")
+        runtime.logic_interpreter._unique_var_counter += 3
+
         list1_pattern = Term(Atom("."), [h1_var, t1_var])
 
         unified_l1_cons, env_clause2_after_l1 = runtime.logic_interpreter.unify(
@@ -299,12 +303,10 @@ class AppendPredicate(BuiltinPredicate):
             # L1 successfully unified with [h1_var | t1_var].
             # h1_var and t1_var are now (potentially) bound in env_clause2_after_l1.
 
-            t3_var = Variable("_T3Append") # Fresh variable for the tail of List3
-
             # List3 must match [h1_var | t3_var].
             # The h1_var in this pattern is the same Variable instance as in list1_pattern.
             # Unification will use its binding from env_clause2_after_l1.
-            list3_pattern = Term(Atom("."), [h1_var, t3_var])
+            list3_pattern = Term(Atom("."), [h1_var, t3_var]) # uses the same h1_var Variable object
 
             unified_l3_cons, env_clause2_after_l3 = runtime.logic_interpreter.unify(
                 self.args[2], list3_pattern, env_clause2_after_l1
@@ -314,7 +316,7 @@ class AppendPredicate(BuiltinPredicate):
                 # Recursively call append(t1_var, List2_original, t3_var)
                 # using env_clause2_after_l3.
                 # The original self.args[1] is List2.
+                # t1_var and t3_var are passed (their bound values if bound, or the Variable objects themselves)
                 recursive_predicate = AppendPredicate(t1_var, self.args[1], t3_var)
                 yield from recursive_predicate.execute(runtime, env_clause2_after_l3)
         return # End of AppendPredicate
-```
