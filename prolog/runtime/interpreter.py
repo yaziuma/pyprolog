@@ -10,7 +10,8 @@ from prolog.core.errors import PrologError, CutException
 from prolog.runtime.builtins import (
     VarPredicate, AtomPredicate, NumberPredicate,
     FunctorPredicate, ArgPredicate, UnivPredicate,
-    DynamicAssertAPredicate, DynamicAssertZPredicate
+    DynamicAssertAPredicate, DynamicAssertZPredicate,
+    MemberPredicate, AppendPredicate
 )
 from typing import List, Iterator, Dict, Any, Union, Optional, Callable
 import logging
@@ -279,6 +280,22 @@ class Runtime:
         elif functor_name == "assertz" and len(processed_goal.args) == 1:
             assertz_pred = DynamicAssertZPredicate(processed_goal.args[0])
             for item in assertz_pred.execute(self, env): yield item
+        elif functor_name == "member" and len(processed_goal.args) == 2:
+            # Note: MemberPredicate's execute method handles dereferencing its arguments as needed.
+            member_pred = MemberPredicate(processed_goal.args[0], processed_goal.args[1])
+            try:
+                for item in member_pred.execute(self, env): yield item
+            except CutException: # Should member/2 propagate CutException? Typically not, but being consistent.
+                logger.debug("CutException from member/2. Re-raising.")
+                raise
+        elif functor_name == "append" and len(processed_goal.args) == 3:
+            # AppendPredicate handles dereferencing its arguments internally as needed.
+            append_pred = AppendPredicate(processed_goal.args[0], processed_goal.args[1], processed_goal.args[2])
+            try:
+                for item in append_pred.execute(self, env): yield item
+            except CutException: # append/3 is not typically a source of CutException by itself
+                logger.debug("CutException from append/3. Re-raising.") # Though unlikely
+                raise
         else:
             logger.critical(f"EXECUTE Term: Attempting Normal Predicate solve_goal for: {processed_goal}")
             try:
