@@ -9,7 +9,8 @@ from prolog.core.operators import operator_registry, OperatorType, OperatorInfo
 from prolog.core.errors import PrologError, CutException
 from prolog.runtime.builtins import (
     VarPredicate, AtomPredicate, NumberPredicate,
-    FunctorPredicate, ArgPredicate, UnivPredicate
+    FunctorPredicate, ArgPredicate, UnivPredicate,
+    DynamicAssertAPredicate, DynamicAssertZPredicate
 )
 from typing import List, Iterator, Dict, Any, Union, Optional, Callable
 import logging
@@ -110,7 +111,7 @@ class Runtime:
                 except CutException:
                     logger.debug(f"CutException from left part of disjunction ';'. Re-raising.")
                     raise
-                else: # Only if left_goal completed without a cut
+                else:
                     for right_env_solution in self.execute(right_goal, env):
                         yield right_env_solution
             elif op_info.symbol == "\\+": # Negation as failure
@@ -121,7 +122,7 @@ class Runtime:
                     for _ in self.execute(goal_to_negate, env): success_found = True; break
                 except CutException:
                     logger.debug(f"CutException inside \\+ for goal {goal_to_negate}. Standard \+ would fail here.")
-                    success_found = True # Standard Prolog: cut in \+ makes \+ fail.
+                    success_found = True
                 if not success_found: yield env
             elif op_info.symbol == "==":
                 if len(args) != 2: raise PrologError("Identity ==/2 requires exactly 2 arguments")
@@ -133,6 +134,16 @@ class Runtime:
                 left_deref = self.logic_interpreter.dereference(args[0], env)
                 right_deref = self.logic_interpreter.dereference(args[1], env)
                 if left_deref != right_deref: yield env
+            elif op_info.symbol == "\\=": # \=/2 Term non-unification
+                if len(args) != 2: raise PrologError("Non-unification operator \\=/2 requires exactly 2 arguments")
+                term1, term2 = args[0], args[1]
+                # We need to try unification and succeed if it fails.
+                # Crucially, unify creates a *copy* of the environment.
+                # So, any bindings made during a successful unify attempt should not persist
+                # if we are only checking for unifiability.
+                unified, _ = self.logic_interpreter.unify(term1, term2, env)
+                if not unified:
+                    yield env # Succeeds if unify returns False
             else: raise NotImplementedError(f"Logical operator {op_info.symbol} not implemented")
         return evaluator
 
@@ -140,7 +151,6 @@ class Runtime:
         def evaluator(args: List, env: BindingEnvironment) -> Iterator[BindingEnvironment]:
             if op_info.symbol == "!":
                 if args: raise PrologError("Cut !/0 takes no arguments")
-                # print(f"PYTHON_PRINT: CUTTING! Environment: {env.bindings}", flush=True)
                 logger.critical(f"CUTTING! Environment: {env.bindings}")
                 yield env
                 raise CutException()
@@ -157,23 +167,12 @@ class Runtime:
                         except CutException:
                             logger.debug("CutException from then_part of '->', re-raising to cut '->' and parent choices.")
                             raise
-                        # Standard "If -> Then" cuts Condition's choices after first success.
-                        # We achieve this by raising a CutException here, which will be caught
-                        # by the outer try-except of this '->' evaluator, preventing further
-                        # solutions from 'condition' to be explored for this '->'.
                         raise CutException()
                 except CutException:
-                    # If cut came from 'condition' (its first solution caused a cut internally in condition)
-                    # or from our own raise CutException() after processing then_part for the first cond_env,
-                    # or from then_part.
-                    # If solution_found_for_condition is True, it means 'condition' succeeded once,
-                    # 'then_part' was executed, and now we must propagate the cut upwards.
-                    # If solution_found_for_condition is False, it means 'condition' failed or cut before any solution,
-                    # so this '->' goal also fails, and the cut (if any) propagates.
                     if solution_found_for_condition:
                          logger.debug(f"CutException after processing 'then_part' or from within 'then_part' for '->'. Re-raising.")
                          raise
-                    else: # condition failed or cut before any solution
+                    else:
                          logger.debug(f"CutException from 'condition' part of '->' before any solution. Re-raising.")
                          raise
             else: raise NotImplementedError(f"Control operator {op_info.symbol} not implemented")
@@ -205,8 +204,8 @@ class Runtime:
 
         processed_goal: Term
         if isinstance(goal, Atom) and goal.name == "!" and "!" in self._operator_evaluators :
-             logger.debug(f"EXECUTE: Atom('!') detected, converting to Term and routing to operator.")
-             processed_goal = Term(goal, [])
+             logger.debug(f"EXECUTE: Atom('!') detected, routing to operator.")
+             processed_goal = Term(goal, []) # Convert to Term to be handled by operator logic
         elif isinstance(goal, Term):
             processed_goal = goal
         elif isinstance(goal, Atom):
@@ -274,6 +273,12 @@ class Runtime:
             try:
                 for item in univ_pred.execute(self, env): yield item
             except CutException: logger.debug("CutException from =../2. Re-raising."); raise
+        elif functor_name == "asserta" and len(processed_goal.args) == 1:
+            asserta_pred = DynamicAssertAPredicate(processed_goal.args[0])
+            for item in asserta_pred.execute(self, env): yield item
+        elif functor_name == "assertz" and len(processed_goal.args) == 1:
+            assertz_pred = DynamicAssertZPredicate(processed_goal.args[0])
+            for item in assertz_pred.execute(self, env): yield item
         else:
             logger.critical(f"EXECUTE Term: Attempting Normal Predicate solve_goal for: {processed_goal}")
             try:
@@ -320,8 +325,9 @@ class Runtime:
                     result = {}
                     for var_name_str in query_vars_names:
                         var_obj = Variable(var_name_str)
-                        value_dereferenced = self.logic_interpreter.dereference(var_obj, env_solution)
-                        result[var_obj] = value_dereferenced
+                        # Use deep_dereference_term to ensure all variables within the result term are resolved
+                        value_fully_dereferenced = self.logic_interpreter.deep_dereference_term(var_obj, env_solution)
+                        result[var_obj] = value_fully_dereferenced
                     solutions.append(result)
             except CutException:
                 logger.info(f"Cut execution stopped further solutions at query level. Returning {len(solutions)} solution(s).")

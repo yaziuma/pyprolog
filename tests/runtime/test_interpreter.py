@@ -413,9 +413,11 @@ class TestRuntime:
         self.assertQueryTrue("T =.. [atom]", [{"T": Atom("atom")}])
         # T =.. [123] => T = 123
         self.assertQueryTrue("T =.. [123]", [{"T": Number(123)}])
+        # T =.. ['.', a, b]  => T = '.'(a,b) (the term, not the list [a,b])
+        self.assertQueryTrue("T =.. ['.', a, b]", [{"T": Term(Atom("."), [Atom("a"), Atom("b")])}])
         # T =.. ['.', a, [b]] => T = [a,b] (same as .(a,.(b,[])))
         list_term = Term(Atom("."), [Atom("a"), Term(Atom("."), [Atom("b"), Atom("[]")])])
-        self.assertQueryTrue("T =.. ['.', a, [b]]", [{"T": list_term}]) # Changed query string
+        self.assertQueryTrue("T =.. ['.', a, [b]]", [{"T": list_term}])
         # T =.. [[]] => T = []
         self.assertQueryTrue("T =.. [[]]", [{"T": Atom("[]")}])
 

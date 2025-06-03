@@ -209,11 +209,20 @@ class OperatorRegistry:
             ),
             # 否定演算子
             OperatorInfo( # NOT
-                "\+", 900, Associativity.NON, OperatorType.LOGICAL, 1, None, "NOT" # Changed from "\\+" to "\+"
+                "\+", 900, Associativity.NON, OperatorType.LOGICAL, 1, None, "NOT"
+            ),
+            OperatorInfo( # Not unifiable (already exists, ensure it's correct)
+                "\\=", # This was NOT_UNIFY, ensure it's NON_UNIFIABLE_OPERATOR or similar if changed
+                700,
+                Associativity.NON, # xfx
+                OperatorType.LOGICAL,
+                2,
+                None,
+                "NON_UNIFIABLE_OPERATOR", # New specific token type name
             ),
             # Univ演算子
             OperatorInfo(
-                "=..", 700, Associativity.NON, OperatorType.STRUCTURAL, 2, None, "UNIV" # xfx (NON for simplicity here)
+                "=..", 700, Associativity.NON, OperatorType.STRUCTURAL, 2, None, "UNIV" # xfx
             ),
             # 特殊演算子
             OperatorInfo( # 'is'/2 は評価演算子
@@ -221,6 +230,16 @@ class OperatorRegistry:
             ),
             OperatorInfo(
                 "!", 200, Associativity.NON, OperatorType.CONTROL, 0, None, "CUT"
+            ),
+            # Rule operator :-
+            OperatorInfo(
+                ":-",
+                1200,
+                Associativity.NON, # Typically xfx
+                OperatorType.LOGICAL, # Or a specific type for rules
+                2,
+                None,
+                "RULE_OPERATOR" # Scanner will generate COLONMINUS
             ),
             # IO演算子
             OperatorInfo(
