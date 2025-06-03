@@ -13,6 +13,7 @@ from prolog.runtime.builtins import (
     DynamicAssertAPredicate, DynamicAssertZPredicate,
     MemberPredicate, AppendPredicate, FindallPredicate
 )
+from .io_manager import IOManager
 from typing import List, Iterator, Dict, Any, Union, Optional, Callable
 import logging
 
@@ -23,10 +24,11 @@ class Runtime:
     def __init__(self, rules: Optional[List[Union[Rule, Fact]]] = None):
         self.rules: List[Union[Rule, Fact]] = rules if rules is not None else []
         self.math_interpreter = MathInterpreter()
-        self.logic_interpreter = LogicInterpreter(self.rules, self)
+        self.io_manager = IOManager() # Initialize IOManager
+        self.logic_interpreter = LogicInterpreter(self.rules, self) # Pass self (Runtime) to LogicInterpreter
         self._operator_evaluators = self._build_unified_evaluator_system()
         logger.info(
-            f"Runtime initialized with {len(self.rules)} rules and {len(self._operator_evaluators)} operator evaluators"
+            f"Runtime initialized with {len(self.rules)} rules, IOManager, and {len(self._operator_evaluators)} operator evaluators"
         )
 
     def _build_unified_evaluator_system(self) -> Dict[str, Callable]:
