@@ -235,7 +235,7 @@ class TestRuntime:
         assert solutions_my_fact[0].get(Variable("Y")) == Number(1)
         assert solutions_my_fact[1].get(Variable("Y")) == Number(2)
 
-        self.assertQueryTrue("retract(my_fact(1)).", [{"X": Number(1)}]) # Retract might return bindings for the retracted clause
+        self.assertQueryTrue("retract(my_fact(1)).", [{}]) # Retract might return bindings for the retracted clause
         self.assertQueryTrue("my_fact(Y)", [{"Y": Number(2)}]) # Only my_fact(2) should remain
 
         self.assertQueryFalse("non_existent_fact(1)")
