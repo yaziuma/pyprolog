@@ -10,7 +10,7 @@ from prolog.core.errors import PrologError, CutException
 from prolog.runtime.builtins import (
     VarPredicate, AtomPredicate, NumberPredicate,
     FunctorPredicate, ArgPredicate, UnivPredicate,
-    DynamicAssertAPredicate, DynamicAssertZPredicate,
+    DynamicAssertAPredicate, DynamicAssertZPredicate, DynamicRetractPredicate,
     MemberPredicate, AppendPredicate, FindallPredicate,
     GetCharPredicate
 )
@@ -308,6 +308,10 @@ class Runtime:
         elif functor_name == "get_char" and len(processed_goal.args) == 1:
             get_char_pred = GetCharPredicate(processed_goal.args[0])
             for item in get_char_pred.execute(self, env):
+                yield item
+        elif functor_name == "retract" and len(processed_goal.args) == 1:
+            retract_pred = DynamicRetractPredicate(processed_goal.args[0])
+            for item in retract_pred.execute(self, env): # self is runtime
                 yield item
         else:
             logger.debug(f"EXECUTE Term: Attempting Normal Predicate solve_goal for: {processed_goal}")

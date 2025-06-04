@@ -543,3 +543,105 @@ class GetCharPredicate(BuiltinPredicate):
         if unified:
             yield next_env
         # If unification fails, the predicate simply fails (yields nothing).
+
+
+class DynamicRetractPredicate(BuiltinPredicate):
+    def __init__(self, clause_arg: PrologType):
+        super().__init__(clause_arg)
+
+    def execute(self, runtime: "Runtime", env: BindingEnvironment) -> Iterator[BindingEnvironment]:
+        logger.debug(f"RETRACT: Entered with arg: {self.args[0]}")
+
+        # Dereference the argument to retract
+        clause_to_retract_orig = self.args[0]
+        # Create a deep copy for unification to avoid binding variables in the original query term structure
+        import copy
+        clause_to_retract_for_unify = copy.deepcopy(runtime.logic_interpreter.dereference(clause_to_retract_orig, env))
+
+        logger.debug(f"RETRACT: Dereferenced clause_to_retract_for_unify: {clause_to_retract_for_unify} (type: {type(clause_to_retract_for_unify)})")
+
+        if isinstance(clause_to_retract_for_unify, Variable):
+            logger.warning(f"RETRACT: Attempt to retract an uninstantiated variable: {clause_to_retract_for_unify}. Failing (Instantiation Error).")
+            # Standard Prolog would raise instantiation_error. Here, we fail.
+            return
+
+        if not isinstance(clause_to_retract_for_unify, (Term, Atom)):
+            logger.warning(f"RETRACT: Argument is not a Term or Atom: {clause_to_retract_for_unify} (type: {type(clause_to_retract_for_unify)}). Failing (Type Error).")
+            # Standard Prolog would raise type_error(callable, Clause). Here, we fail.
+            return
+
+        # Convert Atom to Term for consistent matching, e.g. retract(foo) matches foo.
+        target_clause_struct = Term(clause_to_retract_for_unify, []) if isinstance(clause_to_retract_for_unify, Atom) else clause_to_retract_for_unify
+
+        is_retracting_rule_form = isinstance(target_clause_struct, Term) and \
+                                  target_clause_struct.functor.name == ":-" and \
+                                  len(target_clause_struct.args) == 2
+
+        target_head_to_match = target_clause_struct.args[0] if is_retracting_rule_form else target_clause_struct
+        target_body_to_match = target_clause_struct.args[1] if is_retracting_rule_form else None # None if retracting a fact or simple term
+
+        # Iterate over a copy of the rules list to allow modification, or iterate by index
+        # Iterating by index in reverse is safer for removal.
+        for i in range(len(runtime.rules) - 1, -1, -1):
+            db_clause = runtime.rules[i]
+
+            # Important: For unification with DB clause, rename variables from DB clause
+            # to avoid clashes and incorrect unifications with variables in target_clause_struct
+            renamed_db_clause = runtime.logic_interpreter._rename_variables(db_clause)
+
+            db_head: Term
+            db_body: Optional[PrologType] = None
+
+            if isinstance(renamed_db_clause, Fact):
+                db_head = renamed_db_clause.head
+                if is_retracting_rule_form: # Cannot match a fact with a rule form H:-B
+                    continue
+            elif isinstance(renamed_db_clause, Rule):
+                db_head = renamed_db_clause.head
+                db_body = renamed_db_clause.body
+                if not is_retracting_rule_form and db_body is not None: # retract(H) should not match H:-B unless B is 'true' or matches var
+                     # Standard retract(H) can match Rule H:-Body if Body unifies with 'true'
+                     # For simplicity here, if retracting a fact-form, only match facts or rules H:-true.
+                     # A more complete retract would handle Body unification with 'true'.
+                     # For now, if retracting H, and DB is H:-B, we only match if target_body_to_match is not None (i.e. retracting H:-B1)
+                     # or if db_body is Atom('true') - this part is not implemented here yet.
+                     pass # Allow retract(H) to potentially match Rule(H,B) head.
+            else:
+                logger.error(f"RETRACT: Unknown clause type in DB: {db_clause}")
+                continue
+
+            # Try to unify the head parts
+            # Unify target_head_to_match with db_head using a *copy* of env for this attempt
+            unified_head, head_env = runtime.logic_interpreter.unify(target_head_to_match, db_head, env.copy())
+
+            if unified_head:
+                if is_retracting_rule_form:
+                    # If retracting H:-B, bodies must also unify
+                    if db_body is None: # DB is Fact, cannot match H:-B
+                        continue
+
+                    # Ensure db_body is Term if it's Atom for unification consistency if target_body is Term
+                    db_body_term = Term(db_body, []) if isinstance(db_body, Atom) else db_body
+                    if not isinstance(db_body_term, Term) and target_body_to_match is not None: # e.g. db_body is Number
+                        continue
+
+
+                    unified_body, final_env = runtime.logic_interpreter.unify(target_body_to_match, db_body_term, head_env)
+                    if unified_body:
+                        logger.info(f"RETRACT: Matched and removed rule: {runtime.rules[i]}")
+                        del runtime.rules[i]
+                        runtime.logic_interpreter.rules = runtime.rules # Update logic interpreter's reference
+                        yield final_env # Yield the environment from successful unification
+                        return # Retract first match only for now
+                else: # Retracting a fact form (simple term)
+                    # Standard Prolog: retract(H) can retract Fact(H) or Rule(H, true_body).
+                    # For simplicity, this version retracts Fact(H) or any Rule(H, Body)
+                    # This part might need refinement for strict standard compliance regarding Body.
+                    logger.info(f"RETRACT: Matched and removed clause: {runtime.rules[i]} (using head match for fact-form retract)")
+                    del runtime.rules[i]
+                    runtime.logic_interpreter.rules = runtime.rules
+                    yield head_env # Yield the environment from head unification
+                    return # Retract first match
+
+        logger.debug(f"RETRACT: No matching clause found for: {target_clause_struct}")
+        return # Failed to find a match
