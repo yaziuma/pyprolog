@@ -170,7 +170,7 @@ class TestOperatorRegistry:
         
         # 論理演算子のトークンタイプ
         assert registry.get_token_type("=") == "UNIFY"
-        assert registry.get_token_type("\\=") == "NOT_UNIFY"
+        assert registry.get_token_type("\\=") == "NON_UNIFIABLE_OPERATOR"
         
         # 存在しない演算子
         assert registry.get_token_type("nonexistent") is None

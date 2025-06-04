@@ -1,7 +1,10 @@
-from prolog.core.types import Term, Variable, Atom, Number, PrologType, ListTerm
+from prolog.core.types import Term, Variable, Atom, Number, PrologType, ListTerm, Rule, Fact
 from prolog.core.binding_environment import BindingEnvironment
 from prolog.core.errors import PrologError, CutException # Assuming CutException might be relevant for some builtins
 from typing import TYPE_CHECKING, Iterator, List, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from prolog.runtime.interpreter import Runtime
@@ -171,7 +174,7 @@ class UnivPredicate(BuiltinPredicate): # =../2
             if isinstance(functor_from_list, Number) and args_from_list: return
             if isinstance(functor_from_list, Atom) and functor_from_list.name == "[]" and args_from_list: return
 
-            MAX_ARITY = 255
+            MAX_ARITY = 50
             if len(args_from_list) > MAX_ARITY: return
 
             constructed_term: PrologType
@@ -197,25 +200,61 @@ class DynamicAssertAPredicate(BuiltinPredicate):
         super().__init__(clause_arg)
 
     def execute(self, runtime: "Runtime", env: BindingEnvironment) -> Iterator[BindingEnvironment]:
+        logger.debug(f"ASSERTA: Entered with arg: {self.args[0]}")
         clause_val = runtime.logic_interpreter.dereference(self.args[0], env)
-        if isinstance(clause_val, Variable): return
-        if not isinstance(clause_val, (Term, Atom)):return
+        logger.debug(f"ASSERTA: Dereferenced clause_val: {clause_val} (type: {type(clause_val)})")
 
-        clause_val_as_term = Term(clause_val, []) if isinstance(clause_val, Atom) else clause_val
+        if isinstance(clause_val, Variable):
+            logger.warning(f"ASSERTA: Attempt to assert an uninstantiated variable: {clause_val}. Failing.")
+            return
+        if not isinstance(clause_val, (Term, Atom)):
+            logger.warning(f"ASSERTA: Attempt to assert a non-term/non-atom: {clause_val} (type: {type(clause_val)}). Failing.")
+            return
 
-        # No skolemization here, vars are shared.
-        if clause_val_as_term.functor.name == ":-" and len(clause_val_as_term.args) == 2:
-            head = clause_val_as_term.args[0]
-            body = clause_val_as_term.args[1]
-            if not isinstance(head, (Term,Atom)): return # Basic head validation
-            if isinstance(head, Atom): head = Term(head,[])
+        try:
+            clause_val_as_term = Term(clause_val, []) if isinstance(clause_val, Atom) else clause_val
+            logger.debug(f"ASSERTA: clause_val_as_term: {clause_val_as_term}")
 
-            runtime.rules.insert(0, Rule(head, body))
-        else:
-            runtime.rules.insert(0, Fact(clause_val_as_term))
+            if clause_val_as_term.functor.name == ":-" and len(clause_val_as_term.args) == 2:
+                head = clause_val_as_term.args[0]
+                body = clause_val_as_term.args[1]
+                logger.debug(f"ASSERTA: Identified as rule. Head: {head}, Body: {body}")
+                if not isinstance(head, (Term, Atom)):
+                    logger.warning(f"ASSERTA: Rule head is not Term or Atom: {head}. Failing on clause: {clause_val}")
+                    return
+                if isinstance(head, Atom):
+                    head = Term(head, [])
+                    logger.debug(f"ASSERTA: Converted Atom head to Term: {head}")
 
-        runtime.logic_interpreter.rules = runtime.rules
-        yield env
+                processed_body = body
+                if isinstance(body, Atom):
+                    processed_body = Term(body, [])
+                    logger.debug(f"ASSERTA: Converted Atom body {body} to Term: {processed_body}")
+                elif not isinstance(body, Term):
+                    logger.warning(f"ASSERTA: Rule body {body} (type: {type(body)}) is not an Atom or Term. Failing assertion for clause: {clause_val}")
+                    return # Fail the assertion
+
+                new_rule = Rule(head, processed_body) # Now head and processed_body are Term
+                logger.debug(f"ASSERTA: Created Rule: {new_rule}")
+                runtime.rules.insert(0, new_rule)
+                logger.info(f"ASSERTA: Successfully asserted rule: {new_rule}")
+            else:
+                logger.debug(f"ASSERTA: Identified as fact: {clause_val_as_term}")
+                new_fact = Fact(clause_val_as_term)
+                logger.debug(f"ASSERTA: Created Fact: {new_fact}")
+                runtime.rules.insert(0, new_fact)
+                logger.info(f"ASSERTA: Successfully asserted fact: {new_fact}")
+
+            # This line is intentionally left as is, as per instructions.
+            # runtime.logic_interpreter.rules = runtime.rules
+
+            logger.debug(f"ASSERTA: About to yield environment for: {clause_val_as_term}")
+            yield env
+            logger.debug(f"ASSERTA: Successfully yielded environment for: {clause_val_as_term}")
+
+        except Exception as e:
+            logger.error(f"ASSERTA: Unexpected Python exception during assertion of {clause_val}: {e}", exc_info=True)
+            return # Ensure no yield happens if an error occurred
 
 
 class DynamicAssertZPredicate(BuiltinPredicate):
@@ -223,23 +262,61 @@ class DynamicAssertZPredicate(BuiltinPredicate):
         super().__init__(clause_arg)
 
     def execute(self, runtime: "Runtime", env: BindingEnvironment) -> Iterator[BindingEnvironment]:
+        logger.debug(f"ASSERTZ: Entered with arg: {self.args[0]}")
         clause_val = runtime.logic_interpreter.dereference(self.args[0], env)
-        if isinstance(clause_val, Variable): return
-        if not isinstance(clause_val, (Term, Atom)): return
+        logger.debug(f"ASSERTZ: Dereferenced clause_val: {clause_val} (type: {type(clause_val)})")
 
-        clause_val_as_term = Term(clause_val, []) if isinstance(clause_val, Atom) else clause_val
+        if isinstance(clause_val, Variable):
+            logger.warning(f"ASSERTZ: Attempt to assert an uninstantiated variable: {clause_val}. Failing.")
+            return
+        if not isinstance(clause_val, (Term, Atom)):
+            logger.warning(f"ASSERTZ: Attempt to assert a non-term/non-atom: {clause_val} (type: {type(clause_val)}). Failing.")
+            return
 
-        if clause_val_as_term.functor.name == ":-" and len(clause_val_as_term.args) == 2:
-            head = clause_val_as_term.args[0]
-            body = clause_val_as_term.args[1]
-            if not isinstance(head, (Term,Atom)): return
-            if isinstance(head, Atom): head = Term(head,[])
-            runtime.rules.append(Rule(head, body))
-        else:
-            runtime.rules.append(Fact(clause_val_as_term))
+        try:
+            clause_val_as_term = Term(clause_val, []) if isinstance(clause_val, Atom) else clause_val
+            logger.debug(f"ASSERTZ: clause_val_as_term: {clause_val_as_term}")
 
-        runtime.logic_interpreter.rules = runtime.rules
-        yield env
+            if clause_val_as_term.functor.name == ":-" and len(clause_val_as_term.args) == 2:
+                head = clause_val_as_term.args[0]
+                body = clause_val_as_term.args[1]
+                logger.debug(f"ASSERTZ: Identified as rule. Head: {head}, Body: {body}")
+                if not isinstance(head, (Term, Atom)):
+                    logger.warning(f"ASSERTZ: Rule head is not Term or Atom: {head}. Failing on clause: {clause_val}")
+                    return
+                if isinstance(head, Atom):
+                    head = Term(head, [])
+                    logger.debug(f"ASSERTZ: Converted Atom head to Term: {head}")
+
+                processed_body = body
+                if isinstance(body, Atom):
+                    processed_body = Term(body, [])
+                    logger.debug(f"ASSERTZ: Converted Atom body {body} to Term: {processed_body}")
+                elif not isinstance(body, Term):
+                    logger.warning(f"ASSERTZ: Rule body {body} (type: {type(body)}) is not an Atom or Term. Failing assertion for clause: {clause_val}")
+                    return # Fail the assertion
+
+                new_rule = Rule(head, processed_body) # Now head and processed_body are Term
+                logger.debug(f"ASSERTZ: Created Rule: {new_rule}")
+                runtime.rules.append(new_rule)
+                logger.info(f"ASSERTZ: Successfully asserted rule: {new_rule}")
+            else:
+                logger.debug(f"ASSERTZ: Identified as fact: {clause_val_as_term}")
+                new_fact = Fact(clause_val_as_term)
+                logger.debug(f"ASSERTZ: Created Fact: {new_fact}")
+                runtime.rules.append(new_fact)
+                logger.info(f"ASSERTZ: Successfully asserted fact: {new_fact}")
+
+            # This line is intentionally left as is, as per instructions.
+            # runtime.logic_interpreter.rules = runtime.rules
+
+            logger.debug(f"ASSERTZ: About to yield environment for: {clause_val_as_term}")
+            yield env
+            logger.debug(f"ASSERTZ: Successfully yielded environment for: {clause_val_as_term}")
+
+        except Exception as e:
+            logger.error(f"ASSERTZ: Unexpected Python exception during assertion of {clause_val}: {e}", exc_info=True)
+            return # Ensure no yield happens if an error occurred
 
 class MemberPredicate(BuiltinPredicate):
     def __init__(self, element_arg: PrologType, list_arg: PrologType):

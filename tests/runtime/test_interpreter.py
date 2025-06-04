@@ -174,9 +174,9 @@ class TestRuntime:
         self.runtime.add_rule("ancestor(X,Y) :- parent(X,Y).")
         self.runtime.add_rule("ancestor(X,Z) :- parent(X,Y), ancestor(Y,Z).")
         
-        self.assertQueryTrue("ancestor(a,b)", [{"X":Atom("a"), "Y":Atom("b")}]) # Direct parent
-        self.assertQueryTrue("ancestor(a,c)", [{"X":Atom("a"), "Z":Atom("c")}]) # Grandparent
-        self.assertQueryTrue("ancestor(a,d)", [{"X":Atom("a"), "Z":Atom("d")}]) # Great-grandparent
+        self.assertQueryTrue("ancestor(a,b)", [{}]) # Direct parent
+        self.assertQueryTrue("ancestor(a,c)", [{}]) # Grandparent
+        self.assertQueryTrue("ancestor(a,d)", [{}]) # Great-grandparent
         self.assertQueryFalse("ancestor(c,a)")
 
 

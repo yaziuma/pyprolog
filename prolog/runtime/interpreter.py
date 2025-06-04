@@ -370,9 +370,9 @@ class Runtime:
             raise pe # Re-throw PrologError so tests can catch it
 
         except Exception as e: # Catch other, unexpected exceptions
-            logger.error(f"Unexpected query execution error: {e}", exc_info=True)
-            # For unexpected errors, maintain returning empty solutions.
-            return solutions
+            logger.error(f"Unexpected query execution error during query '{query_string}': {e}", exc_info=True)
+            # Re-raise the exception to make it visible in test output
+            raise e
 
     def _extract_variables_names(self, term) -> List[str]:
         variables = set(); queue = [term]

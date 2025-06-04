@@ -164,15 +164,6 @@ class OperatorRegistry:
             OperatorInfo( # 単一化演算子
                 "=", 700, Associativity.NON, OperatorType.LOGICAL, 2, None, "UNIFY" # 指示書では EQUAL
             ), 
-            OperatorInfo( # Not unifiable
-                "\\=",
-                700,
-                Associativity.NON,
-                OperatorType.LOGICAL, # 指示書では UNIFICATION
-                2,
-                None, 
-                "NOT_UNIFY", # 指示書では NOT_UNIFIABLE
-            ),
             OperatorInfo(
                 "==", 700, Associativity.NON, OperatorType.LOGICAL, 2, None, "IDENTICAL"
             ),
@@ -211,14 +202,14 @@ class OperatorRegistry:
             OperatorInfo( # NOT
                 "\+", 900, Associativity.NON, OperatorType.LOGICAL, 1, None, "NOT"
             ),
-            OperatorInfo( # Not unifiable (already exists, ensure it's correct)
-                "\\=", # This was NOT_UNIFY, ensure it's NON_UNIFIABLE_OPERATOR or similar if changed
+            OperatorInfo(
+                "\\=",
                 700,
-                Associativity.NON, # xfx
+                Associativity.NON,
                 OperatorType.LOGICAL,
                 2,
                 None,
-                "NON_UNIFIABLE_OPERATOR", # New specific token type name
+                "NON_UNIFIABLE_OPERATOR",
             ),
             # Univ演算子
             OperatorInfo(
