@@ -7,19 +7,19 @@ PyProlog の対話型システムは、ユーザーがリアルタイムで Prol
 ### 基本的な起動
 
 ```bash
-python interactive_prolog.py
+uv run interactive_prolog.py
 ```
 
 ### デモモードで起動
 
 ```bash
-python interactive_prolog.py --demo
+uv run interactive_prolog.py --demo
 ```
 
 ### Prolog ファイルを読み込んで起動
 
 ```bash
-python interactive_prolog.py -f sample_usage/family.pl
+uv run interactive_prolog.py -f sample_usage/family.pl
 ```
 
 ## 📋 主な機能
