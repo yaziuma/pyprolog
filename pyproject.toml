@@ -1,15 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "pyprolog"
 version = "0.1.0"
-description = "Add your description here"
+description = "Prolog Interpreter in Python"
 readme = "README.md"
 requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "yaziuma"}
+]
+keywords = ["prolog", "interpreter", "python", "logic", "programming"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Prolog",
+    "Topic :: Software Development :: Interpreters",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+]
 dependencies = [
     "colorama>=0.4.6",
     "prompt-toolkit>=3.0.51",
 ]
 
-[dependency-groups]
+[project.urls]
+Homepage = "https://github.com/yaziuma/pyprolog"
+Repository = "https://github.com/yaziuma/pyprolog"
+"Bug Tracker" = "https://github.com/yaziuma/pyprolog/issues"
+
+[project.scripts]
+pyprolog = "prolog.cli.prolog:main"
+
+[project.optional-dependencies]
 dev = [
     "flake8>=7.2.0",
     "pytest>=8.3.5",
@@ -19,3 +47,9 @@ dev = [
     "wheel>=0.45.1",
     "ruff>=0.11.9",
 ]
+
+[tool.setuptools.packages.find]
+include = ["prolog*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "*.txt", "*.toml"]
