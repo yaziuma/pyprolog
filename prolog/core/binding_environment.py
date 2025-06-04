@@ -33,6 +33,10 @@ class BindingEnvironment:
             return self.parent.get_value(var_name)
         return None
 
+    def is_unbound(self, var_name: str) -> bool:
+        """Checks if a variable is unbound in the current environment and its parents."""
+        return self.get_value(var_name) is None
+
     def copy(self) -> "BindingEnvironment":
         """環境のシャローコピーを作成する"""
         # 親環境は共有し、現在のレベルの束縛のみをコピーする
