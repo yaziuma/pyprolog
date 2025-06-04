@@ -155,7 +155,7 @@ class Runtime:
         def evaluator(args: List, env: BindingEnvironment) -> Iterator[BindingEnvironment]:
             if op_info.symbol == "!":
                 if args: raise PrologError("Cut !/0 takes no arguments")
-                logger.critical(f"CUTTING! Environment: {env.bindings}")
+                logger.debug(f"CUTTING! Environment: {env.bindings}")
                 yield env
                 raise CutException()
             elif op_info.symbol == "->":
@@ -213,10 +213,10 @@ class Runtime:
         elif isinstance(goal, Term):
             processed_goal = goal
         elif isinstance(goal, Atom):
-             logger.critical(f"EXECUTE Atom: Attempting Normal Predicate solve_goal for Atom: {goal}")
+             logger.debug(f"EXECUTE Atom: Attempting Normal Predicate solve_goal for Atom: {goal}")
              try:
                  for item in self.logic_interpreter.solve_goal(goal, env):
-                     logger.critical(f"EXECUTE Atom (solve_goal): Yielding: {item.bindings if item else 'None'}")
+                     logger.debug(f"EXECUTE Atom (solve_goal): Yielding: {item.bindings if item else 'None'}")
                      yield item
              except CutException:
                  logger.debug(f"CutException propagated from solve_goal for Atom: {goal}. Re-raising.")
@@ -310,16 +310,16 @@ class Runtime:
             for item in get_char_pred.execute(self, env):
                 yield item
         else:
-            logger.critical(f"EXECUTE Term: Attempting Normal Predicate solve_goal for: {processed_goal}")
+            logger.debug(f"EXECUTE Term: Attempting Normal Predicate solve_goal for: {processed_goal}")
             try:
                 for item in self.logic_interpreter.solve_goal(processed_goal, env):
-                    logger.critical(f"EXECUTE Term (solve_goal): Yielding: {item.bindings if item else 'None'}")
+                    logger.debug(f"EXECUTE Term (solve_goal): Yielding: {item.bindings if item else 'None'}")
                     yield item
             except CutException:
                 logger.debug(f"CutException propagated from solve_goal for Term: {processed_goal}. Re-raising."); raise
 
     def query(self, query_string: str) -> List[Dict[Variable, Any]]:
-        logger.critical(f"QUERY: Executing query: {query_string}")
+        logger.debug(f"QUERY: Executing query: {query_string}")
         solutions = []
         try:
             tokens = Scanner(query_string).scan_tokens()
@@ -348,9 +348,9 @@ class Runtime:
             query_vars_names = self._extract_variables_names(term_for_vars_extraction)
 
             try:
-                logger.critical(f"QUERY: Starting execute loop for goal: {query_goal}")
+                logger.debug(f"QUERY: Starting execute loop for goal: {query_goal}")
                 for i, env_solution in enumerate(self.execute(query_goal, initial_env)):
-                    logger.critical(f"QUERY: Received solution #{i} from execute: {env_solution.bindings if env_solution else 'None'}")
+                    logger.debug(f"QUERY: Received solution #{i} from execute: {env_solution.bindings if env_solution else 'None'}")
                     if env_solution is None: continue
                     result = {}
                     for var_name_str in query_vars_names:
@@ -362,7 +362,7 @@ class Runtime:
             except CutException:
                 logger.info(f"Cut execution stopped further solutions at query level. Returning {len(solutions)} solution(s).")
 
-            logger.critical(f"QUERY: Completed with {len(solutions)} solutions")
+            logger.debug(f"QUERY: Completed with {len(solutions)} solutions")
             return solutions
 
         except PrologError as pe: # Catch PrologError specifically
