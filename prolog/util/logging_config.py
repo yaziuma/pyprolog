@@ -22,10 +22,12 @@ def get_config_file_path(environment: str) -> Path:
     Raises:
         FileNotFoundError: 設定ファイルが見つからない場合
     """
-    # プロジェクトルートから設定ファイルを探す
+    # prolog/util/logging_config.py から見て、
+    # prolog/config/logging/<env>.conf を参照する
     current_file = Path(__file__)
-    project_root = current_file.parent.parent.parent
-    config_file = project_root / "config" / "logging" / f"{environment}.conf"
+    # prolog/util/ -> prolog/ -> prolog/config/logging/
+    config_dir = current_file.parent.parent / "config" / "logging"
+    config_file = config_dir / f"{environment}.conf"
     
     if not config_file.exists():
         raise FileNotFoundError(f"ログ設定ファイルが見つかりません: {config_file}")
