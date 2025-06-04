@@ -9,7 +9,8 @@ from prolog.parser.parser import Parser
 from prolog.parser.scanner import Scanner
 from prolog.core.types import Variable, Rule
 from prolog.core.errors import InterpreterError, ScannerError
-from prolog.parser.types import Dot, Bar`nfrom prolog.core.types import FALSE_TERM as FALSE, CUT_SIGNAL as CUT
+from prolog.parser.types import Dot, Bar
+from prolog.parser.types import FALSE, TRUE
 
 
 init(autoreset=True)
