@@ -6,7 +6,16 @@
 
 import os
 import sys
+import io
 from pathlib import Path
+
+# UTF-8出力の設定（Windows対応）
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer, 
+        encoding='utf-8', 
+        errors='replace'
+    )
 
 # プロジェクトルートをパスに追加
 project_root = Path(__file__).parent.parent

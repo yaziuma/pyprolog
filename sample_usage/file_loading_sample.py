@@ -6,7 +6,18 @@ Prologファイルの読み込み、複数ファイルの統合、エラーハ�
 
 from prolog import Runtime
 from prolog.core.errors import PrologError
+from utility import safe_get_variable
 import os
+import sys
+import io
+
+# UTF-8出力の設定（Windows対応）
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer, 
+        encoding='utf-8', 
+        errors='replace'
+    )
 
 def demonstrate_single_file_loading():
     """単一ファイルの読み込み"""
@@ -93,11 +104,7 @@ def demonstrate_multiple_file_loading():
             # 数学計算のクエリ
             results = runtime.query("factorial(5, F)")
             if results:
-                f_var = None
-                for var_name, value in results[0].items():
-                    if str(var_name) == 'F' or (hasattr(var_name, 'name') and var_name.name == 'F'):
-                        f_var = value
-                        break
+                f_var = safe_get_variable(results[0], 'F')
                 print(f"  5の階乗: {f_var}")
             else:
                 print("  5の階乗: 計算失敗")
@@ -219,11 +226,7 @@ def demonstrate_incremental_loading():
         runtime.consult("sample_usage/math_rules.pl")
         results = runtime.query("factorial(4, F)")
         if results:
-            f_var = None
-            for var_name, value in results[0].items():
-                if str(var_name) == 'F' or (hasattr(var_name, 'name') and var_name.name == 'F'):
-                    f_var = value
-                    break
+            f_var = safe_get_variable(results[0], 'F')
             print(f"  4の階乗計算: {f_var}")
         else:
             print("  4の階乗計算: 失敗")

@@ -6,6 +6,17 @@ PyProlog計算処理サンプル
 
 from prolog import Runtime
 from prolog.core.errors import PrologError
+from utility import safe_get_variable
+import sys
+import io
+
+# UTF-8出力の設定（Windows対応）
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer, 
+        encoding='utf-8', 
+        errors='replace'
+    )
 
 def basic_arithmetic():
     """基本的な算術演算の例"""
@@ -28,13 +39,7 @@ def basic_arithmetic():
         try:
             results = runtime.query(query)
             if results:
-                # 文字列形式の変数名で辞書にアクセス
-                x_var = None
-                for var_name, value in results[0].items():
-                    if str(var_name) == 'X' or (hasattr(var_name, 'name') and var_name.name == 'X'):
-                        x_var = value
-                        break
-                
+                x_var = safe_get_variable(results[0], 'X')
                 print(f"{description}: {query} -> X = {x_var}")
             else:
                 print(f"{description}: {query} -> 解なし")
@@ -88,11 +93,7 @@ def complex_arithmetic():
         try:
             results = runtime.query(query)
             if results:
-                x_var = None
-                for var_name, value in results[0].items():
-                    if str(var_name) == 'X' or (hasattr(var_name, 'name') and var_name.name == 'X'):
-                        x_var = value
-                        break
+                x_var = safe_get_variable(results[0], 'X')
                 print(f"{description}: {query} -> X = {x_var}")
             else:
                 print(f"{description}: {query} -> 解なし")
@@ -123,11 +124,7 @@ def mathematical_rules():
         try:
             results = runtime.query(f"fibonacci({i}, F)")
             if results:
-                f_var = None
-                for var_name, value in results[0].items():
-                    if str(var_name) == 'F' or (hasattr(var_name, 'name') and var_name.name == 'F'):
-                        f_var = value
-                        break
+                f_var = safe_get_variable(results[0], 'F')
                 print(f"  fibonacci({i}) = {f_var}")
         except Exception as e:
             print(f"  fibonacci({i}) = エラー: {e}")
@@ -138,11 +135,7 @@ def mathematical_rules():
         try:
             results = runtime.query(f"factorial({i}, F)")
             if results:
-                f_var = None
-                for var_name, value in results[0].items():
-                    if str(var_name) == 'F' or (hasattr(var_name, 'name') and var_name.name == 'F'):
-                        f_var = value
-                        break
+                f_var = safe_get_variable(results[0], 'F')
                 print(f"  {i}! = {f_var}")
         except Exception as e:
             print(f"  {i}! = エラー: {e}")
@@ -154,11 +147,7 @@ def mathematical_rules():
         try:
             results = runtime.query(f"gcd({x}, {y}, G)")
             if results:
-                g_var = None
-                for var_name, value in results[0].items():
-                    if str(var_name) == 'G' or (hasattr(var_name, 'name') and var_name.name == 'G'):
-                        g_var = value
-                        break
+                g_var = safe_get_variable(results[0], 'G')
                 print(f"  gcd({x}, {y}) = {g_var}")
         except Exception as e:
             print(f"  gcd({x}, {y}) = エラー: {e}")
@@ -177,15 +166,9 @@ def variable_arithmetic():
         results = runtime.query("X = 10, Y = 5, Z is X + Y")
         if results:
             result = results[0]
-            x_var = y_var = z_var = None
-            for var_name, value in result.items():
-                var_str = str(var_name)
-                if var_str == 'X' or (hasattr(var_name, 'name') and var_name.name == 'X'):
-                    x_var = value
-                elif var_str == 'Y' or (hasattr(var_name, 'name') and var_name.name == 'Y'):
-                    y_var = value
-                elif var_str == 'Z' or (hasattr(var_name, 'name') and var_name.name == 'Z'):
-                    z_var = value
+            x_var = safe_get_variable(result, 'X')
+            y_var = safe_get_variable(result, 'Y')
+            z_var = safe_get_variable(result, 'Z')
             
             print(f"  X = {x_var}, Y = {y_var}, Z = X + Y = {z_var}")
     except Exception as e:
@@ -197,15 +180,9 @@ def variable_arithmetic():
         results = runtime.query("X = 15, Y = 7, X > Y, Z is X - Y")
         if results:
             result = results[0]
-            x_var = y_var = z_var = None
-            for var_name, value in result.items():
-                var_str = str(var_name)
-                if var_str == 'X' or (hasattr(var_name, 'name') and var_name.name == 'X'):
-                    x_var = value
-                elif var_str == 'Y' or (hasattr(var_name, 'name') and var_name.name == 'Y'):
-                    y_var = value
-                elif var_str == 'Z' or (hasattr(var_name, 'name') and var_name.name == 'Z'):
-                    z_var = value
+            x_var = safe_get_variable(result, 'X')
+            y_var = safe_get_variable(result, 'Y')
+            z_var = safe_get_variable(result, 'Z')
             
             print(f"  X = {x_var}, Y = {y_var}, X > Y なので Z = X - Y = {z_var}")
     except Exception as e:
@@ -230,11 +207,7 @@ def temperature_conversion():
         try:
             results = runtime.query(f"celsius_to_fahrenheit({c}, F)")
             if results:
-                f_var = None
-                for var_name, value in results[0].items():
-                    if str(var_name) == 'F' or (hasattr(var_name, 'name') and var_name.name == 'F'):
-                        f_var = value
-                        break
+                f_var = safe_get_variable(results[0], 'F')
                 print(f"  {c}°C = {f_var}°F")
         except Exception as e:
             print(f"  {c}°C = エラー: {e}")
@@ -246,11 +219,7 @@ def temperature_conversion():
         try:
             results = runtime.query(f"fahrenheit_to_celsius({f}, C)")
             if results:
-                c_var = None
-                for var_name, value in results[0].items():
-                    if str(var_name) == 'C' or (hasattr(var_name, 'name') and var_name.name == 'C'):
-                        c_var = value
-                        break
+                c_var = safe_get_variable(results[0], 'C')
                 print(f"  {f}°F = {c_var}°C")
         except Exception as e:
             print(f"  {f}°F = エラー: {e}")

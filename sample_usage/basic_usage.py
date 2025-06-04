@@ -6,6 +6,17 @@ PyProlog基本使用例
 
 from prolog import Runtime
 from prolog.core.errors import PrologError
+from utility import safe_get_variable
+import sys
+import io
+
+# UTF-8出力の設定（Windows対応）
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer, 
+        encoding='utf-8', 
+        errors='replace'
+    )
 
 def basic_facts_and_queries():
     """基本的なファクトとクエリの例"""
@@ -42,7 +53,8 @@ def basic_facts_and_queries():
     results = runtime.query("likes(mary, X)")
     print(f"結果: {len(results)} 件の解")
     for i, result in enumerate(results, 1):
-        print(f"  {i}. X = {result.get('X', 'unknown')}")
+        x_var = safe_get_variable(result, 'X')
+        print(f"  {i}. X = {x_var}")
     print()
     
     # ルールを使ったクエリ
@@ -50,7 +62,8 @@ def basic_facts_and_queries():
     results = runtime.query("happy(X)")
     print(f"結果: {len(results)} 件の解")
     for i, result in enumerate(results, 1):
-        print(f"  {i}. X = {result.get('X', 'unknown')}")
+        x_var = safe_get_variable(result, 'X')
+        print(f"  {i}. X = {x_var}")
     print()
 
 def variable_unification_example():
@@ -75,9 +88,9 @@ def variable_unification_example():
     results = runtime.query("person(Name, Age, Job)")
     print(f"結果: {len(results)} 件の解")
     for i, result in enumerate(results, 1):
-        name = result.get('Name', 'unknown')
-        age = result.get('Age', 'unknown')
-        job = result.get('Job', 'unknown')
+        name = safe_get_variable(result, 'Name')
+        age = safe_get_variable(result, 'Age')
+        job = safe_get_variable(result, 'Job')
         print(f"  {i}. Name={name}, Age={age}, Job={job}")
     print()
     
@@ -86,9 +99,9 @@ def variable_unification_example():
     results = runtime.query("person(Name, Age, Job), Age > 30")
     print(f"結果: {len(results)} 件の解")
     for i, result in enumerate(results, 1):
-        name = result.get('Name', 'unknown')
-        age = result.get('Age', 'unknown')
-        job = result.get('Job', 'unknown')
+        name = safe_get_variable(result, 'Name')
+        age = safe_get_variable(result, 'Age')
+        job = safe_get_variable(result, 'Job')
         print(f"  {i}. Name={name}, Age={age}, Job={job}")
     print()
 
@@ -103,7 +116,8 @@ def list_operations_example():
     results = runtime.query("member(X, [1, 2, 3, 4, 5])")
     print(f"結果: {len(results)} 件の解")
     for i, result in enumerate(results, 1):
-        print(f"  {i}. X = {result.get('X', 'unknown')}")
+        x_var = safe_get_variable(result, 'X')
+        print(f"  {i}. X = {x_var}")
     print()
     
     # appendを使った例
@@ -111,7 +125,8 @@ def list_operations_example():
     results = runtime.query("append([1, 2], [3, 4], L)")
     print(f"結果: {len(results)} 件の解")
     for i, result in enumerate(results, 1):
-        print(f"  {i}. L = {result.get('L', 'unknown')}")
+        l_var = safe_get_variable(result, 'L')
+        print(f"  {i}. L = {l_var}")
     print()
     
     # appendを使ったリスト分割
@@ -119,9 +134,9 @@ def list_operations_example():
     results = runtime.query("append(X, Y, [a, b, c, d])")
     print(f"結果: {len(results)} 件の解")
     for i, result in enumerate(results, 1):
-        x = result.get('X', 'unknown')
-        y = result.get('Y', 'unknown')
-        print(f"  {i}. X={x}, Y={y}")
+        x_var = safe_get_variable(result, 'X')
+        y_var = safe_get_variable(result, 'Y')
+        print(f"  {i}. X={x_var}, Y={y_var}")
     print()
 
 def error_handling_example():

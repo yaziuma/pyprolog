@@ -7,20 +7,24 @@ PyProlog統合デモ
 from prolog import Runtime
 from prolog.core.errors import PrologError
 from prolog.runtime.io_streams import StringStream
+from utility import safe_get_variable
 import os
+import sys
+import io
+
+# UTF-8出力の設定（Windows対応）
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer, 
+        encoding='utf-8', 
+        errors='replace'
+    )
 
 def print_section(title):
     """セクションタイトルを表示"""
     print(f"\n{'='*60}")
     print(f" {title}")
     print(f"{'='*60}")
-
-def safe_get_variable(result_dict, var_name):
-    """結果辞書から変数値を安全に取得"""
-    for key, value in result_dict.items():
-        if str(key) == var_name or (hasattr(key, 'name') and key.name == var_name):
-            return value
-    return 'unknown'
 
 def load_prolog_files(runtime):
     """Prologファイルの読み込み"""
