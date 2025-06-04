@@ -75,42 +75,42 @@ class LogicInterpreter:
     def unify(
         self, term1: PrologType, term2: PrologType, env: BindingEnvironment
     ) -> Tuple[bool, BindingEnvironment]:
-        logger.critical(f"LOGIC_INTERP_UNIFY: Unifying term1: {term1} (type {type(term1)}) with term2: {term2} (type {type(term2)}) in env: {env.bindings}")
+        logger.debug(f"LOGIC_INTERP_UNIFY: Unifying term1: {term1} (type {type(term1)}) with term2: {term2} (type {type(term2)}) in env: {env.bindings}")
         current_env = env.copy()
         t1 = self.dereference(term1, current_env)
         t2 = self.dereference(term2, current_env)
         logger.debug(f"LOGIC_INTERP_UNIFY: Dereferenced t1: {t1} (type {type(t1)}), t2: {t2} (type {type(t2)})")
 
         if t1 == t2:
-            logger.critical(f"LOGIC_INTERP_UNIFY: t1 == t2 ({t1}), returning True, env: {current_env.bindings}")
+            logger.debug(f"LOGIC_INTERP_UNIFY: t1 == t2 ({t1}), returning True, env: {current_env.bindings}")
             return True, current_env
 
         if isinstance(t1, Variable):
             if self._occurs_check(t1, t2, current_env):
-                logger.critical(f"LOGIC_INTERP_UNIFY: Occurs check failed for var {t1} in term {t2}, returning False")
+                logger.debug(f"LOGIC_INTERP_UNIFY: Occurs check failed for var {t1} in term {t2}, returning False")
                 return False, env
             current_env.bind(t1.name, t2)
-            logger.critical(f"LOGIC_INTERP_UNIFY: Bound var {t1.name} to {t2}, returning True, env: {current_env.bindings}")
+            logger.debug(f"LOGIC_INTERP_UNIFY: Bound var {t1.name} to {t2}, returning True, env: {current_env.bindings}")
             return True, current_env
         if isinstance(t2, Variable):
             if self._occurs_check(t2, t1, current_env):
-                logger.critical(f"LOGIC_INTERP_UNIFY: Occurs check failed for var {t2} in term {t1}, returning False")
+                logger.debug(f"LOGIC_INTERP_UNIFY: Occurs check failed for var {t2} in term {t1}, returning False")
                 return False, env
             current_env.bind(t2.name, t1)
-            logger.critical(f"LOGIC_INTERP_UNIFY: Bound var {t2.name} to {t1}, returning True, env: {current_env.bindings}")
+            logger.debug(f"LOGIC_INTERP_UNIFY: Bound var {t2.name} to {t1}, returning True, env: {current_env.bindings}")
             return True, current_env
 
         if isinstance(t1, Atom) and isinstance(t2, Atom):
             success = t1.name == t2.name
-            logger.critical(f"LOGIC_INTERP_UNIFY: Atom vs Atom ({t1.name} vs {t2.name}), success: {success}, returning env: {current_env.bindings}")
+            logger.debug(f"LOGIC_INTERP_UNIFY: Atom vs Atom ({t1.name} vs {t2.name}), success: {success}, returning env: {current_env.bindings}")
             return success, current_env
         if isinstance(t1, Number) and isinstance(t2, Number):
             success = t1.value == t2.value
-            logger.critical(f"LOGIC_INTERP_UNIFY: Number vs Number ({t1.value} vs {t2.value}), success: {success}, returning env: {current_env.bindings}")
+            logger.debug(f"LOGIC_INTERP_UNIFY: Number vs Number ({t1.value} vs {t2.value}), success: {success}, returning env: {current_env.bindings}")
             return success, current_env
         if isinstance(t1, String) and isinstance(t2, String):
             success = t1.value == t2.value
-            logger.critical(f"LOGIC_INTERP_UNIFY: String vs String ('{t1.value}' vs '{t2.value}'), success: {success}, returning env: {current_env.bindings}")
+            logger.debug(f"LOGIC_INTERP_UNIFY: String vs String ('{t1.value}' vs '{t2.value}'), success: {success}, returning env: {current_env.bindings}")
             return success, current_env
 
         if isinstance(t1, Term) and isinstance(t2, Term):
@@ -129,16 +129,16 @@ class LogicInterpreter:
                     temp_env = temp_env_after_arg_unify
 
                 if all_args_unified:
-                    logger.critical(f"LOGIC_INTERP_UNIFY: All args unified for {t1.functor}/{len(t1.args)}, returning True, env: {temp_env.bindings}")
+                    logger.debug(f"LOGIC_INTERP_UNIFY: All args unified for {t1.functor}/{len(t1.args)}, returning True, env: {temp_env.bindings}")
                     return True, temp_env
                 else:
-                    logger.critical(f"LOGIC_INTERP_UNIFY: Arg unification failed for {t1.functor}/{len(t1.args)}, returning False, original env: {env.bindings}")
+                    logger.debug(f"LOGIC_INTERP_UNIFY: Arg unification failed for {t1.functor}/{len(t1.args)}, returning False, original env: {env.bindings}")
                     return False, env
             else:
-                logger.critical(f"LOGIC_INTERP_UNIFY: Term functor/arity mismatch ({t1.functor}/{len(t1.args)} vs {t2.functor}/{len(t2.args)}), returning False")
+                logger.debug(f"LOGIC_INTERP_UNIFY: Term functor/arity mismatch ({t1.functor}/{len(t1.args)} vs {t2.functor}/{len(t2.args)}), returning False")
                 return False, env
 
-        logger.critical(f"LOGIC_INTERP_UNIFY: Unification failed by falling through (t1 type: {type(t1)}, t2 type: {type(t2)}), returning False")
+        logger.debug(f"LOGIC_INTERP_UNIFY: Unification failed by falling through (t1 type: {type(t1)}, t2 type: {type(t2)}), returning False")
         return False, env
 
     def _occurs_check(
@@ -192,25 +192,25 @@ class LogicInterpreter:
     def solve_goal(
         self, goal: PrologType, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
-        logger.critical(f"LOGIC_INTERP: solve_goal called with goal: {goal}, rules in DB: {[str(r) for r in self.rules]}")
+        logger.debug(f"LOGIC_INTERP: solve_goal called with goal: {goal}, rules in DB: {[str(r) for r in self.rules]}")
         actual_goal: Term
         if isinstance(goal, Atom):
             actual_goal = Term(goal, [])
-            logger.critical(f"LOGIC_INTERP: Goal {goal} (Atom) converted to Term: {actual_goal} for solving.")
+            logger.debug(f"LOGIC_INTERP: Goal {goal} (Atom) converted to Term: {actual_goal} for solving.")
         elif isinstance(goal, Term):
             actual_goal = goal
         else:
             logger.debug(f"Goal {goal} (type {type(goal)}) is not callable, failing.")
             return
 
-        logger.critical(f"LOGIC_INTERP: Attempting to solve actual_goal: {actual_goal} with env: {env.bindings}")
+        logger.debug(f"LOGIC_INTERP: Attempting to solve actual_goal: {actual_goal} with env: {env.bindings}")
 
         if actual_goal.functor.name == "true" and not actual_goal.args:
-            logger.critical(f"Goal {actual_goal} is true, yielding current env.")
+            logger.debug(f"Goal {actual_goal} is true, yielding current env.")
             yield env
             return
         elif actual_goal.functor.name == "fail" and not actual_goal.args:
-            logger.critical(f"Goal {actual_goal} is fail, returning.")
+            logger.debug(f"Goal {actual_goal} is fail, returning.")
             return
 
         # カットの特別扱いは Runtime.execute で行うので、ここでは不要
@@ -253,17 +253,17 @@ class LogicInterpreter:
 
             if unified:
                 if is_rule_from_fact_structure:
-                    logger.critical(f"LOGIC_INTERP (PATCH USED): Unified {actual_goal} with {effective_head} (from Fact). Solving body: {rule_body_from_fact_structure}")
+                    logger.debug(f"LOGIC_INTERP (PATCH USED): Unified {actual_goal} with {effective_head} (from Fact). Solving body: {rule_body_from_fact_structure}")
                     try:
                         yield from self.runtime.execute(rule_body_from_fact_structure, new_env_after_unify)
                     except CutException:
                         logger.debug(f"CutException propagated from patched rule body: {rule_body_from_fact_structure}. Re-raising.")
                         raise
                 elif isinstance(renamed_entry, Fact): # Genuine Fact
-                    logger.critical(f"LOGIC_INTERP: Unified Fact {actual_goal} with {effective_head}. Yielding env: {new_env_after_unify.bindings}")
+                    logger.debug(f"LOGIC_INTERP: Unified Fact {actual_goal} with {effective_head}. Yielding env: {new_env_after_unify.bindings}")
                     yield new_env_after_unify
                 elif isinstance(renamed_entry, Rule): # Properly parsed Rule
-                    logger.critical(f"LOGIC_INTERP: Unified Rule Head {actual_goal} with {effective_head}. Solving body: {renamed_entry.body} with env: {new_env_after_unify.bindings}")
+                    logger.debug(f"LOGIC_INTERP: Unified Rule Head {actual_goal} with {effective_head}. Solving body: {renamed_entry.body} with env: {new_env_after_unify.bindings}")
                     try:
                         yield from self.runtime.execute(renamed_entry.body, new_env_after_unify)
                     except CutException:

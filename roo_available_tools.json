@@ -28,6 +28,11 @@
       "parameters": {}
     },
     {
+      "name": "codebase_search",
+      "description": "Description for codebase_search - to be filled manually or by a more advanced parser.",
+      "parameters": {}
+    },
+    {
       "name": "execute_command",
       "description": "Description for execute_command - to be filled manually or by a more advanced parser.",
       "parameters": {}

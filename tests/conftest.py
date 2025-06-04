@@ -9,6 +9,7 @@ import tempfile
 import os
 from pathlib import Path
 from prolog.core.binding_environment import BindingEnvironment
+from prolog.util.logger import switch_to_test_mode, get_logger
 
 
 # 基本的なフィクスチャ（pytest不使用版）
@@ -55,6 +56,11 @@ class TestFixtures:
         """)
         temp_file.close()
         return temp_file.name
+    
+    @staticmethod
+    def test_logger():
+        """テスト用ロガーフィクスチャ"""
+        return get_logger("test")
 
 
 # カスタムアサーション関数
@@ -310,6 +316,9 @@ def should_skip_test(func):
 # セッションレベルの設定
 def setup_test_session():
     """テストセッションの初期化"""
+    # テスト用ログ設定に切り替え
+    switch_to_test_mode()
+    
     # テストデータディレクトリを作成
     test_data_dir = Path(__file__).parent / "test_data"
     test_data_dir.mkdir(exist_ok=True)
