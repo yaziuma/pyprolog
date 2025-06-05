@@ -5,7 +5,7 @@ from typing import Dict, Optional, Union, TYPE_CHECKING
 # from typing import TYPE_CHECKING # この行は Union を追加した行と重複するため削除
 
 if TYPE_CHECKING:
-    from prolog.core.types import PrologType, Variable
+    from pyprolog.core.types import PrologType, Variable
 
 class BindingEnvironment:
     def __init__(self, parent: Optional["BindingEnvironment"] = None):
@@ -159,4 +159,4 @@ class BindingEnvironment:
 
 # __repr__ で Variable を使うため、ここでインポート (TYPE_CHECKING の外)
 # unify, to_dict でも Variable を使うため、この位置で正しい
-from prolog.core.types import Variable
+from pyprolog.core.types import Variable

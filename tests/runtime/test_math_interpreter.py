@@ -5,10 +5,10 @@ Prologインタープリターの数学的評価エンジンの
 動作を検証するテストスイート。
 """
 
-from prolog.runtime.math_interpreter import MathInterpreter
-from prolog.core.binding_environment import BindingEnvironment
-from prolog.core.types import Term, Variable, Number, Atom
-from prolog.core.errors import PrologError
+from pyprolog.runtime.math_interpreter import MathInterpreter
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.types import Term, Variable, Number, Atom
+from pyprolog.core.errors import PrologError
 
 
 class TestMathInterpreter:

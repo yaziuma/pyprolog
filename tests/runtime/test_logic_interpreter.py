@@ -8,9 +8,9 @@ Prologインタープリターの論理的推論エンジンの
 """
 
 import unittest
-from prolog.core.binding_environment import BindingEnvironment
-from prolog.core.types import Term, Variable, Atom, Number, Rule, Fact
-from prolog.core.errors import PrologError
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact
+from pyprolog.core.errors import PrologError
 
 
 class TestLogicInterpreter:
@@ -23,7 +23,7 @@ class TestLogicInterpreter:
         
         # LogicInterpreter の実際の初期化
         try:
-            from prolog.runtime.logic_interpreter import LogicInterpreter
+            from pyprolog.runtime.logic_interpreter import LogicInterpreter
             # MockRuntimeを作成してLogicInterpreterを初期化
             mock_runtime = MockRuntime() # MockRuntime is defined in the same file
             self.logic_interpreter = LogicInterpreter(self.rules, mock_runtime)
@@ -541,7 +541,7 @@ class MockRuntime:
     
     def execute(self, goal, env):
         """ゴール実行のモック実装"""
-        from prolog.core.types import Atom, Term
+        from pyprolog.core.types import Atom, Term
         
         # 簡単なモック実装
         if isinstance(goal, Atom):

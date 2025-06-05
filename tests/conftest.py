@@ -8,8 +8,8 @@ Prologインタープリター全体のテストで共有される
 import tempfile
 import os
 from pathlib import Path
-from prolog.core.binding_environment import BindingEnvironment
-from prolog.util.logger import switch_to_test_mode, get_logger
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.util.logger import switch_to_test_mode, get_logger
 
 
 # 基本的なフィクスチャ（pytest不使用版）

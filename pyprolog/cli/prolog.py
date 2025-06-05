@@ -2,10 +2,10 @@
 
 import argparse
 import sys
-from prolog.runtime.interpreter import Runtime
+from pyprolog.runtime.interpreter import Runtime
 from .repl import run_repl
-from prolog.parser.parser import Parser
-from prolog.parser.scanner import Scanner
+from pyprolog.parser.parser import Parser
+from pyprolog.parser.scanner import Scanner
 
 
 def start(input_path):

@@ -1,4 +1,4 @@
-# prolog/runtime/io_manager.py
+# pyprolog/runtime/io_manager.py
 from .io_streams import IOStream, ConsoleStream
 
 class IOManager:

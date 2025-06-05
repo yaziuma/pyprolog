@@ -1,9 +1,9 @@
 # tests/runtime/test_io_predicates.py
 import pytest
-from prolog.runtime.interpreter import Runtime
-from prolog.runtime.io_streams import StringStream
-from prolog.core.types import Atom, Variable, Term, PrologType # Term might be needed for query construction
-from prolog.core.binding_environment import BindingEnvironment # If directly calling execute
+from pyprolog.runtime.interpreter import Runtime
+from pyprolog.runtime.io_streams import StringStream
+from pyprolog.core.types import Atom, Variable, Term, PrologType # Term might be needed for query construction
+from pyprolog.core.binding_environment import BindingEnvironment # If directly calling execute
 
 class TestIOPredicates:
 

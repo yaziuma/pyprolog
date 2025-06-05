@@ -1,8 +1,8 @@
 # tests/runtime/test_io_infrastructure.py
 import pytest
-from prolog.runtime.io_streams import StringStream, ConsoleStream, IOStream
-from prolog.runtime.io_manager import IOManager
-from prolog.runtime.interpreter import Runtime # Assuming Runtime is in interpreter
+from pyprolog.runtime.io_streams import StringStream, ConsoleStream, IOStream
+from pyprolog.runtime.io_manager import IOManager
+from pyprolog.runtime.interpreter import Runtime # Assuming Runtime is in interpreter
 
 # Test StringStream
 def test_string_stream_read():
@@ -114,6 +114,6 @@ def test_runtime_has_io_manager():
 # We are testing that IOManager *uses* ConsoleStream by default.
 
 # Placeholder for PrologType for type hinting if not using string literals
-# This would normally come from e.g. from prolog.core.types import PrologType
+# This would normally come from e.g. from pyprolog.core.types import PrologType
 # For now, the io_streams.py uses 'PrologType' as a string.
 PrologType = None

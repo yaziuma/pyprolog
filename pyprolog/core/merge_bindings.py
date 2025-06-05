@@ -1,6 +1,6 @@
-# prolog/core/merge_bindings.py
-from prolog.core.types import Variable
-from prolog.util.logger import logger
+# pyprolog/core/merge_bindings.py
+from pyprolog.core.types import Variable
+from pyprolog.util.logger import logger
 
 
 def merge_bindings(bindings1, bindings2=None):
@@ -13,7 +13,7 @@ def merge_bindings(bindings1, bindings2=None):
     Returns:
         結合されたバインディング辞書またはBindingEnvironment
     """
-    from prolog.core.binding_environment import BindingEnvironment
+    from pyprolog.core.binding_environment import BindingEnvironment
 
     # bindings1がNoneの場合の処理
     if bindings1 is None:
@@ -40,8 +40,8 @@ def merge_bindings(bindings1, bindings2=None):
             if key in merged:
                 value1 = merged[key]
                 # 具体値を優先するロジック
-                # Variable は prolog.core.types からインポートする必要がある
-                from prolog.core.types import Variable 
+                # Variable は pyprolog.core.types からインポートする必要がある
+                from pyprolog.core.types import Variable
                 if isinstance(value1, Variable) and not isinstance(value2, Variable):
                     merged[key] = value2  # bindings2の具体値を優先
                 elif isinstance(value2, Variable) and not isinstance(value1, Variable):
@@ -77,7 +77,7 @@ def bindings_to_dict(bindings):
     Returns:
         dict: バインディング辞書
     """
-    from prolog.core.binding_environment import BindingEnvironment
+    from pyprolog.core.binding_environment import BindingEnvironment
 
     if bindings is None:
         return {}
@@ -102,7 +102,7 @@ def dict_to_binding_environment(bindings_dict):
     Returns:
         BindingEnvironment: 新しいバインディング環境
     """
-    from prolog.core.binding_environment import BindingEnvironment
+    from pyprolog.core.binding_environment import BindingEnvironment
 
     env = BindingEnvironment()
 
@@ -125,7 +125,7 @@ def unify_with_bindings(term1, term2, bindings=None):
     Returns:
         tuple: (成功したかどうか, 更新されたバインディング)
     """
-    from prolog.core.binding_environment import BindingEnvironment
+    from pyprolog.core.binding_environment import BindingEnvironment
 
     # バインディング環境の準備
     if isinstance(bindings, BindingEnvironment):
@@ -155,7 +155,7 @@ def apply_substitution(term, bindings):
     Returns:
         置換された項
     """
-    from prolog.core.binding_environment import BindingEnvironment
+    from pyprolog.core.binding_environment import BindingEnvironment
 
     if hasattr(term, "substitute"):
         return term.substitute(bindings)

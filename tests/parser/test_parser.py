@@ -5,10 +5,10 @@ Prologインタープリターのパーサー（構文解析器）の
 動作を検証するテストスイート。
 """
 
-from prolog.parser.parser import Parser
-from prolog.parser.scanner import Scanner
-from prolog.parser.token_type import TokenType
-from prolog.core.types import Term, Variable, Atom, Number, String, Rule, Fact
+from pyprolog.parser.parser import Parser
+from pyprolog.parser.scanner import Scanner
+from pyprolog.parser.token_type import TokenType
+from pyprolog.core.types import Term, Variable, Atom, Number, String, Rule, Fact
 
 
 class TestParser:

@@ -1,4 +1,4 @@
-# prolog/parser/token_type.py
+# pyprolog/parser/token_type.py
 from enum import Enum
 from typing import Dict, Any
 import logging
@@ -60,7 +60,7 @@ class TokenTypeManager:
     def ensure_operator_tokens(self):
         """演算子トークンの動的生成を保証"""
         # 遅延インポートで循環参照回避
-        from prolog.core.operators import operator_registry
+        from pyprolog.core.operators import operator_registry
 
         for symbol, op_info in operator_registry._operators.items():
             token_name = op_info.token_type

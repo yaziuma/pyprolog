@@ -1,8 +1,8 @@
-# prolog/runtime/math_interpreter.py
-from prolog.core.types import Term, Variable, Number, Atom, PrologType
-from prolog.core.binding_environment import BindingEnvironment
-from prolog.core.errors import PrologError
-from prolog.core.operators import operator_registry, OperatorType
+# pyprolog/runtime/math_interpreter.py
+from pyprolog.core.types import Term, Variable, Number, Atom, PrologType
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.errors import PrologError
+from pyprolog.core.operators import operator_registry, OperatorType
 from typing import Union, List
 import logging
 

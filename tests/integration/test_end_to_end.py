@@ -8,8 +8,8 @@ End-to-End テスト
 """
 
 import unittest
-from prolog.core.binding_environment import BindingEnvironment
-from prolog.core.types import Term, Variable, Atom, Number, Rule, Fact
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact
 
 
 class TestEndToEnd:
@@ -19,7 +19,7 @@ class TestEndToEnd:
         """各テストの前処理"""
         # Runtimeクラスの実装状況に応じて調整
         try:
-            from prolog.runtime.interpreter import Runtime
+            from pyprolog.runtime.interpreter import Runtime
             self.runtime = Runtime()
         except ImportError:
             self.runtime = None

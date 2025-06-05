@@ -1,13 +1,13 @@
-from prolog.core.types import Term, Variable, Atom, Number, PrologType, ListTerm, Rule, Fact
-from prolog.core.binding_environment import BindingEnvironment
-from prolog.core.errors import PrologError, CutException # Assuming CutException might be relevant for some builtins
+from pyprolog.core.types import Term, Variable, Atom, Number, PrologType, ListTerm, Rule, Fact
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.errors import PrologError, CutException # Assuming CutException might be relevant for some builtins
 from typing import TYPE_CHECKING, Iterator, List, Any
 import logging
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from prolog.runtime.interpreter import Runtime
+    from pyprolog.runtime.interpreter import Runtime
 
 
 class BuiltinPredicate:

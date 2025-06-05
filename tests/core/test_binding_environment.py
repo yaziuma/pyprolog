@@ -5,8 +5,8 @@ Prologインタープリターのバインディング環境（変数の束縛�
 動作を検証するテストスイート。
 """
 
-from prolog.core.binding_environment import BindingEnvironment
-from prolog.core.types import Atom, Variable, Number, String, Term
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.types import Atom, Variable, Number, String, Term
 
 
 class TestBindingEnvironment:

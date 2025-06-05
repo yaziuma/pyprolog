@@ -1,6 +1,6 @@
-# prolog/parser/scanner.py
-from prolog.parser.token import Token
-from prolog.parser.token_type import TokenType, ensure_operator_tokens
+# pyprolog/parser/scanner.py
+from pyprolog.parser.token import Token
+from pyprolog.parser.token_type import TokenType, ensure_operator_tokens
 from typing import List, Dict, Callable
 import logging
 
@@ -52,7 +52,7 @@ class Scanner:
 
     def _build_operator_mapping(self) -> Dict[str, TokenType]:
         """operator_registryから演算子マッピングを構築"""
-        from prolog.core.operators import operator_registry
+        from pyprolog.core.operators import operator_registry
 
         mapping = {}
         for symbol, op_info in operator_registry._operators.items():

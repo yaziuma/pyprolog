@@ -1,4 +1,4 @@
-from prolog.core.types import (
+from pyprolog.core.types import (
     Term,
     Variable,
     Atom,
@@ -9,13 +9,13 @@ from prolog.core.types import (
     ListTerm,
     String,
 )
-from prolog.core.binding_environment import BindingEnvironment
-from prolog.core.errors import PrologError, CutException
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.errors import PrologError, CutException
 from typing import TYPE_CHECKING, Tuple, Iterator, List, Union, Dict
 import logging
 
 if TYPE_CHECKING:
-    from prolog.runtime.interpreter import Runtime
+    from pyprolog.runtime.interpreter import Runtime
 
 logger = logging.getLogger(__name__)
 

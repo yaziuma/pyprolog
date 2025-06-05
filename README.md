@@ -106,13 +106,13 @@ Prolog インタープリタの REPL (Read-Eval-Print Loop) を実行します�
 
 ```bash
 # uv を使ってプロジェクト環境内でスクリプトを実行
-uvx python -m prolog.prolog [options] path
+uvx python -m pyprolog.cli.prolog [options] path
 ```
 
 例えば:
 
 ```bash
-uvx python -m prolog.prolog tests/data/puzzle1.prolog
+uvx python -m pyprolog.cli.prolog tests/data/puzzle1.prolog
 ```
 
 `pyproject.toml` の `[tool.uv.scripts]` セクションにスクリプトを定義することもできます。
@@ -120,7 +120,7 @@ uvx python -m prolog.prolog tests/data/puzzle1.prolog
 
 ```toml
 [tool.uv.scripts]
-prolog-repl = "python -m prolog.prolog"
+prolog-repl = "python -m pyprolog.cli.prolog"
 ```
 
 その場合、以下のように実行できます:
@@ -133,7 +133,7 @@ uvx prolog-repl -- tests/data/puzzle1.prolog
 サンプル REPL セッション出力:
 
 ```bash
-python -m prolog.prolog tests/data/myadven.prolog
+python -m pyprolog.cli.prolog tests/data/myadven.prolog
 
 Welcome to Simple Prolog
 ctrl-c to quit
@@ -169,7 +169,7 @@ uvx ruff check .
 ### 4.3. テストの実行
 
 ```bash
-uvx pytest --cov=prolog tests
+uvx pytest --cov=pyprolog tests
 ```
 
 ## 5\. PyProlog をライブラリとして使用する
@@ -191,7 +191,7 @@ uv add pieprolog
 ### 5.2. ライブラリ使用例
 
 ```python
-from prolog import Scanner, Parser, Runtime
+from pyprolog import Scanner, Parser, Runtime
 
 def main():
     source = '''

@@ -5,7 +5,7 @@ Prologインタープリターの演算子レジストリの
 動作を検証するテストスイート。
 """
 
-from prolog.core.operators import (
+from pyprolog.core.operators import (
     OperatorRegistry, OperatorInfo, OperatorType, Associativity, operator_registry
 )
 

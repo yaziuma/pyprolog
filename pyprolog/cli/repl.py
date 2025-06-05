@@ -5,12 +5,12 @@ from prompt_toolkit import prompt
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from pathlib import Path
-from prolog.parser.parser import Parser
-from prolog.parser.scanner import Scanner
-from prolog.core.types import Variable, Rule
-from prolog.core.errors import InterpreterError, ScannerError
-from prolog.parser.types import Dot, Bar
-from prolog.parser.types import FALSE, TRUE
+from pyprolog.parser.parser import Parser
+from pyprolog.parser.scanner import Scanner
+from pyprolog.core.types import Variable, Rule
+from pyprolog.core.errors import InterpreterError, ScannerError
+from pyprolog.parser.types import Dot, Bar
+from pyprolog.parser.types import FALSE, TRUE
 
 
 init(autoreset=True)

@@ -4,8 +4,8 @@ PyProlog計算処理サンプル
 算術演算、比較演算、複雑な数式の評価例
 """
 
-from prolog import Runtime
-from prolog.core.errors import PrologError
+from pyprolog import Runtime
+from pyprolog.core.errors import PrologError
 from utility import safe_get_variable
 import sys
 import io

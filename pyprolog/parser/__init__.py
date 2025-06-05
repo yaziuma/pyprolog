@@ -1,4 +1,4 @@
-# prolog/parser/__init__.py
+# pyprolog/parser/__init__.py
 from .scanner import Scanner
 from .parser import Parser
 from .token import Token

@@ -1,6 +1,6 @@
 import pytest
-from prolog.runtime.interpreter import Runtime
-from prolog.core.types import Term, Variable, Atom, Number, Rule, Fact
+from pyprolog.runtime.interpreter import Runtime
+from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact
 
 class TestListOperations:
 

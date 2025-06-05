@@ -7,9 +7,9 @@ Runtime Interpreter テスト
 """
 
 import unittest
-from prolog.core.binding_environment import BindingEnvironment
-from prolog.core.types import Term, Variable, Atom, Number, Rule, Fact
-from prolog.core.errors import PrologError
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact
+from pyprolog.core.errors import PrologError
 # pytest will be used in test_circular_reference_detection in test_logic_interpreter,
 # but not directly needed here yet. If test_type_checking needs it for some reason,
 # it would be added. For now, it's not.
@@ -22,7 +22,7 @@ class TestRuntime:
         """各テストの前処理"""
         # Runtimeクラスの実装状況に応じて調整
         try:
-            from prolog.runtime.interpreter import Runtime
+            from pyprolog.runtime.interpreter import Runtime
             self.runtime = Runtime()
             # Ensure a clean state for rules before each test
             if self.runtime:

@@ -5,9 +5,9 @@ Prologインタープリターのスキャナー（字句解析器）の
 動作を検証するテストスイート。
 """
 
-from prolog.parser.scanner import Scanner
-from prolog.parser.token_type import TokenType
-from prolog.parser.token import Token
+from pyprolog.parser.scanner import Scanner
+from pyprolog.parser.token_type import TokenType
+from pyprolog.parser.token import Token
 
 
 class TestScanner:

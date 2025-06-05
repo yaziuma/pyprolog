@@ -1,4 +1,4 @@
-# prolog/core/operators.py
+# pyprolog/core/operators.py
 from enum import Enum, auto
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Callable

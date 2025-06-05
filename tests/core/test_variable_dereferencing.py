@@ -5,9 +5,9 @@ Variable Dereferencing テスト
 """
 
 import unittest
-from prolog.core.binding_environment import BindingEnvironment
-from prolog.core.types import Variable, Atom, Number, Term, String
-from prolog.core.errors import PrologError
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.types import Variable, Atom, Number, Term, String
+from pyprolog.core.errors import PrologError
 
 
 class TestVariableDereferencing:

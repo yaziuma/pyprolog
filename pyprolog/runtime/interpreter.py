@@ -1,13 +1,13 @@
-# prolog/runtime/interpreter.py
-from prolog.core.types import Term, Variable, Number, Rule, Fact, Atom 
-from prolog.core.binding_environment import BindingEnvironment
-from prolog.parser.scanner import Scanner
-from prolog.parser.parser import Parser
-from prolog.runtime.math_interpreter import MathInterpreter
-from prolog.runtime.logic_interpreter import LogicInterpreter
-from prolog.core.operators import operator_registry, OperatorType, OperatorInfo
-from prolog.core.errors import PrologError, CutException
-from prolog.runtime.builtins import (
+# pyprolog/runtime/interpreter.py
+from pyprolog.core.types import Term, Variable, Number, Rule, Fact, Atom
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.parser.scanner import Scanner
+from pyprolog.parser.parser import Parser
+from pyprolog.runtime.math_interpreter import MathInterpreter
+from pyprolog.runtime.logic_interpreter import LogicInterpreter
+from pyprolog.core.operators import operator_registry, OperatorType, OperatorInfo
+from pyprolog.core.errors import PrologError, CutException
+from pyprolog.runtime.builtins import (
     VarPredicate, AtomPredicate, NumberPredicate,
     FunctorPredicate, ArgPredicate, UnivPredicate,
     DynamicAssertAPredicate, DynamicAssertZPredicate, DynamicRetractPredicate,

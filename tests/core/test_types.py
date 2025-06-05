@@ -5,7 +5,7 @@ Prologインタープリターの基本データ型（Atom, Variable, Number, St
 動作を検証するテストスイート。
 """
 
-from prolog.core.types import (
+from pyprolog.core.types import (
     Atom, Variable, Number, String, Term, ListTerm, Rule, Fact, PrologType
 )
 

@@ -14,13 +14,13 @@ from typing import List, Dict, Any, Optional
 # coloramaは既存REPLで使用されているのでそのまま使用
 from colorama import Fore, Style, init
 
-from prolog.parser.parser import Parser
-from prolog.parser.scanner import Scanner
-from prolog.core.types import Variable, Rule
-from prolog.core.errors import InterpreterError, ScannerError, PrologError
-from prolog.parser.types import FALSE, TRUE
-from prolog.runtime.interpreter import Runtime
-from prolog.core.binding_environment import BindingEnvironment
+from pyprolog.parser.parser import Parser
+from pyprolog.parser.scanner import Scanner
+from pyprolog.core.types import Variable, Rule
+from pyprolog.core.errors import InterpreterError, ScannerError, PrologError
+from pyprolog.parser.types import FALSE, TRUE
+from pyprolog.runtime.interpreter import Runtime
+from pyprolog.core.binding_environment import BindingEnvironment
 
 # カラー初期化
 init(autoreset=True)

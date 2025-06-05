@@ -1,4 +1,4 @@
-# prolog/core/__init__.py
+# pyprolog/core/__init__.py
 from .types import Variable, Term, Rule
 from .binding_environment import BindingEnvironment
 from .errors import InterpreterError, ScannerError, ParserError

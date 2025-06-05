@@ -1,7 +1,7 @@
 import unittest
-from prolog.runtime.interpreter import Runtime
-from prolog.core.types import Term, Variable, Atom, Number, Rule, Fact
-from prolog.core.errors import PrologError
+from pyprolog.runtime.interpreter import Runtime
+from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact
+from pyprolog.core.errors import PrologError
 
 class TestDynamicPredicates(unittest.TestCase):
 
