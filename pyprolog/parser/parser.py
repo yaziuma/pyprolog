@@ -122,8 +122,8 @@ class Parser:
 
         # 前置単項演算子の処理 (例: \+)
         # TokenType.NOT が \+ に対応すると仮定 (scanner と operator_registry で設定)
-        if token.token_type == TokenType.NOT: # \+ (not)
-            op_symbol = token.lexeme # Should be "\+"
+        if token.token_type == TokenType.NOT:  # \+ (not)
+            op_symbol = token.lexeme  # Should be "\+"
             # 演算子情報を取得して優先度を確認
             op_info = operator_registry.get_operator(op_symbol, arity=1)
             if not op_info:
@@ -131,21 +131,26 @@ class Parser:
                 return None
 
             # 現在の最大優先度と比較して、この前置演算子を処理すべきか判断
-            if op_info.precedence <= max_precedence: # 通常、前置演算子の優先度は高い(数値が小さい)
-                self._advance() # 演算子トークンを消費
+            if (
+                op_info.precedence <= max_precedence
+            ):  # 通常、前置演算子の優先度は高い(数値が小さい)
+                self._advance()  # 演算子トークンを消費
                 # オペランドを、この単項演算子の優先度でパース (fy の場合、同じ優先度を許容)
                 operand = self._parse_expression_with_precedence(op_info.precedence)
                 if operand is None:
-                    self._error(self._peek(), f"Expected operand after prefix operator '{op_symbol}'")
+                    self._error(
+                        self._peek(),
+                        f"Expected operand after prefix operator '{op_symbol}'",
+                    )
                     return None
                 left = Term(Atom(op_symbol), [operand])
-            else: # この前置演算子は現在のコンテキストでは処理されない (優先度が高すぎる)
+            else:  # この前置演算子は現在のコンテキストでは処理されない (優先度が高すぎる)
                 left = self._parse_primary()
-        else: # 前置単項演算子で始まらない場合
+        else:  # 前置単項演算子で始まらない場合
             left = self._parse_primary()
 
         if left is None:
-            return None # _parse_primary or operand parsing failed and reported error
+            return None  # _parse_primary or operand parsing failed and reported error
 
         # 後置/二項演算子のループ
         while not self._is_at_end():
@@ -157,14 +162,14 @@ class Parser:
             bin_op_info = operator_registry.get_operator(bin_symbol, arity=2)
 
             if not bin_op_info or bin_op_info.precedence > max_precedence:
-                break # この二項演算子は処理しない (優先度が低いか、ループ終了)
+                break  # この二項演算子は処理しない (優先度が低いか、ループ終了)
 
             # 結合性に基づいて次の優先度を計算
             if bin_op_info.associativity == Associativity.LEFT:
-                next_max_prec = bin_op_info.precedence -1
+                next_max_prec = bin_op_info.precedence - 1
             elif bin_op_info.associativity == Associativity.RIGHT:
                 next_max_prec = bin_op_info.precedence
-            else: # NON_ASSOCIATIVE (xfx など)
+            else:  # NON_ASSOCIATIVE (xfx など)
                 next_max_prec = bin_op_info.precedence - 1
 
             self._advance()  # 二項演算子トークンを消費
@@ -178,20 +183,34 @@ class Parser:
 
     def _parse_primary(self):
         """基本要素の解析（引数解析修正版）"""
-        if self._match(TokenType.ATOM, TokenType.ASSERTA, TokenType.ASSERTZ, TokenType.RETRACT, TokenType.FAIL, TokenType.TRUE): # Added FAIL, TRUE
+        if self._match(
+            TokenType.ATOM,
+            TokenType.ASSERTA,
+            TokenType.ASSERTZ,
+            TokenType.RETRACT,
+            TokenType.FAIL,
+            TokenType.TRUE,
+        ):  # Added FAIL, TRUE
             # Note: Retract might need different handling if it's to behave like an operator.
             # For now, treat like a standard predicate call.
             token = self._previous()
-            atom_name = token.lexeme # e.g., "asserta", "p", "fail"
+            atom_name = token.lexeme  # e.g., "asserta", "p", "fail"
 
             # Convert specific TokenTypes to their canonical atom names for the Term functor
             # This is mainly for asserta, assertz, retract, fail, true if they are parsed with their own TokenTypes
             # For a normal ATOM, atom_name is already correct.
-            if token.token_type in [TokenType.ASSERTA, TokenType.ASSERTZ, TokenType.RETRACT, TokenType.FAIL, TokenType.TRUE]:
-                 functor_atom = Atom(atom_name) # Use the keyword itself as functor name (e.g. Atom('fail'))
-            else: # TokenType.ATOM
-                 functor_atom = Atom(atom_name)
-
+            if token.token_type in [
+                TokenType.ASSERTA,
+                TokenType.ASSERTZ,
+                TokenType.RETRACT,
+                TokenType.FAIL,
+                TokenType.TRUE,
+            ]:
+                functor_atom = Atom(
+                    atom_name
+                )  # Use the keyword itself as functor name (e.g. Atom('fail'))
+            else:  # TokenType.ATOM
+                functor_atom = Atom(atom_name)
 
             if self._match(TokenType.LEFTPAREN):
                 # 複合項の引数解析
@@ -208,11 +227,11 @@ class Parser:
                             continue
                         break
                 self._consume(TokenType.RIGHTPAREN, "Expected ')' after arguments")
-                return Term(functor_atom, args) # Use functor_atom
+                return Term(functor_atom, args)  # Use functor_atom
             else:
                 # If it's one of the special predicates but no '(', it's an atom.
                 # e.g. query "asserta." should be Atom('asserta')
-                return functor_atom # Use functor_atom
+                return functor_atom  # Use functor_atom
 
         elif self._match(TokenType.NUMBER):
             return Number(self._previous().literal)
@@ -220,11 +239,11 @@ class Parser:
         elif self._match(TokenType.VARIABLE):
             return Variable(self._previous().lexeme)
 
-        elif self._match(TokenType.STRING): # Handling of single-quoted atoms
+        elif self._match(TokenType.STRING):  # Handling of single-quoted atoms
             token = self._previous()
-            return Atom(token.literal) # Convert the content within quotes to Atom
+            return Atom(token.literal)  # Convert the content within quotes to Atom
 
-        elif self._match(TokenType.DOT): # Handling when a dot appears alone
+        elif self._match(TokenType.DOT):  # Handling when a dot appears alone
             # It's necessary to distinguish if this is the dot for '.'/2 separator or '.' as an atom.
             # If it's difficult to determine from context, treat it as an atom in specific situations (e.g., outside list construction).
             # If this match is called in term arguments, Atom('.') might be acceptable.
@@ -232,7 +251,7 @@ class Parser:
             # check in _parse_term or similar if a . (period) is expected as a Functor.
             # For the current predicate tests, DOT needs to be interpretable as Atom('.').
             # A simple fix is as follows, but be aware of potential context dependency.
-            return Atom(".") # Interpret a standalone . as Atom(".")
+            return Atom(".")  # Interpret a standalone . as Atom(".")
 
         elif self._match(TokenType.LEFTPAREN):
             expr = self._parse_term()
@@ -244,7 +263,7 @@ class Parser:
         elif self._match(TokenType.LEFTBRACKET):
             return self._parse_list()
 
-        elif self._match(TokenType.CUT): # Handle CUT token
+        elif self._match(TokenType.CUT):  # Handle CUT token
             return Atom("!")
 
         self._error(self._peek(), "Expected expression")

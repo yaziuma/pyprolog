@@ -4,7 +4,6 @@ Variable Dereferencing テスト
 変数の間接参照機能の詳細な動作を検証するテストスイート。
 """
 
-import unittest
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.types import Variable, Atom, Number, Term, String
 from pyprolog.core.errors import PrologError
@@ -22,7 +21,7 @@ class TestVariableDereferencing:
         """単純な間接参照のテスト"""
         # X = hello
         self.env.bind("X", Atom("hello"))
-        
+
         # 直接取得
         result = self.env.get_value("X")
         assert result == Atom("hello")
@@ -33,7 +32,7 @@ class TestVariableDereferencing:
         self.env.bind("X", Variable("Y"))
         self.env.bind("Y", Variable("Z"))
         self.env.bind("Z", Atom("value"))
-        
+
         # チェーンを辿って最終値を取得
         result = self._dereference_fully(Variable("X"))
         assert result == Atom("value")
@@ -43,7 +42,7 @@ class TestVariableDereferencing:
         # X = Y, Y = X (循環参照)
         self.env.bind("X", Variable("Y"))
         self.env.bind("Y", Variable("X"))
-        
+
         # 循環参照を検出して適切に処理することを確認
         try:
             result = self._dereference_fully(Variable("X"))
@@ -59,7 +58,7 @@ class TestVariableDereferencing:
         term = Term(Atom("f"), [Variable("X"), Variable("Y")])
         self.env.bind("X", Atom("bound"))
         # Y は未束縛のまま
-        
+
         result = self._dereference_term(term)
         expected = Term(Atom("f"), [Atom("bound"), Variable("Y")])
         assert result == expected
@@ -70,17 +69,17 @@ class TestVariableDereferencing:
         self.env.bind("X", Atom("john"))
         self.env.bind("Y", Number(25))
         self.env.bind("Z", Variable("X"))
-        
-        complex_term = Term(Atom("person"), [
-            Variable("Z"),  # X -> john
-            Term(Atom("age"), [Variable("Y")])  # Y -> 25
-        ])
-        
+
+        complex_term = Term(
+            Atom("person"),
+            [
+                Variable("Z"),  # X -> john
+                Term(Atom("age"), [Variable("Y")]),  # Y -> 25
+            ],
+        )
+
         result = self._dereference_term(complex_term)
-        expected = Term(Atom("person"), [
-            Atom("john"),
-            Term(Atom("age"), [Number(25)])
-        ])
+        expected = Term(Atom("person"), [Atom("john"), Term(Atom("age"), [Number(25)])])
         assert result == expected
 
     def test_multi_level_chain(self):
@@ -90,7 +89,7 @@ class TestVariableDereferencing:
         self.env.bind("Y", Variable("Z"))
         self.env.bind("Z", Variable("W"))
         self.env.bind("W", String("final_value"))
-        
+
         result = self._dereference_fully(Variable("X"))
         assert result == String("final_value")
 
@@ -100,19 +99,13 @@ class TestVariableDereferencing:
         self.env.bind("NumVar", Number(42))
         self.env.bind("StrVar", String("hello"))
         self.env.bind("AtomVar", Atom("world"))
-        
-        term = Term(Atom("mixed"), [
-            Variable("NumVar"),
-            Variable("StrVar"),
-            Variable("AtomVar")
-        ])
-        
+
+        term = Term(
+            Atom("mixed"), [Variable("NumVar"), Variable("StrVar"), Variable("AtomVar")]
+        )
+
         result = self._dereference_term(term)
-        expected = Term(Atom("mixed"), [
-            Number(42),
-            String("hello"),
-            Atom("world")
-        ])
+        expected = Term(Atom("mixed"), [Number(42), String("hello"), Atom("world")])
         assert result == expected
 
     def test_unbound_variable_handling(self):
@@ -126,7 +119,7 @@ class TestVariableDereferencing:
         """自己参照のテスト"""
         # X = X の場合
         self.env.bind("X", Variable("X"))
-        
+
         # 自己参照は循環参照の特殊ケース
         try:
             result = self._dereference_fully(Variable("X"))
@@ -139,7 +132,7 @@ class TestVariableDereferencing:
         """発生チェック付き間接参照のテスト"""
         # X = f(X) のような構造での発生チェック
         self.env.bind("X", Term(Atom("f"), [Variable("X")]))
-        
+
         # 発生チェックが有効な場合、このような束縛は検出される
         result = self._dereference_fully(Variable("X"))
         # 実装により動作は異なるが、無限ループにならないこと
@@ -151,11 +144,11 @@ class TestVariableDereferencing:
         # Chain 1: A -> B -> value1
         self.env.bind("A", Variable("B"))
         self.env.bind("B", Atom("value1"))
-        
+
         # Chain 2: C -> D -> value2
         self.env.bind("C", Variable("D"))
         self.env.bind("D", Number(123))
-        
+
         term = Term(Atom("test"), [Variable("A"), Variable("C")])
         result = self._dereference_term(term)
         expected = Term(Atom("test"), [Atom("value1"), Number(123)])
@@ -165,18 +158,18 @@ class TestVariableDereferencing:
         """間接参照の性能テスト"""
         # 長いチェーンでの性能確認
         import time
-        
+
         # 100段階のチェーンを作成
         for i in range(100):
             if i == 99:
                 self.env.bind(f"Var{i}", Atom("final"))
             else:
-                self.env.bind(f"Var{i}", Variable(f"Var{i+1}"))
-        
+                self.env.bind(f"Var{i}", Variable(f"Var{i + 1}"))
+
         start_time = time.time()
         result = self._dereference_fully(Variable("Var0"))
         end_time = time.time()
-        
+
         assert result == Atom("final")
         # 合理的な時間内で完了することを確認
         assert end_time - start_time < 1.0  # 1秒以内
@@ -185,7 +178,7 @@ class TestVariableDereferencing:
         """リストコンテキストでの間接参照テスト"""
         self.env.bind("H", Atom("head"))
         self.env.bind("T", Atom("[]"))
-        
+
         # リスト構造 [H|T] の間接参照
         list_term = Term(Atom("."), [Variable("H"), Variable("T")])
         result = self._dereference_term(list_term)
@@ -197,10 +190,10 @@ class TestVariableDereferencing:
         # 親環境と子環境での変数束縛
         parent_env = BindingEnvironment()
         parent_env.bind("ParentVar", Atom("parent_value"))
-        
+
         child_env = BindingEnvironment(parent_env)
         child_env.bind("ChildVar", Variable("ParentVar"))
-        
+
         # 子環境で親環境の変数を参照
         result = child_env.get_value("ChildVar")
         # 実装により、直接値が返されるかVariableが返されるかは異なる
@@ -211,14 +204,14 @@ class TestVariableDereferencing:
         # 初期束縛
         self.env.bind("X", Variable("Y"))
         self.env.bind("Y", Atom("initial"))
-        
+
         # 値を確認
         result1 = self._dereference_fully(Variable("X"))
         assert result1 == Atom("initial")
-        
+
         # 束縛を更新
         self.env.bind("Y", Atom("updated"))
-        
+
         # 更新された値が反映されることを確認
         result2 = self._dereference_fully(Variable("X"))
         assert result2 == Atom("updated")
@@ -228,23 +221,23 @@ class TestVariableDereferencing:
         """完全な間接参照の実装例"""
         if visited is None:
             visited = set()
-        
+
         if not isinstance(var, Variable):
             return var
-        
+
         if var.name in visited:
             # 循環参照を検出
             return var  # または例外を発生
-        
+
         visited.add(var.name)
         value = self.env.get_value(var.name)
-        
+
         if value is None:
             return var  # 未束縛
-        
+
         if isinstance(value, Variable):
             return self._dereference_fully(value, visited.copy())
-        
+
         return value
 
     def _dereference_term(self, term):

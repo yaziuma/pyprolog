@@ -24,19 +24,19 @@ class TestMathInterpreter:
         # 数値の評価
         assert self.math_interpreter.evaluate(Number(42), self.env) == 42
         assert self.math_interpreter.evaluate(Number(3.14), self.env) == 3.14
-        
+
         # 加算
         expr_add = Term(Atom("+"), [Number(5), Number(3)])
         assert self.math_interpreter.evaluate(expr_add, self.env) == 8
-        
+
         # 減算
         expr_sub = Term(Atom("-"), [Number(10), Number(4)])
         assert self.math_interpreter.evaluate(expr_sub, self.env) == 6
-        
+
         # 乗算
         expr_mult = Term(Atom("*"), [Number(6), Number(7)])
         assert self.math_interpreter.evaluate(expr_mult, self.env) == 42
-        
+
         # 除算
         expr_div = Term(Atom("/"), [Number(15), Number(3)])
         assert self.math_interpreter.evaluate(expr_div, self.env) == 5.0
@@ -47,7 +47,7 @@ class TestMathInterpreter:
         inner_expr = Term(Atom("+"), [Number(2), Number(3)])
         complex_expr = Term(Atom("*"), [inner_expr, Number(4)])
         assert self.math_interpreter.evaluate(complex_expr, self.env) == 20
-        
+
         # 2 + 3 * 4 (優先度は外部で解決済みと仮定)
         mult_expr = Term(Atom("*"), [Number(3), Number(4)])
         expr = Term(Atom("+"), [Number(2), mult_expr])
@@ -58,23 +58,23 @@ class TestMathInterpreter:
         # 等価比較
         assert self.math_interpreter.evaluate_comparison_op("=:=", 5, 5) == True
         assert self.math_interpreter.evaluate_comparison_op("=:=", 5, 3) == False
-        
+
         # 非等価比較
         assert self.math_interpreter.evaluate_comparison_op("=\\=", 5, 3) == True
         assert self.math_interpreter.evaluate_comparison_op("=\\=", 5, 5) == False
-        
+
         # 大小比較
         assert self.math_interpreter.evaluate_comparison_op("<", 3, 5) == True
         assert self.math_interpreter.evaluate_comparison_op("<", 5, 3) == False
-        
+
         assert self.math_interpreter.evaluate_comparison_op(">", 5, 3) == True
         assert self.math_interpreter.evaluate_comparison_op(">", 3, 5) == False
-        
+
         # 以下・以上比較
         assert self.math_interpreter.evaluate_comparison_op("=<", 3, 5) == True
         assert self.math_interpreter.evaluate_comparison_op("=<", 5, 5) == True
         assert self.math_interpreter.evaluate_comparison_op("=<", 5, 3) == False
-        
+
         assert self.math_interpreter.evaluate_comparison_op(">=", 5, 3) == True
         assert self.math_interpreter.evaluate_comparison_op(">=", 5, 5) == True
         assert self.math_interpreter.evaluate_comparison_op(">=", 3, 5) == False
@@ -84,21 +84,21 @@ class TestMathInterpreter:
         # abs/1 関数
         abs_expr = Term(Atom("abs"), [Number(-5)])
         assert self.math_interpreter.evaluate(abs_expr, self.env) == 5
-        
+
         abs_expr_pos = Term(Atom("abs"), [Number(3)])
         assert self.math_interpreter.evaluate(abs_expr_pos, self.env) == 3
-        
+
         # max/2 関数
         max_expr = Term(Atom("max"), [Number(3), Number(7)])
         assert self.math_interpreter.evaluate(max_expr, self.env) == 7
-        
+
         max_expr2 = Term(Atom("max"), [Number(10), Number(5)])
         assert self.math_interpreter.evaluate(max_expr2, self.env) == 10
-        
+
         # min/2 関数
         min_expr = Term(Atom("min"), [Number(3), Number(7)])
         assert self.math_interpreter.evaluate(min_expr, self.env) == 3
-        
+
         min_expr2 = Term(Atom("min"), [Number(10), Number(5)])
         assert self.math_interpreter.evaluate(min_expr2, self.env) == 5
 
@@ -107,11 +107,11 @@ class TestMathInterpreter:
         # 変数を束縛
         self.env.bind("X", Number(5))
         self.env.bind("Y", Number(3))
-        
+
         # X + Y
         expr = Term(Atom("+"), [Variable("X"), Variable("Y")])
         assert self.math_interpreter.evaluate(expr, self.env) == 8
-        
+
         # X * Y
         expr_mult = Term(Atom("*"), [Variable("X"), Variable("Y")])
         assert self.math_interpreter.evaluate(expr_mult, self.env) == 15
@@ -121,7 +121,7 @@ class TestMathInterpreter:
         # 数値アトムの評価
         atom_num = Atom("42")
         assert self.math_interpreter.evaluate(atom_num, self.env) == 42.0
-        
+
         atom_float = Atom("3.14")
         assert self.math_interpreter.evaluate(atom_float, self.env) == 3.14
 
@@ -134,7 +134,7 @@ class TestMathInterpreter:
             assert False, "Should have raised PrologError"
         except PrologError as e:
             assert "Division by zero" in str(e)
-        
+
         # 整数除算のゼロ除算
         try:
             expr_int_div_zero = Term(Atom("//"), [Number(5), Number(0)])
@@ -142,7 +142,7 @@ class TestMathInterpreter:
             assert False, "Should have raised PrologError"
         except PrologError as e:
             assert "Integer division by zero" in str(e)
-        
+
         # 未束縛変数
         try:
             unbound_var = Variable("Z")
@@ -150,7 +150,7 @@ class TestMathInterpreter:
             assert False, "Should have raised PrologError"
         except PrologError as e:
             assert "not instantiated" in str(e)
-        
+
         # 非数値アトム
         try:
             non_numeric_atom = Atom("hello")
@@ -158,7 +158,7 @@ class TestMathInterpreter:
             assert False, "Should have raised PrologError"
         except PrologError as e:
             assert "Cannot evaluate atom" in str(e)
-        
+
         # 未知の演算子
         try:
             unknown_op = Term(Atom("unknown_op"), [Number(1), Number(2)])
@@ -172,11 +172,11 @@ class TestMathInterpreter:
         # 指数演算
         expr_power = Term(Atom("**"), [Number(2), Number(3)])
         assert self.math_interpreter.evaluate(expr_power, self.env) == 8
-        
+
         # 整数除算
         expr_int_div = Term(Atom("//"), [Number(7), Number(3)])
         assert self.math_interpreter.evaluate(expr_int_div, self.env) == 2
-        
+
         # モジュロ演算
         expr_mod = Term(Atom("mod"), [Number(7), Number(3)])
         assert self.math_interpreter.evaluate(expr_mod, self.env) == 1
@@ -186,7 +186,7 @@ class TestMathInterpreter:
         # 単項マイナス
         expr_neg = Term(Atom("-"), [Number(5)])
         assert self.math_interpreter.evaluate(expr_neg, self.env) == -5
-        
+
         # 単項プラス
         expr_pos = Term(Atom("+"), [Number(5)])
         assert self.math_interpreter.evaluate(expr_pos, self.env) == 5
@@ -196,10 +196,10 @@ class TestMathInterpreter:
         # X = Y, Y = 42
         self.env.bind("Y", Number(42))
         self.env.bind("X", Variable("Y"))
-        
+
         # Xを評価すると42になる
         assert self.math_interpreter.evaluate(Variable("X"), self.env) == 42
-        
+
         # X + 8 = 50
         expr = Term(Atom("+"), [Variable("X"), Number(8)])
         assert self.math_interpreter.evaluate(expr, self.env) == 50
@@ -210,7 +210,7 @@ class TestMathInterpreter:
         expr_float_add = Term(Atom("+"), [Number(3.14), Number(2.86)])
         result = self.math_interpreter.evaluate(expr_float_add, self.env)
         assert abs(result - 6.0) < 0.0001  # 浮動小数点の精度を考慮
-        
+
         # 浮動小数点の除算
         expr_float_div = Term(Atom("/"), [Number(1), Number(3)])
         result_div = self.math_interpreter.evaluate(expr_float_div, self.env)
@@ -222,7 +222,7 @@ class TestMathInterpreter:
         expr_mixed = Term(Atom("+"), [Number(5), Number(3.14)])
         result = self.math_interpreter.evaluate(expr_mixed, self.env)
         assert abs(result - 8.14) < 0.0001
-        
+
         # 整数 * 浮動小数点
         expr_mixed_mult = Term(Atom("*"), [Number(2), Number(3.5)])
         result_mult = self.math_interpreter.evaluate(expr_mixed_mult, self.env)
@@ -232,11 +232,11 @@ class TestMathInterpreter:
         """変数を含む比較のテスト"""
         self.env.bind("A", Number(5))
         self.env.bind("B", Number(3))
-        
+
         # A と B の直接的な数値比較はevaluate_comparison_opで行う
         a_val = self.math_interpreter.evaluate(Variable("A"), self.env)
         b_val = self.math_interpreter.evaluate(Variable("B"), self.env)
-        
+
         assert self.math_interpreter.evaluate_comparison_op(">", a_val, b_val) == True
         assert self.math_interpreter.evaluate_comparison_op("<", a_val, b_val) == False
         assert self.math_interpreter.evaluate_comparison_op("=:=", a_val, a_val) == True
@@ -250,7 +250,7 @@ class TestMathInterpreter:
             assert False, "Should have raised PrologError"
         except PrologError as e:
             assert "Unknown mathematical function" in str(e)
-        
+
         # max関数に1つの引数を渡す（エラーになるはず）
         try:
             invalid_max = Term(Atom("max"), [Number(1)])

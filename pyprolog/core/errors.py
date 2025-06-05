@@ -20,4 +20,5 @@ class UnificationError(Exception):
 
 class CutException(Exception):
     """カット演算子 (!) が実行されたことを示す例外"""
+
     pass

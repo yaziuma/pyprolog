@@ -1,5 +1,5 @@
 import pyprolog
-import pyprolog.util # pyprolog.util モジュールをインポート
+import pyprolog.util  # pyprolog.util モジュールをインポート
 
 # pyprolog.util.get_logger() を呼び出す
 logger = pyprolog.util.get_logger("test_import_util_access")

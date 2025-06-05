@@ -46,7 +46,7 @@ class MathInterpreter:
             op_info = operator_registry.get_operator(functor_name, arity)
 
             if op_info and op_info.operator_type == OperatorType.ARITHMETIC:
-                if op_info.arity == 2 and arity == 2: # アリティチェックを明示的に
+                if op_info.arity == 2 and arity == 2:  # アリティチェックを明示的に
                     left_val = self.evaluate(expression.args[0], env)
                     right_val = self.evaluate(expression.args[1], env)
                     return self.evaluate_binary_op(functor_name, left_val, right_val)

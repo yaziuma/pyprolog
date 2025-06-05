@@ -1,15 +1,18 @@
 import pytest
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact
+from pyprolog.core.types import Term, Variable, Atom, Number
+
 
 class TestRecursiveRules:
-
     @pytest.fixture(autouse=True)
     def setup_runtime(self):
         self.runtime = Runtime()
         # Ensure a clean state for rules before each test
         self.runtime.rules.clear()
-        if hasattr(self.runtime, 'logic_interpreter') and self.runtime.logic_interpreter:
+        if (
+            hasattr(self.runtime, "logic_interpreter")
+            and self.runtime.logic_interpreter
+        ):
             self.runtime.logic_interpreter.rules.clear()
 
     def assertQuerySolutions(self, query_string, expected_solutions_list, msg=None):
@@ -21,7 +24,10 @@ class TestRecursiveRules:
         """
         print(f"PYTHON_PRINT_ASSERT: Querying: '{query_string}'", flush=True)
         solutions = self.runtime.query(query_string)
-        print(f"PYTHON_PRINT_ASSERT: Solutions for '{query_string}': {solutions} (length: {len(solutions)})", flush=True)
+        print(
+            f"PYTHON_PRINT_ASSERT: Solutions for '{query_string}': {solutions} (length: {len(solutions)})",
+            flush=True,
+        )
 
         # Convert list of dicts of solutions to a list of frozensets of items for order-independent comparison
         # Also, convert Variable keys from solutions to string keys for easier comparison
@@ -33,28 +39,37 @@ class TestRecursiveRules:
                 if isinstance(var_key, Variable):
                     processed_sol[var_key.name] = value
                 else:
-                    processed_sol[str(var_key)] = value # Should not happen with current runtime.query
+                    processed_sol[str(var_key)] = (
+                        value  # Should not happen with current runtime.query
+                    )
             processed_solutions.append(frozenset(processed_sol.items()))
 
         processed_expected_solutions = []
         for expected_sol_dict in expected_solutions_list:
             processed_expected_sol = {}
             for var_name_str, expected_value in expected_sol_dict.items():
-                 processed_expected_sol[var_name_str] = expected_value
-            processed_expected_solutions.append(frozenset(processed_expected_sol.items()))
+                processed_expected_sol[var_name_str] = expected_value
+            processed_expected_solutions.append(
+                frozenset(processed_expected_sol.items())
+            )
 
-        assert len(processed_solutions) == len(processed_expected_solutions), \
-            msg or f"Query '{query_string}' expected {len(processed_expected_solutions)} solutions, got {len(processed_solutions)}. Solutions: {solutions}"
+        assert len(processed_solutions) == len(processed_expected_solutions), (
+            msg
+            or f"Query '{query_string}' expected {len(processed_expected_solutions)} solutions, got {len(processed_solutions)}. Solutions: {solutions}"
+        )
 
         for expected_fs in processed_expected_solutions:
-            assert expected_fs in processed_solutions, \
-                msg or f"Query '{query_string}': Expected solution {dict(expected_fs)} not found in actual solutions {solutions}."
+            assert expected_fs in processed_solutions, (
+                msg
+                or f"Query '{query_string}': Expected solution {dict(expected_fs)} not found in actual solutions {solutions}."
+            )
 
         # This also checks if there are any extra solutions in processed_solutions not in processed_expected_solutions
         for actual_fs in processed_solutions:
-            assert actual_fs in processed_expected_solutions, \
-                 msg or f"Query '{query_string}': Actual solution {dict(actual_fs)} was not expected. Expected: {expected_solutions_list}."
-
+            assert actual_fs in processed_expected_solutions, (
+                msg
+                or f"Query '{query_string}': Actual solution {dict(actual_fs)} was not expected. Expected: {expected_solutions_list}."
+            )
 
     def assertQueryTrue(self, query_string, expected_bindings_list=None, msg=None):
         """
@@ -64,17 +79,33 @@ class TestRecursiveRules:
         """
         print(f"PYTHON_PRINT_ASSERT: Querying: '{query_string}'", flush=True)
         solutions = self.runtime.query(query_string)
-        print(f"PYTHON_PRINT_ASSERT: Solutions for '{query_string}': {solutions} (length: {len(solutions)})", flush=True)
+        print(
+            f"PYTHON_PRINT_ASSERT: Solutions for '{query_string}': {solutions} (length: {len(solutions)})",
+            flush=True,
+        )
 
-        if expected_bindings_list is None: # Only check for success
-            assert len(solutions) >= 1, msg or f"Query '{query_string}' should succeed but failed (no solutions)."
-        elif not expected_bindings_list: # Empty list means succeed, no bindings to check (e.g. a fact).
-            assert len(solutions) >= 1, msg or f"Query '{query_string}' should succeed but failed (no solutions)."
-        else: # Check specific bindings for the first solution (can be extended or use assertQuerySolutions for multi-solution check)
-            assert len(solutions) >= 1, msg or f"Query '{query_string}' expected at least one solution, got {len(solutions)}."
+        if expected_bindings_list is None:  # Only check for success
+            assert len(solutions) >= 1, (
+                msg
+                or f"Query '{query_string}' should succeed but failed (no solutions)."
+            )
+        elif (
+            not expected_bindings_list
+        ):  # Empty list means succeed, no bindings to check (e.g. a fact).
+            assert len(solutions) >= 1, (
+                msg
+                or f"Query '{query_string}' should succeed but failed (no solutions)."
+            )
+        else:  # Check specific bindings for the first solution (can be extended or use assertQuerySolutions for multi-solution check)
+            assert len(solutions) >= 1, (
+                msg
+                or f"Query '{query_string}' expected at least one solution, got {len(solutions)}."
+            )
             # Check specific bindings for the first solution
             first_solution_bindings = solutions[0]
-            expected_first_solution_bindings = expected_bindings_list[0] # Taking the first expected binding set
+            expected_first_solution_bindings = expected_bindings_list[
+                0
+            ]  # Taking the first expected binding set
 
             # Convert Variable keys from solutions to string keys for easier comparison
             processed_first_solution = {}
@@ -84,18 +115,28 @@ class TestRecursiveRules:
                 else:
                     processed_first_solution[str(var_key)] = value
 
-            for var_name_str, expected_value in expected_first_solution_bindings.items():
+            for (
+                var_name_str,
+                expected_value,
+            ) in expected_first_solution_bindings.items():
                 actual_value = processed_first_solution.get(var_name_str)
-                assert actual_value == expected_value, \
-                    msg or f"Query '{query_string}', first solution: Var '{var_name_str}' expected <{expected_value}>, got <{actual_value}>."
-
+                assert actual_value == expected_value, (
+                    msg
+                    or f"Query '{query_string}', first solution: Var '{var_name_str}' expected <{expected_value}>, got <{actual_value}>."
+                )
 
     def assertQueryFalse(self, query_string, msg=None):
         """Asserts that the query fails (no solutions)."""
         print(f"PYTHON_PRINT_ASSERT: Querying: '{query_string}'", flush=True)
         solutions = self.runtime.query(query_string)
-        print(f"PYTHON_PRINT_ASSERT: Solutions for '{query_string}': {solutions} (length: {len(solutions)})", flush=True)
-        assert len(solutions) == 0, msg or f"Query '{query_string}' should fail but succeeded with {len(solutions)} solution(s)."
+        print(
+            f"PYTHON_PRINT_ASSERT: Solutions for '{query_string}': {solutions} (length: {len(solutions)})",
+            flush=True,
+        )
+        assert len(solutions) == 0, (
+            msg
+            or f"Query '{query_string}' should fail but succeeded with {len(solutions)} solution(s)."
+        )
 
     # --- Test Cases ---
 
@@ -103,44 +144,47 @@ class TestRecursiveRules:
         self.runtime.add_rule("member(X, [X|_]).")
         self.runtime.add_rule("member(X, [_|T]) :- member(X,T).")
 
-        self.assertQueryTrue("member(a, [a,b,c])", [{}]) # Ground query, success
-        self.assertQueryFalse("member(x, [a,b,c])")     # Ground query, failure
+        self.assertQueryTrue("member(a, [a,b,c])", [{}])  # Ground query, success
+        self.assertQueryFalse("member(x, [a,b,c])")  # Ground query, failure
 
         # Query with a variable, expecting multiple solutions
-        self.assertQuerySolutions("member(X, [a,b])", [
-            {"X": Atom("a")},
-            {"X": Atom("b")}
-        ])
+        self.assertQuerySolutions(
+            "member(X, [a,b])", [{"X": Atom("a")}, {"X": Atom("b")}]
+        )
         self.assertQuerySolutions("member(X, [a])", [{"X": Atom("a")}])
-        self.assertQueryFalse("member(X, [])") # Membership in empty list should fail
+        self.assertQueryFalse("member(X, [])")  # Membership in empty list should fail
 
     def test_ancestor_predicate(self):
         self.runtime.add_rule("parent(john, mary).")
         self.runtime.add_rule("parent(mary, tom).")
         self.runtime.add_rule("parent(mary, jane).")
-        self.runtime.add_rule("parent(sue, john).") # Adding one more generation
+        self.runtime.add_rule("parent(sue, john).")  # Adding one more generation
 
         self.runtime.add_rule("ancestor(X,Y) :- parent(X,Y).")
         self.runtime.add_rule("ancestor(X,Y) :- parent(X,Z), ancestor(Z,Y).")
 
         self.assertQueryTrue("ancestor(john, tom)", [{}])
-        self.assertQueryTrue("ancestor(sue, tom)", [{}]) # Test multiple levels of ancestry
+        self.assertQueryTrue(
+            "ancestor(sue, tom)", [{}]
+        )  # Test multiple levels of ancestry
 
         # ancestor(john, X) -> mary, tom, jane
-        self.assertQuerySolutions("ancestor(john, X)", [
-            {"X": Atom("mary")},
-            {"X": Atom("tom")},
-            {"X": Atom("jane")}
-        ])
+        self.assertQuerySolutions(
+            "ancestor(john, X)",
+            [{"X": Atom("mary")}, {"X": Atom("tom")}, {"X": Atom("jane")}],
+        )
 
         # ancestor(X, jane) -> mary, john, sue
-        self.assertQuerySolutions("ancestor(X, jane)", [
-            {"X": Atom("mary")}, # Direct parent
-            {"X": Atom("john")}, # Grandparent via mary
-            {"X": Atom("sue")}   # Great-grandparent via john, mary
-        ])
+        self.assertQuerySolutions(
+            "ancestor(X, jane)",
+            [
+                {"X": Atom("mary")},  # Direct parent
+                {"X": Atom("john")},  # Grandparent via mary
+                {"X": Atom("sue")},  # Great-grandparent via john, mary
+            ],
+        )
 
-        self.assertQueryFalse("ancestor(tom, john)") # No reverse ancestry
+        self.assertQueryFalse("ancestor(tom, john)")  # No reverse ancestry
 
     def test_peano_addition(self):
         self.runtime.add_rule("add(0,X,X).")
@@ -148,7 +192,9 @@ class TestRecursiveRules:
 
         # R = s(s(s(0))) -> s(s(s(0.0))) because 0 is parsed as Number(0.0)
         # s(0) + s(s(0)) = s(s(s(0)))
-        expected_result_term1 = Term(Atom("s"), [Term(Atom("s"), [Term(Atom("s"), [Number(0.0)])])])
+        expected_result_term1 = Term(
+            Atom("s"), [Term(Atom("s"), [Term(Atom("s"), [Number(0.0)])])]
+        )
         self.assertQueryTrue("add(s(0), s(s(0)), R)", [{"R": expected_result_term1}])
 
         # X = s(s(0)) -> s(s(0.0))
@@ -170,7 +216,10 @@ class TestRecursiveRules:
         # add(s(s(X)), Y, s(s(Z))) :- add(X,Y,Z)
         # add(s(s(0)), s(s(0)), R)
         # R = s(s(s(s(0.0))))
-        expected_r_term4 = Term(Atom("s"), [Term(Atom("s"), [Term(Atom("s"), [Term(Atom("s"), [Number(0.0)])])])])
+        expected_r_term4 = Term(
+            Atom("s"),
+            [Term(Atom("s"), [Term(Atom("s"), [Term(Atom("s"), [Number(0.0)])])])],
+        )
         self.assertQueryTrue("add(s(s(0)), s(s(0)), R)", [{"R": expected_r_term4}])
 
     def test_left_recursion_problem_naive_ancestor(self):
@@ -180,7 +229,9 @@ class TestRecursiveRules:
         # ancestor(X,Y) :- parent(X,Y).
         self.runtime.add_rule("parent_lr(a,b).")
         self.runtime.add_rule("parent_lr(b,c).")
-        self.runtime.add_rule("ancestor_lr(X,Y) :- ancestor_lr(Z,Y), parent_lr(X,Z).") # Problematic rule
+        self.runtime.add_rule(
+            "ancestor_lr(X,Y) :- ancestor_lr(Z,Y), parent_lr(X,Z)."
+        )  # Problematic rule
         self.runtime.add_rule("ancestor_lr(X,Y) :- parent_lr(X,Y).")
 
         # Depending on the Prolog engine's sophistication, this might lead to an infinite loop.
@@ -222,10 +273,9 @@ class TestRecursiveRules:
 
         # So, expected for ancestor_lr(a,X) are X=b and X=c.
         # This specific ordering might avoid the loop for this query if the interpreter is lucky or smart.
-        self.assertQuerySolutions("ancestor_lr(a,X)", [
-            {"X": Atom("b")},
-            {"X": Atom("c")}
-        ])
+        self.assertQuerySolutions(
+            "ancestor_lr(a,X)", [{"X": Atom("b")}, {"X": Atom("c")}]
+        )
         # This one is more likely to loop: ancestor_lr(X,c)
         # Try 1: ancestor_lr(Z,c), parent_lr(X,Z).
         #    This is the problematic recursive call first.
@@ -235,7 +285,10 @@ class TestRecursiveRules:
         # This test acts as a check for basic left-recursion handling.
         # A true test of non-termination is beyond simple assertQuery.
         # If this query returns the correct set, it implies some form of loop avoidance or specific evaluation strategy.
-        self.assertQuerySolutions("ancestor_lr(X,c)", [
-            {"X": Atom("b")}, # from parent_lr(b,c)
-            {"X": Atom("a")}  # from parent_lr(a,b), ancestor_lr(b,c)
-        ])
+        self.assertQuerySolutions(
+            "ancestor_lr(X,c)",
+            [
+                {"X": Atom("b")},  # from parent_lr(b,c)
+                {"X": Atom("a")},  # from parent_lr(a,b), ancestor_lr(b,c)
+            ],
+        )

@@ -33,8 +33,8 @@ class Scanner:
             "retract": TokenType.RETRACT,
             "asserta": TokenType.ASSERTA,
             "assertz": TokenType.ASSERTZ,
-            "write": TokenType.ATOM, # 'write' をATOMとして扱う
-            "nl": TokenType.ATOM,    # 'nl' もATOMとして扱う
+            "write": TokenType.ATOM,  # 'write' をATOMとして扱う
+            "nl": TokenType.ATOM,  # 'nl' もATOMとして扱う
             # "is": TokenType.OPERATOR_XFX_700, # 'is' は operator_registry 経由で処理
             # "cut": TokenType.CUT, # '!' は _scan_token で直接 TokenType.CUT を生成
             #  'functor', 'arg', '=..' などもここに追加可能だが、これらは通常のアトムとして扱われる
@@ -103,8 +103,8 @@ class Scanner:
                 self._add_token(TokenType.COLONMINUS)
             # else: # ':' 単独の場合、演算子としてスキャンさせる
             elif not self._scan_operator(char):
-                 self._report(self._line, f"Unexpected character: {char}")
-        elif char == "!": # '!' を CUT トークンとして処理
+                self._report(self._line, f"Unexpected character: {char}")
+        elif char == "!":  # '!' を CUT トークンとして処理
             self._add_token(TokenType.CUT)
         elif char in [" ", "\r", "\t"]:
             pass  # 空白無視
@@ -112,17 +112,24 @@ class Scanner:
             self._line += 1
         elif char == "%":
             self._skip_comment()
-        elif char == '-': # Handle potential negative numbers or operators starting with '-'
+        elif (
+            char == "-"
+        ):  # Handle potential negative numbers or operators starting with '-'
             if self._peek().isdigit():
-                self._number() # self._start is at '-', _current is at the first digit. _number handles it.
-            else: # Operator starting with '-'
-                  # _current is already advanced past '-', so _scan_operator which looks at current-1 is fine.
-                if not self._scan_operator(char): # Pass char for context/logging if needed
-                    self._report(self._line, f"Unexpected operator or character sequence starting with: {char}")
+                self._number()  # self._start is at '-', _current is at the first digit. _number handles it.
+            else:  # Operator starting with '-'
+                # _current is already advanced past '-', so _scan_operator which looks at current-1 is fine.
+                if not self._scan_operator(
+                    char
+                ):  # Pass char for context/logging if needed
+                    self._report(
+                        self._line,
+                        f"Unexpected operator or character sequence starting with: {char}",
+                    )
         else:
             # Default: Other characters, likely operators or unexpected.
             # _current is already advanced past char, so _scan_operator which looks at current-1 is fine.
-            if not self._scan_operator(char): # Pass char for context/logging if needed
+            if not self._scan_operator(char):  # Pass char for context/logging if needed
                 self._report(self._line, f"Unexpected character: {char}")
 
     def _scan_operator(self, start_char: str) -> bool:

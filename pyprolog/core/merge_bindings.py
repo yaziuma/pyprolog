@@ -1,5 +1,4 @@
 # pyprolog/core/merge_bindings.py
-from pyprolog.core.types import Variable
 from pyprolog.util.logger import logger
 
 
@@ -28,20 +27,21 @@ def merge_bindings(bindings1, bindings2=None):
     # BindingEnvironmentの場合は新しいmerge_withメソッドを使用
     if isinstance(bindings1, BindingEnvironment):
         return bindings1.merge_with(bindings2)
-    
+
     if isinstance(bindings2, BindingEnvironment):
         return bindings2.merge_with(bindings1)
 
     # 両方が辞書の場合（従来の動作を維持 + 具体値優先ロジック）
     if isinstance(bindings1, dict) and isinstance(bindings2, dict):
         merged = bindings1.copy()
-        
+
         for key, value2 in bindings2.items():
             if key in merged:
                 value1 = merged[key]
                 # 具体値を優先するロジック
                 # Variable は pyprolog.core.types からインポートする必要がある
                 from pyprolog.core.types import Variable
+
                 if isinstance(value1, Variable) and not isinstance(value2, Variable):
                     merged[key] = value2  # bindings2の具体値を優先
                 elif isinstance(value2, Variable) and not isinstance(value1, Variable):
@@ -52,19 +52,21 @@ def merge_bindings(bindings1, bindings2=None):
                     merged[key] = value2
             else:
                 merged[key] = value2
-        
+
         return merged
 
     # 片方が辞書の場合
     if isinstance(bindings1, dict):
         env = dict_to_binding_environment(bindings1)
         return env.merge_with(bindings2)
-    
+
     if isinstance(bindings2, dict):
         env = dict_to_binding_environment(bindings2)
         return bindings1.merge_with(env)
 
-    logger.warning(f"merge_bindings: Unexpected types: {type(bindings1)}, {type(bindings2)}")
+    logger.warning(
+        f"merge_bindings: Unexpected types: {type(bindings1)}, {type(bindings2)}"
+    )
     return bindings1 if bindings1 is not None else bindings2
 
 

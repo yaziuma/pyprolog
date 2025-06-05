@@ -35,7 +35,7 @@ class TokenType(Enum):
     ASSERTA = "ASSERTA"
     ASSERTZ = "ASSERTZ"
 
-    CUT = "CUT" # ! 演算子
+    CUT = "CUT"  # ! 演算子
 
     EOF = "EOF"
 

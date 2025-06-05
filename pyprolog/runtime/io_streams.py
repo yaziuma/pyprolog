@@ -1,12 +1,13 @@
 # prolog/runtime/io_streams.py
 from abc import ABC, abstractmethod
 import sys
-from typing import List # For Python list type hint in StringStream
+from typing import List  # For Python list type hint in StringStream
 
 # To use 'PrologType' as a type hint, it would typically be imported:
 # from prolog.core.types import PrologType
 # However, to avoid potential circular dependencies at this stage of module creation,
 # we can use it as a string literal in type hints: 'PrologType'.
+
 
 class IOStream(ABC):
     """
@@ -31,7 +32,7 @@ class IOStream(ABC):
         pass
 
     @abstractmethod
-    def read_term(self) -> 'PrologType':
+    def read_term(self) -> "PrologType":
         """
         Reads a Prolog term from the stream.
         Returns the Prolog term.
@@ -40,7 +41,7 @@ class IOStream(ABC):
         pass
 
     @abstractmethod
-    def write_term(self, term: 'PrologType') -> None:
+    def write_term(self, term: "PrologType") -> None:
         """
         Writes a Prolog term to the stream.
         Should handle term serialization.
@@ -52,6 +53,7 @@ class ConsoleStream(IOStream):
     """
     Concrete IOStream implementation for standard console I/O.
     """
+
     def __init__(self):
         super().__init__()
         # No specific initialization needed for stdin/stdout if using sys directly.
@@ -66,11 +68,11 @@ class ConsoleStream(IOStream):
         # Returns empty string "" on EOF.
         return sys.stdin.read(1)
 
-    def read_term(self) -> 'PrologType':
+    def read_term(self) -> "PrologType":
         # This will require a parser integrated with the stream.
         raise NotImplementedError("ConsoleStream.read_term() is not yet implemented.")
 
-    def write_term(self, term: 'PrologType') -> None:
+    def write_term(self, term: "PrologType") -> None:
         # This will require a term serializer.
         raise NotImplementedError("ConsoleStream.write_term() is not yet implemented.")
 
@@ -79,12 +81,15 @@ class StringStream(IOStream):
     """
     Concrete IOStream implementation for reading from and writing to strings/buffers.
     """
+
     def __init__(self, initial_input: str = "", output_buffer: List[str] = None):
         super().__init__()
         self.input_string = initial_input
         self.read_position = 0
         # Ensure output_buffer is a list. If None is passed, create a new list.
-        self.output_buffer: List[str] = output_buffer if output_buffer is not None else []
+        self.output_buffer: List[str] = (
+            output_buffer if output_buffer is not None else []
+        )
 
     def write_char(self, char: str) -> None:
         self.output_buffer.append(char)
@@ -95,7 +100,7 @@ class StringStream(IOStream):
             self.read_position += 1
             return char
         else:
-            return "" # Signify EOF
+            return ""  # Signify EOF
 
     def get_output_string(self) -> str:
         """Helper method to get the accumulated output as a single string."""
@@ -110,10 +115,10 @@ class StringStream(IOStream):
         self.input_string = new_input_string
         self.read_position = 0
 
-    def read_term(self) -> 'PrologType':
+    def read_term(self) -> "PrologType":
         # This will require a parser integrated with the stream (reading from self.input_string).
         raise NotImplementedError("StringStream.read_term() is not yet implemented.")
 
-    def write_term(self, term: 'PrologType') -> None:
+    def write_term(self, term: "PrologType") -> None:
         # This will require a term serializer (writing to self.output_buffer).
         raise NotImplementedError("StringStream.write_term() is not yet implemented.")

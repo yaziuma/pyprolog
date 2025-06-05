@@ -52,4 +52,9 @@ dev = [
 include = ["pyprolog*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.md", "*.txt", "*.toml"]
+"pyprolog" = [
+    "*.md", 
+    "*.txt", 
+    "*.toml",
+    "config/logging/*.conf"  # 追加: ログ設定ファイルを含める
+]

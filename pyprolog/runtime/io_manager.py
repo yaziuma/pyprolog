@@ -1,6 +1,7 @@
 # pyprolog/runtime/io_manager.py
 from .io_streams import IOStream, ConsoleStream
 
+
 class IOManager:
     """
     Manages the current input and output streams for the Prolog runtime.

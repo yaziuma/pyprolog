@@ -6,32 +6,30 @@ Simple Interactive Prolog CLI
 
 import os
 import sys
-import json
-from datetime import datetime
-from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 
 from colorama import Fore, Style, init
 
 from pyprolog.parser.parser import Parser
 from pyprolog.parser.scanner import Scanner
-from pyprolog.core.types import Variable, Rule
+from pyprolog.core.types import Variable
 from pyprolog.core.errors import InterpreterError, ScannerError, PrologError
 from pyprolog.runtime.interpreter import Runtime
 
 # カラー初期化
 init(autoreset=True)
 
+
 class SimplePrologInteractive:
     """シンプルな対話型Prologシステム"""
-    
+
     def __init__(self):
         self.runtime: Optional[Runtime] = None
         self.session_history: List[str] = []
         self.current_rules_file: Optional[str] = None
-        
+
         print(self._get_welcome_message())
-    
+
     def _get_welcome_message(self) -> str:
         """ウェルカムメッセージを取得"""
         return f"""{Fore.CYAN}
@@ -81,15 +79,15 @@ class SimplePrologInteractive:
     def _format_success(self, text: str) -> str:
         """成功メッセージのフォーマット"""
         return f"{Fore.GREEN}{text}{Style.RESET_ALL}"
-    
+
     def _format_error(self, text: str) -> str:
         """エラーメッセージのフォーマット"""
         return f"{Fore.RED}{text}{Style.RESET_ALL}"
-    
+
     def _format_warning(self, text: str) -> str:
         """警告メッセージのフォーマット"""
         return f"{Fore.YELLOW}{text}{Style.RESET_ALL}"
-    
+
     def _format_info(self, text: str) -> str:
         """情報メッセージのフォーマット"""
         return f"{Fore.BLUE}{text}{Style.RESET_ALL}"
@@ -99,18 +97,22 @@ class SimplePrologInteractive:
         try:
             if rules_file and os.path.exists(rules_file):
                 # ファイルからルールを読み込み
-                with open(rules_file, 'r', encoding='utf-8') as f:
+                with open(rules_file, "r", encoding="utf-8") as f:
                     rules_text = f.read()
-                
+
                 parsed_rules = Parser(Scanner(rules_text).scan_tokens())._parse_rule()
-                
+
                 # 結果をリストに変換
                 if parsed_rules is not None:
-                    rules_list = [parsed_rules] if not isinstance(parsed_rules, list) else parsed_rules
+                    rules_list = (
+                        [parsed_rules]
+                        if not isinstance(parsed_rules, list)
+                        else parsed_rules
+                    )
                     self.runtime = Runtime(rules_list)
                 else:
                     self.runtime = Runtime([])
-                
+
                 self.current_rules_file = rules_file
                 print(self._format_success(f"ファイル '{rules_file}' を読み込みました"))
                 return True
@@ -119,7 +121,7 @@ class SimplePrologInteractive:
                 self.runtime = Runtime([])
                 print(self._format_info("空のランタイムを初期化しました"))
                 return True
-                
+
         except Exception as e:
             print(self._format_error(f"ランタイム初期化エラー: {e}"))
             return False
@@ -128,51 +130,53 @@ class SimplePrologInteractive:
         """コマンドを処理（True=継続、False=終了）"""
         parts = command.strip().split()
         cmd = parts[0].lower()
-        
-        if cmd in [':quit', ':exit']:
+
+        if cmd in [":quit", ":exit"]:
             return False
-        
-        elif cmd == ':help':
+
+        elif cmd == ":help":
             print(self._get_help_message())
-        
-        elif cmd == ':load':
+
+        elif cmd == ":load":
             if len(parts) < 2:
                 print(self._format_error("使用法: :load <ファイルパス>"))
                 return True
-            
+
             file_path = parts[1]
             if not os.path.exists(file_path):
                 print(self._format_error(f"ファイル '{file_path}' が見つかりません"))
                 return True
-            
+
             self._init_runtime(file_path)
-        
-        elif cmd == ':reload':
+
+        elif cmd == ":reload":
             if self.current_rules_file:
                 self._init_runtime(self.current_rules_file)
             else:
                 print(self._format_warning("再読み込みするファイルがありません"))
-        
-        elif cmd == ':show_rules':
+
+        elif cmd == ":show_rules":
             if self.runtime and self.runtime.rules:
-                print(self._format_info(f"現在のルール ({len(self.runtime.rules)} 件):"))
+                print(
+                    self._format_info(f"現在のルール ({len(self.runtime.rules)} 件):")
+                )
                 for i, rule in enumerate(self.runtime.rules, 1):
                     print(f"  {i:2d}. {rule}")
             else:
                 print(self._format_warning("ルールが読み込まれていません"))
-        
-        elif cmd == ':clear':
+
+        elif cmd == ":clear":
             self.runtime = Runtime([])
             self.current_rules_file = None
             print(self._format_success("ルールをクリアしました"))
-        
-        elif cmd == ':status':
+
+        elif cmd == ":status":
             self._show_status()
-        
+
         else:
             print(self._format_error(f"不明なコマンド: {cmd}"))
             print("':help' でコマンド一覧を確認してください")
-        
+
         return True
 
     def _show_status(self):
@@ -188,9 +192,9 @@ class SimplePrologInteractive:
         if not solutions:
             print(self._format_warning("解が見つかりませんでした"))
             return
-        
+
         print(self._format_success(f"{len(solutions)} 件の解が見つかりました:"))
-        
+
         # 解を表示
         for i, solution in enumerate(solutions, 1):
             if isinstance(solution, dict):
@@ -213,23 +217,23 @@ class SimplePrologInteractive:
         """クエリを実行"""
         if not self.runtime:
             self._init_runtime()
-        
+
         try:
             self.session_history.append(query_text)
-            
+
             if self.runtime is not None:
                 # queryメソッドを使用
                 solutions = self.runtime.query(query_text)
-                
+
                 # 結果表示
                 self._display_query_results(solutions)
             else:
                 print(self._format_error("ランタイムが初期化されていません"))
-                
+
         except (InterpreterError, ScannerError, PrologError) as e:
             error_msg = f"Prologエラー: {str(e)}"
             print(self._format_error(error_msg))
-        
+
         except Exception as e:
             error_msg = f"システムエラー: {str(e)}"
             print(self._format_error(error_msg))
@@ -241,26 +245,26 @@ class SimplePrologInteractive:
                 try:
                     # プロンプト表示と入力受付
                     user_input = input("Prolog> ").strip()
-                    
+
                     # 空入力をスキップ
                     if not user_input:
                         continue
-                    
+
                     # コマンド処理
-                    if user_input.startswith(':'):
+                    if user_input.startswith(":"):
                         if not self._handle_command(user_input):
                             break  # 終了コマンド
                     else:
                         # Prologクエリとして実行
                         self._execute_query(user_input)
-                
+
                 except KeyboardInterrupt:
                     print(f"\n{self._format_warning('割り込まれました (Ctrl+C)')}")
                     print("':quit' で終了、':help' でヘルプを表示")
-                
+
         except KeyboardInterrupt:
             pass  # 外側のキャッチ
-        
+
         finally:
             print(f"\n{self._format_info('PyProlog セッションを終了します')}")
             if self.session_history:

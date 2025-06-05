@@ -10,7 +10,7 @@ from pyprolog.parser.scanner import Scanner
 from pyprolog.core.types import Variable, Rule
 from pyprolog.core.errors import InterpreterError, ScannerError
 from pyprolog.parser.types import Dot, Bar
-from pyprolog.parser.types import FALSE, TRUE
+from pyprolog.parser.types import FALSE
 
 
 init(autoreset=True)
@@ -18,7 +18,7 @@ init(autoreset=True)
 home_path = str(Path.home())
 
 
-if os.name == 'nt':
+if os.name == "nt":
     import msvcrt
 
     def wait_for_char():
@@ -41,19 +41,19 @@ else:
 
 
 def success(input):
-    return f'{Fore.GREEN}{input}'
+    return f"{Fore.GREEN}{input}"
 
 
 def failure(input):
-    return f'{Fore.RED}{input}'
+    return f"{Fore.RED}{input}"
 
 
 def warning(input):
-    return f'{Fore.YELLOW}{input}'
+    return f"{Fore.YELLOW}{input}"
 
 
 def display_variables(goal, solution, stream_reader):
-    print(stream_reader(), end='')
+    print(stream_reader(), end="")
     has_variables = False
     if isinstance(goal, Rule):
         goal = goal.head
@@ -62,41 +62,39 @@ def display_variables(goal, solution, stream_reader):
             goal_match = goal.match(solution)
             if goal_match:
                 bind = goal_match.get(arg)
-                print(success(f'{arg} = {bind}'), end=' ')
+                print(success(f"{arg} = {bind}"), end=" ")
                 has_variables = True
         elif isinstance(arg, Dot):
             goal_match = goal.match(solution)
             if isinstance(arg, Dot) and goal_match:
                 for k, v in goal_match.items():
-                    if isinstance(k, Variable) and k.name == '_':
+                    if isinstance(k, Variable) and k.name == "_":
                         continue
-                    print(f'{k} = {v}', end=' ')
+                    print(f"{k} = {v}", end=" ")
                 has_variables = True
         elif isinstance(arg, Bar):
             goal_match = goal.match(solution)
             if goal_match:
                 for k, v in goal_match.items():
-                    if isinstance(k, Variable) and k.name == '_':
+                    if isinstance(k, Variable) and k.name == "_":
                         continue
-                    print(f'{k} = {v}', end=' ')
+                    print(f"{k} = {v}", end=" ")
                 has_variables = True
     if has_variables:
-        print('')
+        print("")
 
 
 def run_repl(runtime):
-    print(success('\nWelcome to Simple Prolog'))
-    print(warning('ctrl-c to quit'))
+    print(success("\nWelcome to Simple Prolog"))
+    print(warning("ctrl-c to quit"))
     try:
         while True:
             query = prompt(
-                '> ',
-                history=FileHistory(
-                    os.path.join(home_path, '.simpleprolog_history')
-                ),
+                "> ",
+                history=FileHistory(os.path.join(home_path, ".simpleprolog_history")),
                 auto_suggest=AutoSuggestFromHistory(),
             )
-            if query == '':
+            if query == "":
                 continue
 
             try:
@@ -115,25 +113,25 @@ def run_repl(runtime):
                         is_first_iter = True
                     else:
                         ch = wait_for_char()
-                        if ch == ';':
+                        if ch == ";":
                             has_solution = False
                         else:
                             has_solution = False
                             break
                     display_variables(goal, solution, runtime.stream_read)
                 if has_solution:
-                    print('yes')
+                    print("yes")
                 else:
                     if not is_first_iter:
-                        print(runtime.stream_read(), end='')
-                    print('no')
+                        print(runtime.stream_read(), end="")
+                    print("no")
             except IndexError:
-                print('Unterminated input')
+                print("Unterminated input")
             except KeyboardInterrupt as e:  # Exception as e:
-                print(failure(f'Error: {str(e)}'))
+                print(failure(f"Error: {str(e)}"))
             except InterpreterError as e:
-                print(failure(f'Error: {str(e)}'))
+                print(failure(f"Error: {str(e)}"))
             except ScannerError as e:
-                print(failure(f'Error: {str(e)}'))
+                print(failure(f"Error: {str(e)}"))
     except KeyboardInterrupt:
-        print('\nExiting...')
+        print("\nExiting...")

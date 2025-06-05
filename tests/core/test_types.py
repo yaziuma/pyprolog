@@ -6,7 +6,14 @@ Prologインタープリターの基本データ型（Atom, Variable, Number, St
 """
 
 from pyprolog.core.types import (
-    Atom, Variable, Number, String, Term, ListTerm, Rule, Fact, PrologType
+    Atom,
+    Variable,
+    Number,
+    String,
+    Term,
+    ListTerm,
+    Rule,
+    Fact,
 )
 
 
@@ -19,16 +26,16 @@ class TestBasicTypes:
         atom1 = Atom("test")
         atom2 = Atom("test")
         atom3 = Atom("different")
-        
+
         # 等価性の確認
         assert atom1 == atom2
         assert atom1 != atom3
         assert atom1.name == "test"
-        
+
         # ハッシュ性の確認
         assert hash(atom1) == hash(atom2)
         assert hash(atom1) != hash(atom3)
-        
+
         # repr の確認
         assert repr(atom1) == "test"
 
@@ -38,16 +45,16 @@ class TestBasicTypes:
         var1 = Variable("X")
         var2 = Variable("X")
         var3 = Variable("Y")
-        
+
         # 等価性の確認
         assert var1 == var2
         assert var1 != var3
         assert var1.name == "X"
-        
+
         # ハッシュ性の確認
         assert hash(var1) == hash(var2)
         assert hash(var1) != hash(var3)
-        
+
         # repr の確認
         assert repr(var1) == "X"
 
@@ -57,27 +64,27 @@ class TestBasicTypes:
         num1 = Number(42)
         num2 = Number(42)
         num3 = Number(24)
-        
+
         # 浮動小数点数の作成
         float1 = Number(3.14)
         float2 = Number(3.14)
         float3 = Number(2.71)
-        
+
         # 等価性の確認
         assert num1 == num2
         assert num1 != num3
         assert float1 == float2
         assert float1 != float3
         assert num1 != float1
-        
+
         # 値の確認
         assert num1.value == 42
         assert float1.value == 3.14
-        
+
         # ハッシュ性の確認
         assert hash(num1) == hash(num2)
         assert hash(float1) == hash(float2)
-        
+
         # repr の確認
         assert repr(num1) == "42"
         assert repr(float1) == "3.14"
@@ -88,16 +95,16 @@ class TestBasicTypes:
         str1 = String("hello")
         str2 = String("hello")
         str3 = String("world")
-        
+
         # 等価性の確認
         assert str1 == str2
         assert str1 != str3
         assert str1.value == "hello"
-        
+
         # ハッシュ性の確認
         assert hash(str1) == hash(str2)
         assert hash(str1) != hash(str3)
-        
+
         # repr の確認
         assert repr(str1) == "'hello'"
 
@@ -106,22 +113,21 @@ class TestBasicTypes:
         # 引数なしのTerm（アトムと同等）
         term1 = Term(Atom("fact"))
         assert repr(term1) == "fact"
-        
+
         # 引数ありのTerm
         term2 = Term(Atom("likes"), [Atom("john"), Atom("mary")])
         assert repr(term2) == "likes(john, mary)"
-        
+
         # 複雑なネストしたTerm
-        term3 = Term(Atom("parent"), [
-            Term(Atom("father"), [Variable("X")]),
-            Variable("Y")
-        ])
+        term3 = Term(
+            Atom("parent"), [Term(Atom("father"), [Variable("X")]), Variable("Y")]
+        )
         assert repr(term3) == "parent(father(X), Y)"
-        
+
         # 等価性の確認
         term4 = Term(Atom("likes"), [Atom("john"), Atom("mary")])
         assert term2 == term4
-        
+
         term5 = Term(Atom("likes"), [Atom("mary"), Atom("john")])
         assert term2 != term5
 
@@ -132,32 +138,31 @@ class TestBasicTypes:
         internal_empty = empty_list.to_internal_list_term()
         assert isinstance(internal_empty, Atom)
         assert internal_empty.name == "[]"
-        
+
         # 単一要素のリスト
         single_list = ListTerm([Atom("a")])
         internal_single = single_list.to_internal_list_term()
         expected_single = Term(Atom("."), [Atom("a"), Atom("[]")])
         assert internal_single == expected_single
-        
+
         # 複数要素のリスト
         multi_list = ListTerm([Atom("a"), Atom("b"), Atom("c")])
         internal_multi = multi_list.to_internal_list_term()
-        expected_multi = Term(Atom("."), [
-            Atom("a"),
-            Term(Atom("."), [
-                Atom("b"),
-                Term(Atom("."), [Atom("c"), Atom("[]")])
-            ])
-        ])
+        expected_multi = Term(
+            Atom("."),
+            [
+                Atom("a"),
+                Term(Atom("."), [Atom("b"), Term(Atom("."), [Atom("c"), Atom("[]")])]),
+            ],
+        )
         assert internal_multi == expected_multi
-        
+
         # テール付きリスト
         tail_list = ListTerm([Atom("a"), Atom("b")], Variable("T"))
         internal_tail = tail_list.to_internal_list_term()
-        expected_tail = Term(Atom("."), [
-            Atom("a"),
-            Term(Atom("."), [Atom("b"), Variable("T")])
-        ])
+        expected_tail = Term(
+            Atom("."), [Atom("a"), Term(Atom("."), [Atom("b"), Variable("T")])]
+        )
         assert internal_tail == expected_tail
 
     def test_rule_and_fact_creation(self):
@@ -165,21 +170,24 @@ class TestBasicTypes:
         # Factの作成
         fact = Fact(Term(Atom("likes"), [Atom("john"), Atom("mary")]))
         assert repr(fact) == "likes(john, mary)."
-        
+
         # Ruleの作成
         head = Term(Atom("grandparent"), [Variable("X"), Variable("Z")])
-        body = Term(Atom(","), [
-            Term(Atom("parent"), [Variable("X"), Variable("Y")]),
-            Term(Atom("parent"), [Variable("Y"), Variable("Z")])
-        ])
+        body = Term(
+            Atom(","),
+            [
+                Term(Atom("parent"), [Variable("X"), Variable("Y")]),
+                Term(Atom("parent"), [Variable("Y"), Variable("Z")]),
+            ],
+        )
         rule = Rule(head, body)
         expected_repr = "grandparent(X, Z) :- ,(parent(X, Y), parent(Y, Z))."
         assert repr(rule) == expected_repr
-        
+
         # 等価性の確認
         fact2 = Fact(Term(Atom("likes"), [Atom("john"), Atom("mary")]))
         assert fact == fact2
-        
+
         rule2 = Rule(head, body)
         assert rule == rule2
 
@@ -192,7 +200,7 @@ class TestListTerm:
         empty1 = ListTerm([])
         empty2 = ListTerm([], Atom("[]"))
         empty3 = ListTerm([], None)
-        
+
         assert repr(empty1) == "[]"
         assert repr(empty2) == "[]"
         assert repr(empty3) == "[]"
@@ -218,7 +226,7 @@ class TestListTerm:
         list1 = ListTerm([Atom("a"), Atom("b")])
         list2 = ListTerm([Atom("a"), Atom("b")])
         list3 = ListTerm([Atom("b"), Atom("a")])
-        
+
         assert list1 == list2
         assert list1 != list3
 
@@ -226,10 +234,10 @@ class TestListTerm:
         """リストのハッシュテスト"""
         list1 = ListTerm([Atom("a"), Atom("b")])
         list2 = ListTerm([Atom("a"), Atom("b")])
-        
+
         # 同じ内容のリストは同じハッシュ値を持つ
         assert hash(list1) == hash(list2)
-        
+
         # セットに追加できることを確認
         list_set = {list1, list2}
         assert len(list_set) == 1
@@ -244,21 +252,24 @@ class TestComplexStructures:
         inner_term1 = Term(Atom("g"), [Variable("X")])
         inner_term2 = Term(Atom("h"), [Variable("Y"), Variable("Z")])
         outer_term = Term(Atom("f"), [inner_term1, inner_term2])
-        
+
         expected_repr = "f(g(X), h(Y, Z))"
         assert repr(outer_term) == expected_repr
 
     def test_mixed_data_types(self):
         """混合データ型のテスト"""
         # complex(atom, 42, "string", X, [a, b])
-        mixed_term = Term(Atom("complex"), [
-            Atom("atom"),
-            Number(42),
-            String("string"),
-            Variable("X"),
-            ListTerm([Atom("a"), Atom("b")])
-        ])
-        
+        mixed_term = Term(
+            Atom("complex"),
+            [
+                Atom("atom"),
+                Number(42),
+                String("string"),
+                Variable("X"),
+                ListTerm([Atom("a"), Atom("b")]),
+            ],
+        )
+
         expected_repr = "complex(atom, 42, 'string', X, [a, b])"
         assert repr(mixed_term) == expected_repr
 
@@ -266,11 +277,14 @@ class TestComplexStructures:
         """複雑なボディを持つRuleのテスト"""
         # ancestor(X, Z) :- parent(X, Y), ancestor(Y, Z).
         head = Term(Atom("ancestor"), [Variable("X"), Variable("Z")])
-        body = Term(Atom(","), [
-            Term(Atom("parent"), [Variable("X"), Variable("Y")]),
-            Term(Atom("ancestor"), [Variable("Y"), Variable("Z")])
-        ])
+        body = Term(
+            Atom(","),
+            [
+                Term(Atom("parent"), [Variable("X"), Variable("Y")]),
+                Term(Atom("ancestor"), [Variable("Y"), Variable("Z")]),
+            ],
+        )
         rule = Rule(head, body)
-        
+
         expected_repr = "ancestor(X, Z) :- ,(parent(X, Y), ancestor(Y, Z))."
         assert repr(rule) == expected_repr
