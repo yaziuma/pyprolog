@@ -1,8 +1,8 @@
-import prolog
-import prolog.util # prolog.util モジュールをインポート
+import pyprolog
+import pyprolog.util  # pyprolog.util モジュールをインポート
 
-# prolog.util.get_logger() を呼び出す
-logger = prolog.util.get_logger("test_import_util_access")
-logger.info("prolog.util.get_logger() の呼び出しテストに成功しました。")
+# pyprolog.util.get_logger() を呼び出す
+logger = pyprolog.util.get_logger("test_import_util_access")
+logger.info("pyprolog.util.get_logger() の呼び出しテストに成功しました。")
 
-print("prolog.util.get_logger() の呼び出しテストに成功しました。")
+print("pyprolog.util.get_logger() の呼び出しテストに成功しました。")

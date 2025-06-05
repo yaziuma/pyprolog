@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyprolog"
-version = "0.1.0"
+version = "0.2.0"
 description = "Prolog Interpreter in Python"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "yaziuma"}
@@ -35,7 +35,7 @@ Repository = "https://github.com/yaziuma/pyprolog"
 "Bug Tracker" = "https://github.com/yaziuma/pyprolog/issues"
 
 [project.scripts]
-pyprolog = "prolog.cli.prolog:main"
+pyprolog = "pyprolog.cli.prolog:main"
 
 [project.optional-dependencies]
 dev = [
@@ -49,7 +49,12 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["prolog*"]
+include = ["pyprolog*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.md", "*.txt", "*.toml"]
+"pyprolog" = [
+    "*.md", 
+    "*.txt", 
+    "*.toml",
+    "config/logging/*.conf"  # 追加: ログ設定ファイルを含める
+]
