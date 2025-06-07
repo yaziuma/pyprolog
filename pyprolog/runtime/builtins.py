@@ -477,14 +477,26 @@ class MemberPredicate(BuiltinPredicate):
             and len(current_list.args) == 2
         ):
             head = current_list.args[0]
+            head = current_list.args[0]
             tail = current_list.args[1]
+            logger.debug(
+                f"MEMBER: Loop iteration. current_list='{current_list}', head='{head}', tail='{tail}', element_to_match='{element_to_match}'"
+            )
 
             unified, next_env = runtime.logic_interpreter.unify(
                 element_to_match, head, env
             )
+            logger.debug(
+                f"MEMBER: Unify result for element '{element_to_match}' and head '{head}': {unified}. Env after unify: {next_env.bindings if unified else 'N/A'}"
+            )
             if unified:
                 yield next_env
+
+            current_list_before_deref = tail
             current_list = runtime.logic_interpreter.dereference(tail, env)
+            logger.debug(
+                f"MEMBER: Tail dereferenced. Before='{current_list_before_deref}', After='{current_list}', Type After='{type(current_list)}'"
+            )
         return
 
 
@@ -502,15 +514,31 @@ class AppendPredicate(BuiltinPredicate):
         unified_l1_empty, env_clause1_after_l1 = runtime.logic_interpreter.unify(
             self.args[0], Atom("[]"), env_clause1
         )
+        logger.debug(
+            f"APPEND_CP1: L1='{self.args[0]}', L2='{self.args[1]}', L3='{self.args[2]}'. Trying to unify L1 with []."
+        )
         if unified_l1_empty:
+            logger.debug(
+                f"APPEND_CP1: L1 unified with []. Env after L1 unify: {env_clause1_after_l1.bindings}"
+            )
             # L1 is []. Unify L2 and L3.
             unified_l2_l3, final_env_clause1 = runtime.logic_interpreter.unify(
                 self.args[1], self.args[2], env_clause1_after_l1
             )
             if unified_l2_l3:
+                logger.debug(
+                    f"APPEND_CP1: L2 and L3 unified. Yielding solution from CP1. Env: {final_env_clause1.bindings}"
+                )
                 yield final_env_clause1
+            else:
+                logger.debug(f"APPEND_CP1: L2 and L3 failed to unify.")
+        else:
+            logger.debug(f"APPEND_CP1: L1 failed to unify with [].")
 
         # --- Choice Point 2: append([H|T1], L2, [H|T3]) :- append(T1, L2, T3). ---
+        logger.debug(
+            f"APPEND_CP2: L1='{self.args[0]}', L2='{self.args[1]}', L3='{self.args[2]}'. Creating patterns."
+        )
         env_clause2 = env.copy()
 
         # Create fresh variables for the components of List1 and List3 for this specific choice point
@@ -523,12 +551,17 @@ class AppendPredicate(BuiltinPredicate):
         runtime.logic_interpreter._unique_var_counter += 3
 
         list1_pattern = Term(Atom("."), [h1_var, t1_var])
-
+        logger.debug(
+            f"APPEND_CP2: Attempting to unify L1 ('{self.args[0]}') with pattern '{list1_pattern}'."
+        )
         unified_l1_cons, env_clause2_after_l1 = runtime.logic_interpreter.unify(
             self.args[0], list1_pattern, env_clause2
         )
 
         if unified_l1_cons:
+            logger.debug(
+                f"APPEND_CP2: L1 unified with '{list1_pattern}'. Env after L1 unify: {env_clause2_after_l1.bindings}"
+            )
             # L1 successfully unified with [h1_var | t1_var].
             # h1_var and t1_var are now (potentially) bound in env_clause2_after_l1.
 
@@ -538,18 +571,30 @@ class AppendPredicate(BuiltinPredicate):
             list3_pattern = Term(
                 Atom("."), [h1_var, t3_var]
             )  # uses the same h1_var Variable object
-
+            logger.debug(
+                f"APPEND_CP2: Attempting to unify L3 ('{self.args[2]}') with pattern '{list3_pattern}'."
+            )
             unified_l3_cons, env_clause2_after_l3 = runtime.logic_interpreter.unify(
                 self.args[2], list3_pattern, env_clause2_after_l1
             )
 
             if unified_l3_cons:
+                logger.debug(
+                    f"APPEND_CP2: L3 unified with '{list3_pattern}'. Env after L3 unify: {env_clause2_after_l3.bindings}"
+                )
                 # Recursively call append(t1_var, List2_original, t3_var)
                 # using env_clause2_after_l3.
                 # The original self.args[1] is List2.
                 # t1_var and t3_var are passed (their bound values if bound, or the Variable objects themselves)
+                logger.debug(
+                    f"APPEND_CP2: Making recursive call: append({t1_var}, {self.args[1]}, {t3_var}) with env: {env_clause2_after_l3.bindings}"
+                )
                 recursive_predicate = AppendPredicate(t1_var, self.args[1], t3_var)
                 yield from recursive_predicate.execute(runtime, env_clause2_after_l3)
+            else:
+                logger.debug(f"APPEND_CP2: L3 failed to unify with '{list3_pattern}'.")
+        else:
+            logger.debug(f"APPEND_CP2: L1 failed to unify with '{list1_pattern}'.")
         return  # End of AppendPredicate
 
 

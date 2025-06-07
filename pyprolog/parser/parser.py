@@ -278,7 +278,10 @@ class Parser:
         if not self._check(TokenType.RIGHTBRACKET):
             while True:
                 # リスト要素解析時もコンマ演算子の優先度より高い優先度で解析
-                elem = self._parse_expression_with_precedence(999)
+                # [H|T] の H が | を越えて読み込まないように、優先度を調整
+                # 仮に199とする（多くの二項演算子より優先度を低く設定し、BARを演算子として読まないようにする）
+                # これにより、リスト要素内で直接演算子を使う場合（例: [X+Y, Z]）に影響が出る可能性がある
+                elem = self._parse_expression_with_precedence(199) # 999 から 199 に変更
                 if elem is None:
                     return None
                 elements.append(elem)
@@ -296,10 +299,19 @@ class Parser:
         self._consume(TokenType.RIGHTBRACKET, "Expected ']' after list")
 
         # リストを内部表現に変換
-        if tail is None:
-            tail = Atom("[]")
+        # elements が空で、tail が指定されている場合 (例: [|T]) は tail そのもの。
+        # tail が指定されていない場合 (例: []) は Atom("[]")。
+        # tail が指定されておらず elements も空の場合 (例: []) は Atom("[]")。
+        if not elements:
+            return tail if tail is not None else Atom("[]")
 
-        result = tail
+        # elements が存在する場合
+        # tail が BAR によって設定されていなければ、デフォルトの tail は Atom("[]")
+        current_tail = tail if tail is not None else Atom("[]")
+
+        # elements を逆順に処理して '.'/2 の入れ子構造を作る
+        # ループの最初の result の初期値は current_tail
+        result = current_tail
         for element in reversed(elements):
             result = Term(Atom("."), [element, result])
         return result
