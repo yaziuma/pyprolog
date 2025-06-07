@@ -3,7 +3,8 @@ from pyprolog.parser.token import Token
 from pyprolog.parser.token_type import TokenType
 from pyprolog.core.types import Term, Variable, Atom, Number, String, Rule, Fact
 from pyprolog.core.operators import operator_registry, Associativity
-from typing import List, Optional, Callable, Union
+from typing import List, Optional, Callable, Union # Added Optional
+from pyprolog.util.variable_mapper import VariableMapper # Added VariableMapper
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,10 +21,12 @@ class Parser:
         self,
         tokens: List[Token],
         error_handler: Callable[[Token, str], None] = default_error_handler,
+        variable_mapper: Optional[VariableMapper] = None, # Added variable_mapper
     ):
         self._tokens = tokens
         self._current = 0
         self._error_handler = error_handler
+        self._variable_mapper = variable_mapper if variable_mapper is not None else VariableMapper() # Initialize variable_mapper
         logger.debug(f"Parser initialized with {len(tokens)} tokens")
 
     def parse(self) -> List[Union[Rule, Fact]]:
@@ -237,7 +240,7 @@ class Parser:
             return Number(self._previous().literal)
 
         elif self._match(TokenType.VARIABLE):
-            return Variable(self._previous().lexeme)
+            return Variable(self._previous().literal) # Changed lexeme to literal
 
         elif self._match(TokenType.STRING):  # Handling of single-quoted atoms
             token = self._previous()

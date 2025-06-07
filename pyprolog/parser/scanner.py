@@ -3,6 +3,7 @@ from pyprolog.parser.token import Token
 from pyprolog.parser.token_type import TokenType, ensure_operator_tokens
 from typing import List, Dict, Callable
 import logging
+from pyprolog.util import VariableMapper # Added import
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,10 @@ class Scanner:
     """演算子統合設計を活用したスキャナー"""
 
     def __init__(
-        self, source: str, report: Callable[[int, str], None] = default_error_handler
+        self,
+        source: str,
+        report: Callable[[int, str], None] = default_error_handler,
+        variable_mapper: VariableMapper = None, # Added variable_mapper
     ):
         self._source = source
         self._tokens: List[Token] = []
@@ -23,6 +27,7 @@ class Scanner:
         self._current = 0
         self._line = 1
         self._report = report
+        self._variable_mapper = variable_mapper # Store variable_mapper
 
         # 演算子トークンの初期化をキーワード定義より前に移動
         ensure_operator_tokens()
@@ -153,10 +158,14 @@ class Scanner:
 
     def _identifier(self):
         """識別子のスキャン"""
-        while self._peek().isalnum() or self._peek() == "_":
+        # 日本語識別子を考慮し、より広い範囲の文字を許可する必要があるかもしれないが、
+        # VariableMapper.is_japanese_variable でチェックするため、ここでは基本的な英数字+_で進める
+        while self._peek().isalnum() or self._peek() == "_" or \
+              (self._variable_mapper and self._variable_mapper.is_japanese_variable(self._source[self._start : self._current + 1])):
             self._advance()
 
         text = self._source[self._start : self._current]
+        literal_override = None
 
         # キーワードチェック
         token_type = self._keywords.get(text)
@@ -165,12 +174,20 @@ class Scanner:
             # 演算子キーワードチェック（統合設計活用）
             if text in self._operator_symbols:
                 token_type = self._operator_symbols[text]
+            elif self._variable_mapper and self._variable_mapper.is_japanese_variable(text):
+                token_type = TokenType.VARIABLE
+                literal_override = self._variable_mapper.map_japanese_to_english(text)
+                logger.debug(f"Mapped Japanese variable '{text}' to '{literal_override}'")
             elif text[0].isupper() or text[0] == "_":
                 token_type = TokenType.VARIABLE
             else:
                 token_type = TokenType.ATOM
 
-        self._add_token(token_type)
+        if literal_override is not None:
+            self._add_token(token_type, literal_override=literal_override)
+        else:
+            self._add_token(token_type)
+
 
     def _number(self):
         """数値のスキャン"""
@@ -229,8 +246,7 @@ class Scanner:
         self._current += 1
         return self._source[self._current - 1]
 
-    def _add_token(self, token_type: TokenType, literal=None):
+    def _add_token(self, token_type: TokenType, literal_override=None):
         text = self._source[self._start : self._current]
-        if literal is None:
-            literal = text
-        self._tokens.append(Token(token_type, text, literal, self._line))
+        literal_to_store = literal_override if literal_override is not None else text
+        self._tokens.append(Token(token_type, text, literal_to_store, self._line))

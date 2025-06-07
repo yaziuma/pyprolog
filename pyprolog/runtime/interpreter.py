@@ -3,6 +3,7 @@ from pyprolog.core.types import Term, Variable, Number, Rule, Fact, Atom
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.parser.scanner import Scanner
 from pyprolog.parser.parser import Parser
+from pyprolog.util.variable_mapper import VariableMapper # Added
 from pyprolog.runtime.math_interpreter import MathInterpreter
 from pyprolog.runtime.logic_interpreter import LogicInterpreter
 from pyprolog.core.operators import operator_registry, OperatorType, OperatorInfo
@@ -23,15 +24,16 @@ from pyprolog.runtime.builtins import (
     GetCharPredicate,
 )
 from .io_manager import IOManager
-from typing import List, Iterator, Dict, Any, Union, Optional, Callable
+from typing import List, Iterator, Dict, Any, Union, Optional, Callable # Optional was already here
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class Runtime:
-    def __init__(self, rules: Optional[List[Union[Rule, Fact]]] = None):
+    def __init__(self, rules: Optional[List[Union[Rule, Fact]]] = None, variable_mapper: Optional[VariableMapper] = None): # Added variable_mapper
         self.rules: List[Union[Rule, Fact]] = rules if rules is not None else []
+        self.variable_mapper = variable_mapper if variable_mapper is not None else VariableMapper() # Initialize variable_mapper
         self.math_interpreter = MathInterpreter()
         self.io_manager = IOManager()  # Initialize IOManager
         self.logic_interpreter = LogicInterpreter(
@@ -39,7 +41,7 @@ class Runtime:
         )  # Pass self (Runtime) to LogicInterpreter
         self._operator_evaluators = self._build_unified_evaluator_system()
         logger.info(
-            f"Runtime initialized with {len(self.rules)} rules, IOManager, and {len(self._operator_evaluators)} operator evaluators"
+            f"Runtime initialized with {len(self.rules)} rules, IOManager, VariableMapper, and {len(self._operator_evaluators)} operator evaluators"
         )
 
     def _build_unified_evaluator_system(self) -> Dict[str, Callable]:
@@ -515,11 +517,11 @@ class Runtime:
         logger.debug(f"QUERY: Executing query: {query_string}")
         solutions = []
         try:
-            tokens = Scanner(query_string).scan_tokens()
+            # Ensure query ends with a dot for parsing consistency
             if not query_string.strip().endswith("."):
                 query_string += "."
-                tokens = Scanner(query_string).scan_tokens()
-            parsed_structures = Parser(tokens).parse()
+            tokens = Scanner(query_string, variable_mapper=self.variable_mapper).scan_tokens() # Added variable_mapper
+            parsed_structures = Parser(tokens, variable_mapper=self.variable_mapper).parse() # Added variable_mapper
             if not parsed_structures:
                 logger.warning("Query parsing failed")
                 return []
@@ -563,14 +565,17 @@ class Runtime:
                         continue
                     result = {}
                     for var_name_str in query_vars_names:
-                        var_obj = Variable(var_name_str)
-                        # Use deep_dereference_term to ensure all variables within the result term are resolved
+                        var_obj = Variable(var_name_str) # This is the English (mapped) variable name
                         value_fully_dereferenced = (
                             self.logic_interpreter.deep_dereference_term(
                                 var_obj, env_solution
                             )
                         )
-                        result[var_obj] = value_fully_dereferenced
+                        # Convert variable name back to Japanese for display
+                        original_var_name = self.variable_mapper.map_english_to_japanese(var_obj.name)
+                        display_var_obj = Variable(original_var_name)
+                        # Convert any variables within the result term back to Japanese
+                        result[display_var_obj] = self._convert_vars_to_japanese(value_fully_dereferenced)
                     solutions.append(result)
             except CutException:
                 logger.info(
@@ -611,8 +616,8 @@ class Runtime:
         try:
             if not rule_string.strip().endswith("."):
                 rule_string += "."
-            tokens = Scanner(rule_string).scan_tokens()
-            parsed_items = Parser(tokens).parse()
+            tokens = Scanner(rule_string, variable_mapper=self.variable_mapper).scan_tokens() # Added variable_mapper
+            parsed_items = Parser(tokens, variable_mapper=self.variable_mapper).parse() # Added variable_mapper
             added_count = 0
             if parsed_items:
                 for item in parsed_items:
@@ -637,8 +642,8 @@ class Runtime:
         try:
             with open(filename, "r", encoding="utf-8") as f:
                 source = f.read()
-            tokens = Scanner(source).scan_tokens()
-            new_rules_or_terms = Parser(tokens).parse()
+            tokens = Scanner(source, variable_mapper=self.variable_mapper).scan_tokens() # Added variable_mapper
+            new_rules_or_terms = Parser(tokens, variable_mapper=self.variable_mapper).parse() # Added variable_mapper
             added_count = 0
             for item in new_rules_or_terms:
                 if isinstance(item, (Rule, Fact)):
@@ -655,3 +660,22 @@ class Runtime:
         except Exception as e:
             logger.error(f"Failed to consult {filename}: {e}", exc_info=True)
             return False
+
+    def _convert_vars_to_japanese(self, term: Any) -> Any:
+        if isinstance(term, Variable):
+            return Variable(self.variable_mapper.map_english_to_japanese(term.name))
+        elif isinstance(term, Term):
+            new_args = [self._convert_vars_to_japanese(arg) for arg in term.args]
+            # FunctorがVariableの場合も変換する（通常はAtomだが念のため）
+            functor_display_name = term.functor.name if isinstance(term.functor, Atom) else str(term.functor)
+            current_functor = term.functor
+            if isinstance(current_functor, Variable): # VariableMapperを使うのは変数の場合のみ
+                 functor_display_name = self.variable_mapper.map_english_to_japanese(current_functor.name)
+                 # FunctorがVariableならVariableとして再構築
+                 return Term(Variable(functor_display_name), new_args)
+            # 通常のAtom functorの場合
+            return Term(Atom(functor_display_name), new_args)
+        elif isinstance(term, list): # For lists (e.g. from findall)
+            return [self._convert_vars_to_japanese(item) for item in term]
+        # Other types (Number, Atom, String) are returned as is.
+        return term
