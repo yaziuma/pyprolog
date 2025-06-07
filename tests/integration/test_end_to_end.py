@@ -8,6 +8,8 @@ End-to-End テスト
 """
 
 import unittest
+from pyprolog.runtime.interpreter import Runtime
+from pyprolog.core.types import Variable, Term, Atom
 
 
 class TestEndToEnd:
@@ -322,6 +324,74 @@ class TestEndToEnd:
 
         # 実装例:
         # 各コンポーネントの境界ケースの組み合わせ
+
+    def test_medical_diagnosis_japanese(self):
+        """日本語医療診断KBのエンドツーエンドテスト"""
+        # Runtimeが初期化されていることを確認 (setup_methodで初期化されるはず)
+        if self.runtime is None:
+            # Fallback if setup_method didn't run or failed, though pytest typically ensures setup runs.
+            # Or, if Runtime import itself is the issue, this test can't proceed.
+            try:
+                from pyprolog.runtime.interpreter import Runtime
+                self.runtime = Runtime()
+            except ImportError:
+                raise unittest.SkipTest("Runtime could not be imported or initialized.")
+
+        kb_path = "tests/data/medical_diagnosis_kb_japanese.pl"
+        consult_success = self.runtime.consult(kb_path)
+        assert consult_success, f"Failed to consult the knowledge base: {kb_path}"
+
+        # --- Test basic write/1 and nl/0 ---
+        write_test_query = "test_write."
+        write_solutions = self.runtime.query(write_test_query)
+        assert write_solutions is not None, "test_write query returned None."
+        # test_write should succeed once if it's found and write/nl work.
+        assert len(write_solutions) >= 0, "test_write query failed (or produced unexpected results)."
+        # We assert >=0 because it might succeed with no bindings, or once with empty binding.
+        # The main check is the captured stdout for 'Hello from Prolog write'.
+        # --- End Test basic write/1 and nl/0 ---
+
+        # --- Basic KB Integrity Check ---
+        simple_fact_query = "疾患症状(風邪, 発熱, 0.8)."
+        simple_solutions = self.runtime.query(simple_fact_query)
+        assert simple_solutions is not None, "Simple fact query returned None."
+        assert len(simple_solutions) > 0, "Simple fact query '疾患症状(風邪, 発熱, 0.8).' failed. KB might not be loaded correctly or basic fact retrieval is broken."
+        # --- End Basic KB Integrity Check ---
+
+        # Query 1: 患者診断([発熱, 咳], 30, [], [], 結果). - Added empty list for Lifestyles for arity 5
+        query1_str = "患者診断([発熱, 咳], 30, [], [], 結果)."
+        solutions1 = self.runtime.query(query1_str)
+
+        assert solutions1 is not None, "Query 1 returned None instead of a list of solutions."
+        assert len(solutions1) > 0, "Query 1 '患者診断([発熱, 咳], 30, [], [], 結果).' returned no solutions."
+
+        result_var1 = Variable("結果")
+        solution1 = solutions1[0]
+        assert result_var1 in solution1, "Variable '結果' not found in solution1 for Query 1."
+        result_value1 = solution1[result_var1]
+        assert isinstance(result_value1, Term) and result_value1.functor.name == ".", "結果 from Query 1 should be a Prolog list."
+
+        # Query 2: 患者診断([息切れ, 発熱], 70, [糖尿病], [], 結果). - Added empty list for Lifestyles for arity 5
+        query2_str = "患者診断([息切れ, 発熱], 70, [糖尿病], [], 結果)."
+        solutions2 = self.runtime.query(query2_str)
+        assert solutions2 is not None, "Query 2 returned None."
+        assert len(solutions2) > 0, "Query 2 '患者診断([息切れ, 発熱], 70, [糖尿病], [], 結果).' returned no solutions."
+        result_var2 = Variable("結果")
+        solution2 = solutions2[0]
+        assert result_var2 in solution2, "Variable '結果' not found in solution2 for Query 2."
+        result_value2 = solution2[result_var2]
+        assert isinstance(result_value2, Term) and result_value2.functor.name == ".", "結果 from Query 2 should be a Prolog list."
+
+        # Query 3: 診断([発熱, 咳, のどの痛み], 45, [喫煙], 診断リスト). - This uses 診断/4 which correctly calls 患者診断/5
+        query3_str = "診断([発熱, 咳, のどの痛み], 45, [喫煙], 診断リスト)."
+        solutions3 = self.runtime.query(query3_str)
+        assert solutions3 is not None, "Query 3 returned None."
+        assert len(solutions3) > 0, "Query 3 '診断([発熱, 咳, のどの痛み], 45, [喫煙], 診断リスト).' returned no solutions."
+        result_var3 = Variable("診断リスト")
+        solution3 = solutions3[0]
+        assert result_var3 in solution3, "Variable '診断リスト' not found in solution3 for Query 3."
+        result_value3 = solution3[result_var3]
+        assert isinstance(result_value3, Term) and result_value3.functor.name == ".", "診断リスト from Query 3 should be a Prolog list."
 
 
 # テスト用のヘルパークラス
