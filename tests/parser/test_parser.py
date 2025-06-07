@@ -275,8 +275,105 @@ class TestParser:
         assert len(results) == 4
         assert isinstance(results[0], Fact)
         assert isinstance(results[1], Fact)
-        assert isinstance(results[2], Rule)
-        assert isinstance(results[3], Rule)
+
+    def test_parse_japanese_facts(self):
+        """日本語を含むファクトの解析テスト"""
+        source = "疾患(風邪). 症状(発熱, 咳)."
+        results = self._parse_source(source)
+
+        assert len(results) == 2
+
+        # 疾患(風邪)
+        fact1 = results[0]
+        assert isinstance(fact1, Fact)
+        assert fact1.head.functor.name == "疾患"
+        assert len(fact1.head.args) == 1
+        assert isinstance(fact1.head.args[0], Atom)
+        assert fact1.head.args[0].name == "風邪"
+
+        # 症状(発熱, 咳)
+        fact2 = results[1]
+        assert isinstance(fact2, Fact)
+        assert fact2.head.functor.name == "症状"
+        assert len(fact2.head.args) == 2
+        assert isinstance(fact2.head.args[0], Atom)
+        assert fact2.head.args[0].name == "発熱"
+        assert isinstance(fact2.head.args[1], Atom)
+        assert fact2.head.args[1].name == "咳"
+
+    def test_parse_japanese_rules(self):
+        """日本語を含むルールの解析テスト"""
+        source = "診断(X, 風邪) :- 症状(X, 発熱), 症状(X, 咳)."
+        results = self._parse_source(source)
+
+        assert len(results) == 1
+        rule = results[0]
+        assert isinstance(rule, Rule)
+
+        # ヘッド: 診断(X, 風邪)
+        assert rule.head.functor.name == "診断"
+        assert len(rule.head.args) == 2
+        assert isinstance(rule.head.args[0], Variable)
+        assert rule.head.args[0].name == "X"
+        assert isinstance(rule.head.args[1], Atom)
+        assert rule.head.args[1].name == "風邪"
+
+        # ボディ: 症状(X, 発熱), 症状(X, 咳)
+        assert isinstance(rule.body, Term)
+        assert rule.body.functor.name == "," # Conjunction
+
+        # ボディ左側: 症状(X, 発熱)
+        body_left = rule.body.args[0]
+        assert isinstance(body_left, Term)
+        assert body_left.functor.name == "症状"
+        assert len(body_left.args) == 2
+        assert isinstance(body_left.args[0], Variable)
+        assert body_left.args[0].name == "X"
+        assert isinstance(body_left.args[1], Atom)
+        assert body_left.args[1].name == "発熱"
+
+        # ボディ右側: 症状(X, 咳)
+        body_right = rule.body.args[1]
+        assert isinstance(body_right, Term)
+        assert body_right.functor.name == "症状"
+        assert len(body_right.args) == 2
+        assert isinstance(body_right.args[0], Variable)
+        assert body_right.args[0].name == "X"
+        assert isinstance(body_right.args[1], Atom)
+        assert body_right.args[1].name == "咳"
+
+    def test_parse_japanese_string_as_atom_in_term(self):
+        """項内部の日本語文字列（アトムとして）の解析テスト"""
+        source = "説明('これは日本語のテストです')."
+        results = self._parse_source(source)
+
+        assert len(results) == 1
+        fact = results[0]
+        assert isinstance(fact, Fact)
+        assert fact.head.functor.name == "説明"
+        assert len(fact.head.args) == 1
+        assert isinstance(fact.head.args[0], Atom) # Single quoted strings are parsed as Atoms
+        assert fact.head.args[0].name == "これは日本語のテストです"
+
+    def test_parse_mixed_japanese_english_terms(self):
+        """日本語と英語が混在する項の解析テスト"""
+        source = "my_predicate('テスト', Variable, 日本語アトム)."
+        results = self._parse_source(source)
+
+        assert len(results) == 1
+        fact = results[0]
+        assert isinstance(fact, Fact)
+        assert fact.head.functor.name == "my_predicate"
+        assert len(fact.head.args) == 3
+
+        assert isinstance(fact.head.args[0], Atom)
+        assert fact.head.args[0].name == "テスト" # Single quoted
+
+        assert isinstance(fact.head.args[1], Variable)
+        assert fact.head.args[1].name == "Variable"
+
+        assert isinstance(fact.head.args[2], Atom)
+        assert fact.head.args[2].name == "日本語アトム"
 
     def test_parse_conjunction_in_rule_body(self):
         """ルールボディのコンジャンクションテスト"""

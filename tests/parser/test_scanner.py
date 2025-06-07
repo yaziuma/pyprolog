@@ -284,3 +284,70 @@ class TestScanner:
         ]
         assert len(string_tokens) == 1
         assert string_tokens[0].literal == "line1\nline2"
+
+    def test_japanese_atoms(self):
+        """日本語アトムのスキャンテスト"""
+        source = "疾患(風邪) 症状(発熱)"
+        scanner = Scanner(source)
+        tokens = scanner.scan_tokens()
+
+        expected_lexemes = ["疾患", "(", "風邪", ")", "症状", "(", "発熱", ")", ""] # EOF lexeme is empty
+        expected_types = [
+            TokenType.ATOM, TokenType.LEFTPAREN, TokenType.ATOM, TokenType.RIGHTPAREN,
+            TokenType.ATOM, TokenType.LEFTPAREN, TokenType.ATOM, TokenType.RIGHTPAREN,
+            TokenType.EOF
+        ]
+
+        assert len(tokens) == len(expected_types), f"Expected {len(expected_types)} tokens, got {len(tokens)}"
+        for i, token in enumerate(tokens):
+            assert token.lexeme == expected_lexemes[i], f"Token {i} lexeme mismatch: expected '{expected_lexemes[i]}', got '{token.lexeme}'"
+            assert token.token_type == expected_types[i], f"Token {i} type mismatch: expected {expected_types[i]}, got {token.token_type}"
+
+    def test_japanese_string_literals(self):
+        """日本語を含む文字列リテラルのスキャンテスト"""
+        source = "'これはテストです' 'メッセージ'"
+        scanner = Scanner(source)
+        tokens = scanner.scan_tokens()
+
+        # Expected tokens: STRING, STRING, EOF
+        assert tokens[0].literal == "これはテストです"
+        assert tokens[0].token_type == TokenType.STRING
+        assert tokens[1].literal == "メッセージ"
+        assert tokens[1].token_type == TokenType.STRING
+        assert tokens[2].token_type == TokenType.EOF
+        assert len(tokens) == 3, f"Expected 3 tokens, got {len(tokens)}"
+
+
+    def test_japanese_variable_like_atoms(self):
+        """日本語の変数のようなアトムのスキャンテスト（通常アトムとして扱われることを期待）"""
+        # Prologの標準では変数は英大文字か_で始まる。日本語の識別子は通常アトムになる。
+        source = "変数Ｘ あいまいな変数" # これらはアトムとして扱われるはず
+        scanner = Scanner(source)
+        tokens = scanner.scan_tokens()
+
+        expected_lexemes = ["変数Ｘ", "あいまいな変数", ""] # EOF lexeme is empty
+        expected_types = [TokenType.ATOM, TokenType.ATOM, TokenType.EOF]
+
+        assert len(tokens) == len(expected_types), f"Expected {len(expected_types)} tokens, got {len(tokens)}"
+        for i, token in enumerate(tokens):
+            assert token.lexeme == expected_lexemes[i], f"Token {i} lexeme mismatch: expected '{expected_lexemes[i]}', got '{token.lexeme}'"
+            assert token.token_type == expected_types[i], f"Token {i} type mismatch: expected {expected_types[i]}, got {token.token_type}"
+
+
+    def test_mixed_japanese_and_english_atoms(self):
+        """日本語と英語が混在するアトムのスキャンテスト"""
+        source = "disease(風邪) symptom(発熱)"
+        scanner = Scanner(source)
+        tokens = scanner.scan_tokens()
+
+        expected_lexemes = ["disease", "(", "風邪", ")", "symptom", "(", "発熱", ")", ""] # EOF lexeme is empty
+        expected_types = [
+            TokenType.ATOM, TokenType.LEFTPAREN, TokenType.ATOM, TokenType.RIGHTPAREN,
+            TokenType.ATOM, TokenType.LEFTPAREN, TokenType.ATOM, TokenType.RIGHTPAREN,
+            TokenType.EOF
+        ]
+
+        assert len(tokens) == len(expected_types), f"Expected {len(expected_types)} tokens, got {len(tokens)}"
+        for i, token in enumerate(tokens):
+            assert token.lexeme == expected_lexemes[i], f"Token {i} lexeme mismatch: expected '{expected_lexemes[i]}', got '{token.lexeme}'"
+            assert token.token_type == expected_types[i], f"Token {i} type mismatch: expected {expected_types[i]}, got {token.token_type}"

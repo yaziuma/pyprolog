@@ -101,6 +101,16 @@ class MathInterpreter:
                 if right_val == 0:
                     raise PrologError("Modulo by zero")
                 return left_val % right_val
+            elif op_symbol == "&":
+                return int(left_val) & int(right_val)
+            elif op_symbol == "|":
+                return int(left_val) | int(right_val)
+            elif op_symbol == "^":
+                return int(left_val) ^ int(right_val)
+            elif op_symbol == "<<":
+                return int(left_val) << int(right_val)
+            elif op_symbol == ">>":
+                return int(left_val) >> int(right_val)
             else:
                 raise PrologError(
                     f"Unsupported binary arithmetic operator: {op_symbol}"
@@ -125,6 +135,8 @@ class MathInterpreter:
             return operand_val
         elif op_symbol == "abs":
             return abs(operand_val)
+        elif op_symbol == "~":
+            return ~int(operand_val)
         else:
             raise PrologError(f"Unknown unary arithmetic operator: {op_symbol}")
 

@@ -167,6 +167,111 @@ class TestMathInterpreter:
         except PrologError as e:
             assert "Unknown mathematical function" in str(e)
 
+    def test_symptom_score_calculation(self):
+        """症状マッチスコア計算ロジックのテスト"""
+        # Helper to simulate Prolog's list_to_prolog_number_list and sum_list/evaluate
+        def calculate_score(probabilities: list) -> float:
+            if not probabilities: # prolog: length(マッチした確率, マッチ数), (マッチ数 > 0 -> ... ; スコア = 0)
+                return 0.0
+
+            # Simulate sum_list using MathInterpreter for evaluation
+            # prolog: sum_list(マッチした確率, 合計)
+            # For [0.9, 0.7, 0.6], sum_expr becomes Term(Atom("+"), [Term(Atom("+"), [Number(0.9), Number(0.7)]), Number(0.6)])
+            # For a single element list like [0.9], it's just Number(0.9)
+            if len(probabilities) == 1:
+                sum_expr = Number(probabilities[0])
+            else:
+                # Build nested sum expression: e.g., +(+(arg1, arg2), arg3)
+                sum_expr = Number(probabilities[0]) # Initialize with the first element
+                for i in range(1, len(probabilities)):
+                    sum_expr = Term(Atom("+"), [sum_expr, Number(probabilities[i])])
+
+            evaluated_sum = self.math_interpreter.evaluate(sum_expr, self.env)
+
+            # Simulate division for the average
+            # prolog: スコア is 合計 / マッチ数
+            # Ensure evaluated_sum is treated as a number for the division
+            division_expr = Term(Atom("/"), [Number(evaluated_sum), Number(len(probabilities))])
+            score = self.math_interpreter.evaluate(division_expr, self.env)
+            return score
+
+        # 1. 確率リストが空の場合 (マッチ数 = 0)
+        # Prolog: スコア = 0
+        assert calculate_score([]) == 0.0
+
+        # 2. 通常の確率リスト
+        # Prolog: マッチした確率 = [0.9, 0.7, 0.6], マッチ数 = 3
+        # Prolog: 合計 = 0.9 + 0.7 + 0.6 = 2.2
+        # Prolog: スコア = 2.2 / 3 = 0.73333...
+        probs1 = [0.9, 0.7, 0.6]
+        expected_score1 = (0.9 + 0.7 + 0.6) / 3
+        assert abs(calculate_score(probs1) - expected_score1) < 0.0001
+
+        # 3. 単一の確率
+        # Prolog: マッチした確率 = [0.8], マッチ数 = 1
+        # Prolog: 合計 = 0.8
+        # Prolog: スコア = 0.8 / 1 = 0.8
+        probs2 = [0.8]
+        expected_score2 = 0.8 / 1
+        assert abs(calculate_score(probs2) - expected_score2) < 0.0001
+
+        # 4. 非常に小さい確率値を含むリスト
+        # Prolog: マッチした確率 = [0.0000001, 0.0000002], マッチ数 = 2
+        # Prolog: 合計 = 0.0000001 + 0.0000002 = 0.0000003
+        # Prolog: スコア = 0.0000003 / 2 = 0.00000015
+        probs3 = [0.0000001, 0.0000002]
+        expected_score3 = (0.0000001 + 0.0000002) / 2
+        # This test is crucial for the reported issue.
+        assert abs(calculate_score(probs3) - expected_score3) < 0.00000001
+
+        # 5. 確率値が0.0のみのリスト
+        # Prolog: マッチした確率 = [0.0, 0.0, 0.0], マッチ数 = 3
+        # Prolog: 合計 = 0.0 + 0.0 + 0.0 = 0.0
+        # Prolog: スコア = 0.0 / 3 = 0.0
+        probs4 = [0.0, 0.0, 0.0]
+        expected_score4 = 0.0 # 0.0 / 3 is 0.0
+        assert abs(calculate_score(probs4) - expected_score4) < 0.0001
+
+        # 6. 症状が一つの場合 (Prologの例: 疾患症状(風邪, 鼻水, 0.9) のみ)
+        # Prolog: マッチした確率 = [0.9], マッチ数 = 1, スコア = 0.9
+        probs5 = [0.9]
+        expected_score5 = 0.9 / 1
+        assert abs(calculate_score(probs5) - expected_score5) < 0.0001
+
+        # 7. 症状が複数で、一部マッチしない場合 (Prolog側でフィルタリングされる前提のテスト)
+        # Prolog: マッチした確率 = [0.7, 0.6], マッチ数 = 2
+        # Prolog: 合計 = 0.7 + 0.6 = 1.3
+        # Prolog: スコア = 1.3 / 2 = 0.65
+        probs6 = [0.7, 0.6]
+        expected_score6 = (0.7 + 0.6) / 2
+        assert abs(calculate_score(probs6) - expected_score6) < 0.0001
+
+    def test_bitwise_operations(self):
+        """ビット単位演算のテスト"""
+        # AND
+        expr_and = Term(Atom("&"), [Number(6), Number(3)])  # 6 (110) & 3 (011) = 2 (010)
+        assert self.math_interpreter.evaluate(expr_and, self.env) == 2
+
+        # OR
+        expr_or = Term(Atom("|"), [Number(6), Number(3)])   # 6 (110) | 3 (011) = 7 (111)
+        assert self.math_interpreter.evaluate(expr_or, self.env) == 7
+
+        # XOR
+        expr_xor = Term(Atom("^"), [Number(6), Number(3)])  # 6 (110) ^ 3 (011) = 5 (101)
+        assert self.math_interpreter.evaluate(expr_xor, self.env) == 5
+
+        # NOT (単項)
+        expr_not = Term(Atom("~"), [Number(6)])            # ~6 (110) = -7 (2の補数)
+        assert self.math_interpreter.evaluate(expr_not, self.env) == -7
+
+        # 左シフト
+        expr_lshift = Term(Atom("<<"), [Number(3), Number(2)]) # 3 (011) << 2 = 12 (1100)
+        assert self.math_interpreter.evaluate(expr_lshift, self.env) == 12
+
+        # 右シフト
+        expr_rshift = Term(Atom(">>"), [Number(6), Number(1)]) # 6 (110) >> 1 = 3 (011)
+        assert self.math_interpreter.evaluate(expr_rshift, self.env) == 3
+
     def test_advanced_operations(self):
         """高度な演算のテスト"""
         # 指数演算
