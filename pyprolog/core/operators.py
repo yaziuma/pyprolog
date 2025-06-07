@@ -240,7 +240,7 @@ class OperatorRegistry:
             ),
             # 否定演算子
             OperatorInfo(  # NOT
-                "\+", 900, Associativity.NON, OperatorType.LOGICAL, 1, None, "NOT"
+                "\\+", 900, Associativity.NON, OperatorType.LOGICAL, 1, None, "NOT"
             ),
             OperatorInfo(
                 "\\=",

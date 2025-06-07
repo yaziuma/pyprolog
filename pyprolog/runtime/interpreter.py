@@ -194,7 +194,7 @@ class Runtime:
                         break
                 except CutException:
                     logger.debug(
-                        f"CutException inside \\+ for goal {goal_to_negate}. Standard \+ would fail here."
+                        f"CutException inside \\+ for goal {goal_to_negate}. Standard \\+ would fail here."
                     )
                     success_found = True
                 if not success_found:
