@@ -90,7 +90,10 @@ class Scanner:
         elif char == "'":
             self._string()
         elif char == "(":
+            # SCANNER_DEBUG: Logging for '(' character
+            logger.debug(f"SCANNER_DEBUG: Encountered char '{char}'. Current index: {self._current-1}. Intending to classify as LEFTPAREN.")
             self._add_token(TokenType.LEFTPAREN)
+            logger.debug(f"SCANNER_DEBUG: Added token: {self._tokens[-1]}")
         elif char == ")":
             self._add_token(TokenType.RIGHTPAREN)
         elif char == "[":

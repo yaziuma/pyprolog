@@ -41,6 +41,18 @@ class Parser:
             if rule:
                 rules.append(rule)
 
+            # Enhanced logging for debugging
+            logger.debug(f"PARSER_DEBUG: Current index: {self._current}")
+            if not self._is_at_end():
+                logger.debug(f"PARSER_DEBUG: Current token: {self._peek()}")
+            for i in range(5): # Log next 5 tokens
+                idx = self._current + i
+                if idx < len(self._tokens):
+                    logger.debug(f"PARSER_DEBUG: Token at index {idx}: {self._tokens[idx]}")
+                else:
+                    logger.debug(f"PARSER_DEBUG: No token at index {idx} (end of stream)")
+                    break
+
             if not self._match(TokenType.DOT):
                 if not self._is_at_end():
                     self._error(self._peek(), "Expected '.' after rule or fact")
@@ -55,6 +67,17 @@ class Parser:
         # This ensures that ':-' is not consumed as part of the head term itself.
         head_term = self._parse_expression_with_precedence(1199)
         if head_term is None:
+            # Enhanced logging for debugging _parse_rule exit
+            logger.debug(f"PARSER_DEBUG_RULE_EXIT: Exiting _parse_rule. Current index: {self._current}")
+            if not self._is_at_end():
+                logger.debug(f"PARSER_DEBUG_RULE_EXIT: Current token at exit: {self._peek()}")
+            for i in range(3): # Log next 3 tokens at exit
+                idx = self._current + i
+                if idx < len(self._tokens):
+                    logger.debug(f"PARSER_DEBUG_RULE_EXIT: Token at index {idx}: {self._tokens[idx]}")
+                else:
+                    logger.debug(f"PARSER_DEBUG_RULE_EXIT: No token at index {idx} (end of stream)")
+                    break
             return None
 
         # Termに変換 (Atom以外もTermにラップする)
@@ -69,6 +92,17 @@ class Parser:
                 self._error(
                     self._previous(), f"Unexpected head term type: {type(head_term)}"
                 )
+                # Enhanced logging for debugging _parse_rule exit
+                logger.debug(f"PARSER_DEBUG_RULE_EXIT: Exiting _parse_rule. Current index: {self._current}")
+                if not self._is_at_end():
+                    logger.debug(f"PARSER_DEBUG_RULE_EXIT: Current token at exit: {self._peek()}")
+                for i in range(3): # Log next 3 tokens at exit
+                    idx = self._current + i
+                    if idx < len(self._tokens):
+                        logger.debug(f"PARSER_DEBUG_RULE_EXIT: Token at index {idx}: {self._tokens[idx]}")
+                    else:
+                        logger.debug(f"PARSER_DEBUG_RULE_EXIT: No token at index {idx} (end of stream)")
+                        break
                 return None
 
         if self._match(TokenType.COLONMINUS):
@@ -77,6 +111,17 @@ class Parser:
             while not self._check(TokenType.DOT) and not self._is_at_end():
                 term = self._parse_term()
                 if term is None:
+                    # Enhanced logging for debugging _parse_rule exit
+                    logger.debug(f"PARSER_DEBUG_RULE_EXIT: Exiting _parse_rule. Current index: {self._current}")
+                    if not self._is_at_end():
+                        logger.debug(f"PARSER_DEBUG_RULE_EXIT: Current token at exit: {self._peek()}")
+                    for i in range(3): # Log next 3 tokens at exit
+                        idx = self._current + i
+                        if idx < len(self._tokens):
+                            logger.debug(f"PARSER_DEBUG_RULE_EXIT: Token at index {idx}: {self._tokens[idx]}")
+                        else:
+                            logger.debug(f"PARSER_DEBUG_RULE_EXIT: No token at index {idx} (end of stream)")
+                            break
                     return None
                 body_terms.append(term)
 
@@ -86,10 +131,32 @@ class Parser:
                     break
                 else:
                     self._error(self._peek(), "Expected ',' or '.' in rule body")
+                    # Enhanced logging for debugging _parse_rule exit
+                    logger.debug(f"PARSER_DEBUG_RULE_EXIT: Exiting _parse_rule. Current index: {self._current}")
+                    if not self._is_at_end():
+                        logger.debug(f"PARSER_DEBUG_RULE_EXIT: Current token at exit: {self._peek()}")
+                    for i in range(3): # Log next 3 tokens at exit
+                        idx = self._current + i
+                        if idx < len(self._tokens):
+                            logger.debug(f"PARSER_DEBUG_RULE_EXIT: Token at index {idx}: {self._tokens[idx]}")
+                        else:
+                            logger.debug(f"PARSER_DEBUG_RULE_EXIT: No token at index {idx} (end of stream)")
+                            break
                     return None
 
             if not body_terms:
                 self._error(self._peek(), "Rule body cannot be empty")
+                # Enhanced logging for debugging _parse_rule exit
+                logger.debug(f"PARSER_DEBUG_RULE_EXIT: Exiting _parse_rule. Current index: {self._current}")
+                if not self._is_at_end():
+                    logger.debug(f"PARSER_DEBUG_RULE_EXIT: Current token at exit: {self._peek()}")
+                for i in range(3): # Log next 3 tokens at exit
+                    idx = self._current + i
+                    if idx < len(self._tokens):
+                        logger.debug(f"PARSER_DEBUG_RULE_EXIT: Token at index {idx}: {self._tokens[idx]}")
+                    else:
+                        logger.debug(f"PARSER_DEBUG_RULE_EXIT: No token at index {idx} (end of stream)")
+                        break
                 return None
 
             # 統合設計：コンジャンクションも通常の Term として構築
@@ -97,8 +164,30 @@ class Parser:
             if isinstance(body, Atom):
                 body = Term(body, [])
 
+            # Enhanced logging for debugging _parse_rule exit
+            logger.debug(f"PARSER_DEBUG_RULE_EXIT: Exiting _parse_rule. Current index: {self._current}")
+            if not self._is_at_end():
+                logger.debug(f"PARSER_DEBUG_RULE_EXIT: Current token at exit: {self._peek()}")
+            for i in range(3): # Log next 3 tokens at exit
+                idx = self._current + i
+                if idx < len(self._tokens):
+                    logger.debug(f"PARSER_DEBUG_RULE_EXIT: Token at index {idx}: {self._tokens[idx]}")
+                else:
+                    logger.debug(f"PARSER_DEBUG_RULE_EXIT: No token at index {idx} (end of stream)")
+                    break
             return Rule(head_term, body)
         else:
+            # Enhanced logging for debugging _parse_rule exit
+            logger.debug(f"PARSER_DEBUG_RULE_EXIT: Exiting _parse_rule. Current index: {self._current}")
+            if not self._is_at_end():
+                logger.debug(f"PARSER_DEBUG_RULE_EXIT: Current token at exit: {self._peek()}")
+            for i in range(3): # Log next 3 tokens at exit
+                idx = self._current + i
+                if idx < len(self._tokens):
+                    logger.debug(f"PARSER_DEBUG_RULE_EXIT: Token at index {idx}: {self._tokens[idx]}")
+                else:
+                    logger.debug(f"PARSER_DEBUG_RULE_EXIT: No token at index {idx} (end of stream)")
+                    break
             return Fact(head_term)
 
     def _build_conjunction(self, terms: List) -> Union[Term, Atom]:
@@ -215,6 +304,15 @@ class Parser:
             else:  # TokenType.ATOM
                 functor_atom = Atom(atom_name)
 
+            # PARSER_DEBUG_PRIMARY: Detailed check for LEFTPAREN matching
+            current_peek_token = self._peek()
+            is_leftparen_type = current_peek_token.token_type == TokenType.LEFTPAREN
+            check_result = self._check(TokenType.LEFTPAREN)
+            logger.debug(f"PARSER_DEBUG_PRIMARY: Before _match(LEFTPAREN): Current index: {self._current}")
+            logger.debug(f"PARSER_DEBUG_PRIMARY: Peeked token: {current_peek_token}")
+            logger.debug(f"PARSER_DEBUG_PRIMARY: Peeked token type: {current_peek_token.token_type}, Expected type: {TokenType.LEFTPAREN}")
+            logger.debug(f"PARSER_DEBUG_PRIMARY: Direct comparison (peeked_type == LEFTPAREN): {is_leftparen_type}")
+            logger.debug(f"PARSER_DEBUG_PRIMARY: self._check(TokenType.LEFTPAREN) result: {check_result}")
             if self._match(TokenType.LEFTPAREN):
                 # 複合項の引数解析
                 args = []
@@ -334,7 +432,12 @@ class Parser:
     def _check(self, token_type: TokenType) -> bool:
         if self._is_at_end():
             return False
-        return self._peek_token_type() == token_type
+        # Directly access the token_type attribute of the current token
+        # This bypasses _peek_token_type() for a more direct comparison.
+        current_token = self._peek()
+        if current_token is None: # Should not happen if not _is_at_end() but good for safety
+            return False
+        return current_token.token_type == token_type
 
     def _advance(self) -> Token:
         if not self._is_at_end():
