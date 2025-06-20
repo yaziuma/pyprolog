@@ -62,7 +62,7 @@ class TestFixtures:
     @staticmethod
     def test_logger():
         """テスト用ロガーフィクスチャ"""
-        return get_logger("test")
+        get_logger("test")
 
 
 # カスタムアサーション関数

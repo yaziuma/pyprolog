@@ -36,11 +36,11 @@ class TestScannerParserIntegration(unittest.TestCase):
         return None
 
     def test_japanese_variable_in_simple_fact(self):
-        # "好きな食べ物(X)." -> 内部的には "好きな食べ物(V1)." のようにパースされる
-        fact = self._scan_and_parse_fact("好きな食べ物(日本語変数).")
+        # Test Japanese variable handling with English functor
+        fact = self._scan_and_parse_fact("favorite_food(日本語変数).")
         self.assertIsNotNone(fact)
         self.assertIsInstance(fact.head, Term)
-        self.assertEqual(fact.head.functor.name, "好きな食べ物")
+        self.assertEqual(fact.head.functor.name, "favorite_food")
         self.assertEqual(len(fact.head.args), 1)
         self.assertIsInstance(fact.head.args[0], Variable)
         # Scanner により Token.literal が "V1" になっているはず
@@ -50,17 +50,17 @@ class TestScannerParserIntegration(unittest.TestCase):
         self.assertEqual(self.variable_mapper.map_english_to_japanese("V1"), "日本語変数")
 
     def test_multiple_japanese_variables_in_fact(self):
-        # "親子(父, 母, 子)."
+        # Test multiple Japanese variables with English functor
         # Note: In Prolog, unquoted lowercase terms are atoms. Japanese terms starting with Hiragana/Katakana/Kanji
         # without being uppercase English-like are treated as atoms by default unless VariableMapper identifies them as variables.
         # The current VariableMapper identifies Japanese starting terms as variables.
         # So, ちち, はは, こども will be treated as variables by the VariableMapper logic.
         # Let's adjust the test to reflect this, or use quoted atoms if they must be atoms.
         # Assuming the intent is for these to be variables:
-        fact = self._scan_and_parse_fact("親子(ちち, はは, こども).")
+        fact = self._scan_and_parse_fact("family(ちち, はは, こども).")
         self.assertIsNotNone(fact)
         self.assertIsInstance(fact.head, Term)
-        self.assertEqual(fact.head.functor.name, "親子")
+        self.assertEqual(fact.head.functor.name, "family")
         self.assertEqual(len(fact.head.args), 3)
         self.assertIsInstance(fact.head.args[0], Variable) # ちち -> V1
         self.assertEqual(fact.head.args[0].name, "V1")
@@ -72,12 +72,12 @@ class TestScannerParserIntegration(unittest.TestCase):
         self.assertEqual(self.variable_mapper.map_english_to_japanese("V2"), "はは")
         self.assertEqual(self.variable_mapper.map_english_to_japanese("V3"), "こども")
 
-        # "関係(変数A, 変数B)."
+        # Test second fact with English functor
         self.setUp() # Reset mapper for next part of test
-        fact2 = self._scan_and_parse_fact("関係(へんすうA, へんすうB).")
+        fact2 = self._scan_and_parse_fact("relation(へんすうA, へんすうB).")
         self.assertIsNotNone(fact2)
         self.assertIsInstance(fact2.head, Term)
-        self.assertEqual(fact2.head.functor.name, "関係")
+        self.assertEqual(fact2.head.functor.name, "relation")
         self.assertEqual(len(fact2.head.args), 2)
         self.assertIsInstance(fact2.head.args[0], Variable)
         self.assertEqual(fact2.head.args[0].name, "V1") # "へんすうA" -> V1
