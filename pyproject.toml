@@ -58,3 +58,10 @@ include = ["pyprolog*"]
     "*.toml",
     "config/logging/*.conf"  # 追加: ログ設定ファイルを含める
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "ruff>=0.12.0",
+]
