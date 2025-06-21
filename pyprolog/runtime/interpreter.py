@@ -569,8 +569,8 @@ class Runtime:
             # Ensure query ends with a dot for parsing consistency
             if not query_string.strip().endswith("."):
                 query_string += "."
-            tokens = Scanner(query_string, variable_mapper=self.variable_mapper).scan_tokens() # Added variable_mapper
-            parsed_structures = Parser(tokens, variable_mapper=self.variable_mapper).parse() # Added variable_mapper
+            tokens = Scanner(query_string, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).scan_tokens()
+            parsed_structures = Parser(tokens, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).parse()
             if not parsed_structures:
                 logger.warning("Query parsing failed")
                 return []
@@ -665,8 +665,8 @@ class Runtime:
         try:
             if not rule_string.strip().endswith("."):
                 rule_string += "."
-            tokens = Scanner(rule_string, variable_mapper=self.variable_mapper).scan_tokens() # Added variable_mapper
-            parsed_items = Parser(tokens, variable_mapper=self.variable_mapper).parse() # Added variable_mapper
+            tokens = Scanner(rule_string, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).scan_tokens()
+            parsed_items = Parser(tokens, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).parse()
             added_count = 0
             if parsed_items:
                 for item in parsed_items:
@@ -691,8 +691,8 @@ class Runtime:
         try:
             with open(filename, "r", encoding="utf-8") as f:
                 source = f.read()
-            tokens = Scanner(source, variable_mapper=self.variable_mapper).scan_tokens() # Added variable_mapper
-            new_rules_or_terms = Parser(tokens, variable_mapper=self.variable_mapper).parse() # Added variable_mapper
+            tokens = Scanner(source, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).scan_tokens()
+            new_rules_or_terms = Parser(tokens, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).parse()
             added_count = 0
             for item in new_rules_or_terms:
                 if isinstance(item, (Rule, Fact)):
@@ -716,14 +716,21 @@ class Runtime:
         elif isinstance(term, Term):
             new_args = [self._convert_vars_to_japanese(arg) for arg in term.args]
             # FunctorがVariableの場合も変換する（通常はAtomだが念のため）
-            functor_display_name = term.functor.name if isinstance(term.functor, Atom) else str(term.functor)
             current_functor = term.functor
-            if isinstance(current_functor, Variable): # VariableMapperを使うのは変数の場合のみ
-                 functor_display_name = self.variable_mapper.map_english_to_japanese(current_functor.name)
-                 # FunctorがVariableならVariableとして再構築
-                 return Term(Variable(functor_display_name), new_args)
-            # 通常のAtom functorの場合
-            return Term(Atom(functor_display_name), new_args)
+            if isinstance(current_functor, Variable):
+                # FunctorがVariableの場合は変数として変換
+                functor_display_name = self.variable_mapper.map_english_to_japanese(current_functor.name)
+                return Term(Variable(functor_display_name), new_args)
+            elif isinstance(current_functor, Atom):
+                # FunctorがAtomの場合は、まずファンクター名の日本語復元を試す
+                functor_name = current_functor.name
+                # FunctorMapperで日本語復元を試行
+                restored_functor_name = self.functor_mapper.map_english_to_non_ascii(functor_name)
+                return Term(Atom(restored_functor_name), new_args)
+            else:
+                # その他の場合（通常は発生しない）
+                functor_display_name = str(current_functor)
+                return Term(Atom(functor_display_name), new_args)
         elif isinstance(term, list): # For lists (e.g. from findall)
             return [self._convert_vars_to_japanese(item) for item in term]
         # Other types (Number, Atom, String) are returned as is.

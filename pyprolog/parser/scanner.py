@@ -163,10 +163,11 @@ class Scanner:
     def _identifier(self):
         """識別子のスキャン（Unicode対応版）"""
         # Unicode文字を含む識別子をサポート
-        while (self._peek().isalnum() or
-               self._peek() == "_" or
-               ord(self._peek()) > 127 or  # 非ASCII文字
-               self._is_valid_identifier_char(self._peek())):
+        while (not self._is_at_end() and
+               (self._peek().isalnum() or
+                self._peek() == "_" or
+                (self._peek() and ord(self._peek()) > 127) or  # 非ASCII文字（空文字チェック追加）
+                self._is_valid_identifier_char(self._peek()))):
             self._advance()
 
         text = self._source[self._start : self._current]
