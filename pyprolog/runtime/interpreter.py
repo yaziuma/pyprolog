@@ -4,6 +4,7 @@ from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.parser.scanner import Scanner
 from pyprolog.parser.parser import Parser
 from pyprolog.util.variable_mapper import VariableMapper # Added
+from pyprolog.util.functor_mapper import FunctorMapper # Added FunctorMapper
 from pyprolog.runtime.math_interpreter import MathInterpreter
 from pyprolog.runtime.logic_interpreter import LogicInterpreter
 from pyprolog.core.operators import operator_registry, OperatorType, OperatorInfo
@@ -31,9 +32,23 @@ logger = logging.getLogger(__name__)
 
 
 class Runtime:
-    def __init__(self, rules: Optional[List[Union[Rule, Fact]]] = None, variable_mapper: Optional[VariableMapper] = None): # Added variable_mapper
+    def __init__(
+        self,
+        rules: Optional[List[Union[Rule, Fact]]] = None,
+        variable_mapper: Optional[VariableMapper] = None,
+        functor_mapper: Optional[FunctorMapper] = None
+    ):
         self.rules: List[Union[Rule, Fact]] = rules if rules is not None else []
-        self.variable_mapper = variable_mapper if variable_mapper is not None else VariableMapper() # Initialize variable_mapper
+        self.variable_mapper = variable_mapper if variable_mapper is not None else VariableMapper()
+        
+        # 既存ルールからファンクター名を抽出して衝突回避
+        existing_functors = self._extract_existing_functors()
+        self.functor_mapper = functor_mapper if functor_mapper is not None else FunctorMapper(existing_functors)
+        
+        # 既にマッパーが提供されている場合は、既存ファンクターを登録
+        if functor_mapper is not None:
+            self.functor_mapper.register_existing_functors(existing_functors)
+            
         self.math_interpreter = MathInterpreter()
         self.io_manager = IOManager()  # Initialize IOManager
         self.logic_interpreter = LogicInterpreter(
@@ -41,8 +56,42 @@ class Runtime:
         )  # Pass self (Runtime) to LogicInterpreter
         self._operator_evaluators = self._build_unified_evaluator_system()
         logger.info(
-            f"Runtime initialized with {len(self.rules)} rules, IOManager, VariableMapper, and {len(self._operator_evaluators)} operator evaluators"
+            f"Runtime initialized with {len(self.rules)} rules, IOManager, VariableMapper, FunctorMapper, and {len(self._operator_evaluators)} operator evaluators"
         )
+
+    def _extract_existing_functors(self) -> set:
+        """既存ルールからファンクター名を抽出"""
+        functors = set()
+        
+        for rule in self.rules:
+            if isinstance(rule, Fact):
+                functors.update(self._extract_functors_from_term(rule.head))
+            elif isinstance(rule, Rule):
+                functors.update(self._extract_functors_from_term(rule.head))
+                functors.update(self._extract_functors_from_term(rule.body))
+        
+        return functors
+
+    def _extract_functors_from_term(self, term) -> set:
+        """項から再帰的にファンクター名を抽出"""
+        functors = set()
+        
+        if isinstance(term, Term):
+            if isinstance(term.functor, Atom):
+                functors.add(term.functor.name)
+            
+            # 引数も再帰的にチェック
+            for arg in term.args:
+                functors.update(self._extract_functors_from_term(arg))
+                
+        elif isinstance(term, Atom):
+            functors.add(term.name)
+            
+        elif isinstance(term, list):
+            for item in term:
+                functors.update(self._extract_functors_from_term(item))
+        
+        return functors
 
     def _build_unified_evaluator_system(self) -> Dict[str, Callable]:
         evaluators: Dict[str, Callable] = {}

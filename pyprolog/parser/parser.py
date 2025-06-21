@@ -5,6 +5,7 @@ from pyprolog.core.types import Term, Variable, Atom, Number, String, Rule, Fact
 from pyprolog.core.operators import operator_registry, Associativity
 from typing import List, Optional, Callable, Union # Added Optional
 from pyprolog.util.variable_mapper import VariableMapper # Added VariableMapper
+from pyprolog.util.functor_mapper import FunctorMapper # Added FunctorMapper
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,11 +23,13 @@ class Parser:
         tokens: List[Token],
         error_handler: Callable[[Token, str], None] = default_error_handler,
         variable_mapper: Optional[VariableMapper] = None, # Added variable_mapper
+        functor_mapper: Optional[FunctorMapper] = None, # Added functor_mapper
     ):
         self._tokens = tokens
         self._current = 0
         self._error_handler = error_handler
         self._variable_mapper = variable_mapper if variable_mapper is not None else VariableMapper() # Initialize variable_mapper
+        self._functor_mapper = functor_mapper # Store functor_mapper
         logger.debug(f"Parser initialized with {len(tokens)} tokens")
 
     def parse(self) -> List[Union[Rule, Fact]]:
