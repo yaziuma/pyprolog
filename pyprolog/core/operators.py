@@ -251,6 +251,25 @@ class OperatorRegistry:
                 None,
                 "NON_UNIFIABLE_OPERATOR",
             ),
+            # 代替非等価演算子（統一記法）
+            OperatorInfo(
+                "<>",
+                700,
+                Associativity.NON,
+                OperatorType.LOGICAL,
+                2,
+                None,
+                "NOT_EQUAL",
+            ),
+            OperatorInfo(
+                "!=",
+                700,
+                Associativity.NON,
+                OperatorType.LOGICAL,
+                2,
+                None,
+                "NOT_EQUAL_ALT",
+            ),
             # Univ演算子
             OperatorInfo(
                 "=..",

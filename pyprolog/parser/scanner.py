@@ -3,7 +3,6 @@ from pyprolog.parser.token import Token
 from pyprolog.parser.token_type import TokenType, ensure_operator_tokens
 from typing import List, Dict, Callable, Optional
 import logging
-import re
 from pyprolog.util import VariableMapper # Added import
 from pyprolog.util.functor_mapper import FunctorMapper # Added FunctorMapper import
 
@@ -113,8 +112,13 @@ class Scanner:
             # else: # ':' 単独の場合、演算子としてスキャンさせる
             elif not self._scan_operator(char):
                 self._report(self._line, f"Unexpected character: {char}")
-        elif char == "!":  # '!' を CUT トークンとして処理
-            self._add_token(TokenType.CUT)
+        elif char == "!":  # '!' を CUT または != 演算子として処理
+            if self._match("="):
+                # != 演算子
+                self._add_token(self._operator_symbols["!="], "!=")
+            else:
+                # CUT トークン
+                self._add_token(TokenType.CUT)
         elif char in [" ", "\r", "\t"]:
             pass  # 空白無視
         elif char == "\n":

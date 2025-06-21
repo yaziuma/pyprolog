@@ -279,6 +279,26 @@ class Runtime:
                 unified, _ = self.logic_interpreter.unify(term1, term2, env)
                 if not unified:
                     yield env  # Succeeds if unify returns False
+            elif op_info.symbol == "<>":  # NOT_EQUAL - alternative to \=
+                if len(args) != 2:
+                    raise PrologError(
+                        "Not-equal operator <>/2 requires exactly 2 arguments"
+                    )
+                term1, term2 = args[0], args[1]
+                # Same logic as \= - succeed if unification fails
+                unified, _ = self.logic_interpreter.unify(term1, term2, env)
+                if not unified:
+                    yield env
+            elif op_info.symbol == "!=":  # NOT_EQUAL_ALT - alternative to \=
+                if len(args) != 2:
+                    raise PrologError(
+                        "Not-equal operator !=/2 requires exactly 2 arguments"
+                    )
+                term1, term2 = args[0], args[1]
+                # Same logic as \= - succeed if unification fails
+                unified, _ = self.logic_interpreter.unify(term1, term2, env)
+                if not unified:
+                    yield env
             else:
                 raise NotImplementedError(
                     f"Logical operator {op_info.symbol} not implemented"

@@ -5,6 +5,34 @@
 このプロジェクトは、Python で実装されたシンプルな Prolog インタープリタです。
 ここでは、高速な Python パッケージインストーラーおよびリゾルバーである `uv` を使用した開発手順を説明します。
 
+## ⚠️ 演算子システム更新について
+
+**2025年6月21日 - 重要な演算子システム修正を実施中**
+
+バックスラッシュ演算子（`\==`, `\=`, `=\=`）のパース処理に問題があるため、以下の代替演算子を導入しました：
+
+### 新しい演算子体系
+- **等価性**: `=`（単一化）, `==`（同一性）, `=:=`（算術等価）
+- **非等価性**: `<>`（統一記法）, `!=`（代替記法）
+- **比較**: `<`, `>`, `=<`, `>=`（従来通り）
+
+### 変更の利点
+- パーサーの安定性向上
+- 他言語経験者にとって直感的
+- 保守性とテスト性の向上
+
+### 使用例
+```prolog
+% 新しい演算子の使用例（推奨）
+different(X, Y) :- X <> Y.
+not_same(A, B) :- A != B.
+
+% ❌ 禁止: バックスラッシュ演算子は使用不可
+% old_way(X, Y) :- X \= Y.  % 使用禁止！
+```
+
+詳細は `docs/20250621/operator_alternatives.md` および `docs/pyprolog_実装済み機能・述語リスト.md` を参照してください。
+
 ## 0\. `uv` のインストール
 
 まだ `uv` をインストールしていない場合は、以下のコマンドでインストールしてください。
@@ -145,7 +173,14 @@ X = desk Y = office
 ```
 
 Simple Prolog は、`write`, `tab`, `nl`, `fail` といった組み込み述語をサポートしています。
-算術演算やリスト操作も可能です。詳細な例は元の README を参照してください。
+算術演算やリスト操作も可能です。
+
+**重要な変更**: 2025年6月21日のアップデートで、新しい非等価演算子 `<>` と `!=` が追加されました。
+これらは従来のバックスラッシュ演算子 `\=` の代替として、より安定したパース処理と直感的な記法を提供します。
+
+**⚠️ 注意**: バックスラッシュ演算子（`\=`, `\==`, `=\=`）の使用は禁止されました。必ず新しい演算子を使用してください。
+
+詳細な機能リストと使用例については `docs/pyprolog_実装済み機能・述語リスト.md` を参照してください。
 
 ## 4\. テストとリンティング
 
@@ -201,6 +236,12 @@ def main():
     location(shoe, hall).
 
     isoffice(X) :- location(computer, X), location(chair, X).
+    
+    % 新しい演算子の使用例（推奨）
+    different_locations(X, Y) :- location(_, X), location(_, Y), X <> Y.
+    
+    % ❌ 禁止例: バックスラッシュ演算子
+    % old_different(X, Y) :- X \= Y.  % 使用禁止！
     '''
 
     tokens = Scanner(source).tokenize()
@@ -208,22 +249,13 @@ def main():
 
     runtime = Runtime(rules)
 
+    # 基本的なクエリ例
     goal_text = 'location(X, office).'
     goal = Parser(Scanner(goal_text).tokenize()).parse_terms()
 
-    # goal から 'X' 変数を取得する正しい方法は、
-    # Parser がどのように Term オブジェクトを構築するかに依存します。
-    # ここでは単純化のため、goal.args[0] が 'X' に対応すると仮定します。
-    # 実際のProlog実装では、変数を名前で参照する機構があるかもしれません。
-    # この例では、元のREADMEの構造を踏襲します。
-    # goal の構造を確認し、適切に変数 'X' を取得してください。
-    # 例:
-    # query_vars = {}
-    # for term in goal:
-    #     for i, arg in enumerate(term.args):
-    #         if isinstance(arg, Var) and arg.name == 'X': # Var型と仮定
-    #             query_vars['X'] = arg
-    # x_var = query_vars.get('X')
+    # 新しい非等価演算子の使用例
+    different_query = 'different_locations(office, kitchen).'
+    different_goal = Parser(Scanner(different_query).tokenize()).parse_terms()
 
     x = goal.args[0] # 元のREADMEの記述に合わせる
 
@@ -241,6 +273,10 @@ def main():
             # print(f"X = {item.args[0]}") # item の構造に依存
             pass
 
+    # 新しい演算子のテスト
+    print("\n新しい演算子のテスト:")
+    different_solutions = list(runtime.execute(different_goal))
+    print(f"different_locations クエリ: {len(different_solutions)} 個の解")
 
     if has_solution:
         print('Query has solution(s)')
