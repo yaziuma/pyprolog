@@ -23,6 +23,7 @@ from pyprolog.runtime.builtins import (
     AppendPredicate,
     FindallPredicate,
     GetCharPredicate,
+    ReadLinePredicate,
 )
 from .io_manager import IOManager
 from typing import List, Iterator, Dict, Any, Union, Optional, Callable # Optional was already here
@@ -561,6 +562,10 @@ class Runtime:
         elif functor_name == "get_char" and len(processed_goal.args) == 1:
             get_char_pred = GetCharPredicate(processed_goal.args[0])
             for item in get_char_pred.execute(self, env):
+                yield item
+        elif functor_name == "read_line" and len(processed_goal.args) == 1:
+            read_line_pred = ReadLinePredicate(processed_goal.args[0])
+            for item in read_line_pred.execute(self, env):
                 yield item
         elif functor_name == "retract" and len(processed_goal.args) == 1:
             retract_pred = DynamicRetractPredicate(processed_goal.args[0])

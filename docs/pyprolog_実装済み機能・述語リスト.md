@@ -6,6 +6,11 @@
 
 ## 最新の更新情報
 
+**2025年7月7日** - 入出力述語の拡張:
+- 新しい入出力述語 `read_line/1` を追加
+- 行単位での入力読み込み機能を実装
+- 日本語文字列対応とEOF処理を含む包括的なテスト
+
 **2025年6月21日** - 演算子システムの重要な更新:
 - 新しい非等価演算子 `<>` と `!=` を追加（従来の `\=` の代替）
 - パーサーの安定性向上とユーザビリティ改善
@@ -101,9 +106,10 @@
 
 ### 入出力述語
 
-| 述語         | アリティ | 実装クラス                                                | 説明                                    |
-| ------------ | -------- | --------------------------------------------------------- | --------------------------------------- |
-| `get_char/1` | 1        | [`GetCharPredicate`](../pyprolog/runtime/builtins.py:659) | 現在の入力ストリームから 1 文字読み取り |
+| 述語          | アリティ | 実装クラス                                                 | 説明                                    |
+| ------------- | -------- | ---------------------------------------------------------- | --------------------------------------- |
+| `get_char/1`  | 1        | [`GetCharPredicate`](../pyprolog/runtime/builtins.py:704) | 現在の入力ストリームから 1 文字読み取り |
+| `read_line/1` | 1        | [`ReadLinePredicate`](../pyprolog/runtime/builtins.py:769) | 現在の入力ストリームから 1 行読み取り   |
 
 ## 演算子
 
@@ -263,6 +269,31 @@ for result in results:
 # append述語
 results = runtime.query("append([1, 2], [3, 4], L)")
 print(f"L = {results[0]['L']}")  # L = [1, 2, 3, 4]
+```
+
+### 入出力操作例
+
+```python
+# get_char述語（文字単位入力）
+from pyprolog.runtime.io_streams import StringStream
+runtime.io_manager.set_input_stream(StringStream("hello"))
+results = runtime.query("get_char(X)")
+print(f"X = {results[0]['X']}")  # X = h
+
+# read_line述語（行単位入力）
+runtime.io_manager.set_input_stream(StringStream("Hello World\n"))
+results = runtime.query("read_line(Line)")
+print(f"Line = {results[0]['Line']}")  # Line = Hello World
+
+# 日本語の行読み込み
+runtime.io_manager.set_input_stream(StringStream("こんにちは世界\n"))
+results = runtime.query("read_line(X)")
+print(f"X = {results[0]['X']}")  # X = こんにちは世界
+
+# EOF処理
+runtime.io_manager.set_input_stream(StringStream(""))
+results = runtime.query("read_line(X)")
+print(f"X = {results[0]['X']}")  # X = end_of_file
 ```
 
 ### 新しい演算子の使用例

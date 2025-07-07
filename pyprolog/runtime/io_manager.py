@@ -1,5 +1,6 @@
 # pyprolog/runtime/io_manager.py
 from .io_streams import IOStream, ConsoleStream
+from typing import Optional
 
 
 class IOManager:
@@ -48,6 +49,13 @@ class IOManager:
         Reads a single character from the current input stream.
         """
         return self.current_input_stream.read_char()
+
+    def read_line_from_current(self) -> Optional[str]:
+        """
+        Reads a line from the current input stream.
+        Returns None on EOF.
+        """
+        return self.current_input_stream.read_line()
 
     def write_char_to_current(self, char: str) -> None:
         """

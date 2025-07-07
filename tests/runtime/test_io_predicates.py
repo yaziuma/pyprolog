@@ -147,3 +147,86 @@ class TestIOPredicates:
         self.assertQueryFalse(
             "test_bound_fail(What)"
         )  # X=x, get_char(x) will try to unify 'a' with 'x' -> fail
+
+    # --- Test Cases for read_line/1 ---
+
+    def test_read_line_variable(self):
+        """Test read_line(X) with a variable, X should bind to the line as a string."""
+        input_stream = StringStream("hello world\n")
+        self.runtime.io_manager.set_input_stream(input_stream)
+
+        self.assertQueryTrue("read_line(X)", [{"X": Atom("hello world")}])
+
+    def test_read_line_multiple_lines(self):
+        """Test reading multiple lines sequentially."""
+        input_stream = StringStream("first line\nsecond line\n")
+        self.runtime.io_manager.set_input_stream(input_stream)
+
+        # First call
+        self.assertQueryTrue("read_line(FirstLine)", [{"FirstLine": Atom("first line")}])
+        
+        # Second call should read the next line
+        self.assertQueryTrue("read_line(SecondLine)", [{"SecondLine": Atom("second line")}])
+
+    def test_read_line_empty_line(self):
+        """Test reading an empty line."""
+        input_stream = StringStream("\n")
+        self.runtime.io_manager.set_input_stream(input_stream)
+
+        self.assertQueryTrue("read_line(X)", [{"X": Atom("")}])
+
+    def test_read_line_without_newline(self):
+        """Test reading a line without trailing newline."""
+        input_stream = StringStream("no newline")
+        self.runtime.io_manager.set_input_stream(input_stream)
+
+        self.assertQueryTrue("read_line(X)", [{"X": Atom("no newline")}])
+
+    def test_read_line_eof(self):
+        """Test read_line(X) at end of file, X should bind to 'end_of_file'."""
+        input_stream = StringStream("")  # Empty input string
+        self.runtime.io_manager.set_input_stream(input_stream)
+
+        self.assertQueryTrue("read_line(X)", [{"X": Atom("end_of_file")}])
+
+    def test_read_line_match_string_success(self):
+        """Test read_line(atom) when the line matches the atom."""
+        input_stream = StringStream("expected line\n")
+        self.runtime.io_manager.set_input_stream(input_stream)
+
+        self.assertQueryTrue("read_line('expected line')")
+
+    def test_read_line_match_string_failure(self):
+        """Test read_line(atom) when the line does not match the atom."""
+        input_stream = StringStream("actual line\n")
+        self.runtime.io_manager.set_input_stream(input_stream)
+
+        self.assertQueryFalse("read_line('different line')")
+
+    def test_read_line_japanese_characters(self):
+        """Test read_line with Japanese characters."""
+        input_stream = StringStream("こんにちは世界\n")
+        self.runtime.io_manager.set_input_stream(input_stream)
+
+        self.assertQueryTrue("read_line(X)", [{"X": Atom("こんにちは世界")}])
+
+    def test_read_line_with_spaces(self):
+        """Test read_line with leading/trailing spaces."""
+        input_stream = StringStream("  spaced line  \n")
+        self.runtime.io_manager.set_input_stream(input_stream)
+
+        self.assertQueryTrue("read_line(X)", [{"X": Atom("  spaced line  ")}])
+
+    def test_read_line_already_bound_success(self):
+        """Test read_line(BoundVar) where BoundVar is already bound to the line."""
+        self.runtime.add_rule("test_bound_line(X) :- X = 'test line', read_line(X).")
+        input_stream = StringStream("test line\n")
+        self.runtime.io_manager.set_input_stream(input_stream)
+        self.assertQueryTrue("test_bound_line(What)")
+
+    def test_read_line_already_bound_fail(self):
+        """Test read_line(BoundVar) where BoundVar is bound to a different line."""
+        self.runtime.add_rule("test_bound_line_fail(X) :- X = 'expected', read_line(X).")
+        input_stream = StringStream("actual\n")
+        self.runtime.io_manager.set_input_stream(input_stream)
+        self.assertQueryFalse("test_bound_line_fail(What)")

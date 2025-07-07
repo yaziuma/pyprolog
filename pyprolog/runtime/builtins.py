@@ -766,6 +766,40 @@ class GetCharPredicate(BuiltinPredicate):
         # If unification fails, the predicate simply fails (yields nothing).
 
 
+class ReadLinePredicate(BuiltinPredicate):
+    """
+    Built-in predicate read_line/1.
+    Reads a line from the current input stream and unifies it with Arg.
+    """
+
+    def __init__(self, arg: "PrologType"):
+        super().__init__(arg)
+        if len(self.args) != 1:
+            raise PrologError(f"read_line/1 expects 1 argument, got {len(self.args)}")
+
+    def execute(
+        self, runtime: "Runtime", env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        # 1. Read a line from the IOManager
+        line_str = runtime.io_manager.read_line_from_current()
+
+        # 2. Determine the target Prolog Atom based on the line string
+        target_atom: Atom
+        if line_str is None:  # EOF
+            target_atom = Atom("end_of_file")
+        else:
+            target_atom = Atom(line_str)
+
+        # 3. Unify the target atom with the argument
+        unified, final_env = runtime.logic_interpreter.unify(
+            self.args[0], target_atom, env
+        )
+        if unified:
+            yield final_env
+        # If unification fails, read_line/1 fails (no solutions yielded).
+        return
+
+
 class DynamicRetractPredicate(BuiltinPredicate):
     def __init__(self, clause_arg: PrologType):
         super().__init__(clause_arg)

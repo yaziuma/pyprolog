@@ -1,7 +1,7 @@
 # prolog/runtime/io_streams.py
 from abc import ABC, abstractmethod
 import sys
-from typing import List  # For Python list type hint in StringStream
+from typing import List, Optional  # For Python list type hint in StringStream
 
 # To use 'PrologType' as a type hint, it would typically be imported:
 # from prolog.core.types import PrologType
@@ -21,6 +21,15 @@ class IOStream(ABC):
         Reads a single character from the stream.
         Returns the character read.
         Should raise an appropriate exception on EOF or error.
+        """
+        pass
+
+    @abstractmethod
+    def read_line(self) -> Optional[str]:
+        """
+        Reads a line from the stream (up to and including newline).
+        Returns the line without the newline character.
+        Returns None on EOF.
         """
         pass
 
@@ -68,6 +77,18 @@ class ConsoleStream(IOStream):
         # Returns empty string "" on EOF.
         return sys.stdin.read(1)
 
+    def read_line(self) -> Optional[str]:
+        # Read a line from stdin, strip the newline character
+        try:
+            line = sys.stdin.readline()
+            if line == "":  # EOF
+                return None
+            if line.endswith('\n'):
+                return line[:-1]
+            return line
+        except EOFError:
+            return None
+
     def read_term(self) -> "PrologType":
         # This will require a parser integrated with the stream.
         raise NotImplementedError("ConsoleStream.read_term() is not yet implemented.")
@@ -101,6 +122,24 @@ class StringStream(IOStream):
             return char
         else:
             return ""  # Signify EOF
+
+    def read_line(self) -> Optional[str]:
+        if self.read_position >= len(self.input_string):
+            return None  # EOF - return None to distinguish from empty line
+        
+        # Find the next newline character
+        newline_pos = self.input_string.find('\n', self.read_position)
+        
+        if newline_pos == -1:
+            # No newline found, return rest of string
+            line = self.input_string[self.read_position:]
+            self.read_position = len(self.input_string)
+            return line
+        else:
+            # Newline found, return line without newline
+            line = self.input_string[self.read_position:newline_pos]
+            self.read_position = newline_pos + 1  # Skip the newline
+            return line
 
     def get_output_string(self) -> str:
         """Helper method to get the accumulated output as a single string."""
