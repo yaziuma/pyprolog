@@ -21,7 +21,7 @@ class TestNewOperators:
         goals = Parser(tokens).parse()
         if goals:
             goal = goals[0]
-            actual_goal = goal.head if hasattr(goal, 'head') else goal
+            actual_goal = goal.head if hasattr(goal, "head") else goal
             env = BindingEnvironment()
             return list(self.runtime.execute(actual_goal, env))
         return []
@@ -100,7 +100,9 @@ class TestNewOperators:
         goal_source = "different(a, b)."
         goal_tokens = Scanner(goal_source).scan_tokens()
         goal_parsed = Parser(goal_tokens).parse()
-        goal = goal_parsed[0].head if hasattr(goal_parsed[0], 'head') else goal_parsed[0]
+        goal = (
+            goal_parsed[0].head if hasattr(goal_parsed[0], "head") else goal_parsed[0]
+        )
 
         env = BindingEnvironment()
         solutions = list(runtime.execute(goal, env))
@@ -110,7 +112,11 @@ class TestNewOperators:
         goal_source2 = "different(a, a)."
         goal_tokens2 = Scanner(goal_source2).scan_tokens()
         goal_parsed2 = Parser(goal_tokens2).parse()
-        goal2 = goal_parsed2[0].head if hasattr(goal_parsed2[0], 'head') else goal_parsed2[0]
+        goal2 = (
+            goal_parsed2[0].head
+            if hasattr(goal_parsed2[0], "head")
+            else goal_parsed2[0]
+        )
 
         env2 = BindingEnvironment()
         solutions2 = list(runtime.execute(goal2, env2))
@@ -128,7 +134,9 @@ class TestNewOperators:
         goal_source = "not_same(1, 2)."
         goal_tokens = Scanner(goal_source).scan_tokens()
         goal_parsed = Parser(goal_tokens).parse()
-        goal = goal_parsed[0].head if hasattr(goal_parsed[0], 'head') else goal_parsed[0]
+        goal = (
+            goal_parsed[0].head if hasattr(goal_parsed[0], "head") else goal_parsed[0]
+        )
 
         env = BindingEnvironment()
         solutions = list(runtime.execute(goal, env))
@@ -146,7 +154,9 @@ class TestNewOperators:
         goal_source = "all_different(a, b, c)."
         goal_tokens = Scanner(goal_source).scan_tokens()
         goal_parsed = Parser(goal_tokens).parse()
-        goal = goal_parsed[0].head if hasattr(goal_parsed[0], 'head') else goal_parsed[0]
+        goal = (
+            goal_parsed[0].head if hasattr(goal_parsed[0], "head") else goal_parsed[0]
+        )
 
         env = BindingEnvironment()
         solutions = list(runtime.execute(goal, env))
@@ -156,8 +166,14 @@ class TestNewOperators:
         goal_source2 = "all_different(a, a, c)."
         goal_tokens2 = Scanner(goal_source2).scan_tokens()
         goal_parsed2 = Parser(goal_tokens2).parse()
-        goal2 = goal_parsed2[0].head if hasattr(goal_parsed2[0], 'head') else goal_parsed2[0]
+        goal2 = (
+            goal_parsed2[0].head
+            if hasattr(goal_parsed2[0], "head")
+            else goal_parsed2[0]
+        )
 
         env2 = BindingEnvironment()
         solutions2 = list(runtime.execute(goal2, env2))
-        assert len(solutions2) == 0, "Compound expression should fail when some values are same"
+        assert len(solutions2) == 0, (
+            "Compound expression should fail when some values are same"
+        )

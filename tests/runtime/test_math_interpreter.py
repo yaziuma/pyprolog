@@ -169,9 +169,10 @@ class TestMathInterpreter:
 
     def test_symptom_score_calculation(self):
         """症状マッチスコア計算ロジックのテスト"""
+
         # Helper to simulate Prolog's list_to_prolog_number_list and sum_list/evaluate
         def calculate_score(probabilities: list) -> float:
-            if not probabilities: # prolog: length(マッチした確率, マッチ数), (マッチ数 > 0 -> ... ; スコア = 0)
+            if not probabilities:  # prolog: length(マッチした確率, マッチ数), (マッチ数 > 0 -> ... ; スコア = 0)
                 return 0.0
 
             # Simulate sum_list using MathInterpreter for evaluation
@@ -182,7 +183,7 @@ class TestMathInterpreter:
                 sum_expr = Number(probabilities[0])
             else:
                 # Build nested sum expression: e.g., +(+(arg1, arg2), arg3)
-                sum_expr = Number(probabilities[0]) # Initialize with the first element
+                sum_expr = Number(probabilities[0])  # Initialize with the first element
                 for i in range(1, len(probabilities)):
                     sum_expr = Term(Atom("+"), [sum_expr, Number(probabilities[i])])
 
@@ -191,7 +192,9 @@ class TestMathInterpreter:
             # Simulate division for the average
             # prolog: スコア is 合計 / マッチ数
             # Ensure evaluated_sum is treated as a number for the division
-            division_expr = Term(Atom("/"), [Number(evaluated_sum), Number(len(probabilities))])
+            division_expr = Term(
+                Atom("/"), [Number(evaluated_sum), Number(len(probabilities))]
+            )
             score = self.math_interpreter.evaluate(division_expr, self.env)
             return score
 
@@ -229,7 +232,7 @@ class TestMathInterpreter:
         # Prolog: 合計 = 0.0 + 0.0 + 0.0 = 0.0
         # Prolog: スコア = 0.0 / 3 = 0.0
         probs4 = [0.0, 0.0, 0.0]
-        expected_score4 = 0.0 # 0.0 / 3 is 0.0
+        expected_score4 = 0.0  # 0.0 / 3 is 0.0
         assert abs(calculate_score(probs4) - expected_score4) < 0.0001
 
         # 6. 症状が一つの場合 (Prologの例: 疾患症状(風邪, 鼻水, 0.9) のみ)
@@ -249,27 +252,33 @@ class TestMathInterpreter:
     def test_bitwise_operations(self):
         """ビット単位演算のテスト"""
         # AND
-        expr_and = Term(Atom("&"), [Number(6), Number(3)])  # 6 (110) & 3 (011) = 2 (010)
+        expr_and = Term(
+            Atom("&"), [Number(6), Number(3)]
+        )  # 6 (110) & 3 (011) = 2 (010)
         assert self.math_interpreter.evaluate(expr_and, self.env) == 2
 
         # OR
-        expr_or = Term(Atom("|"), [Number(6), Number(3)])   # 6 (110) | 3 (011) = 7 (111)
+        expr_or = Term(Atom("|"), [Number(6), Number(3)])  # 6 (110) | 3 (011) = 7 (111)
         assert self.math_interpreter.evaluate(expr_or, self.env) == 7
 
         # XOR
-        expr_xor = Term(Atom("^"), [Number(6), Number(3)])  # 6 (110) ^ 3 (011) = 5 (101)
+        expr_xor = Term(
+            Atom("^"), [Number(6), Number(3)]
+        )  # 6 (110) ^ 3 (011) = 5 (101)
         assert self.math_interpreter.evaluate(expr_xor, self.env) == 5
 
         # NOT (単項)
-        expr_not = Term(Atom("~"), [Number(6)])            # ~6 (110) = -7 (2の補数)
+        expr_not = Term(Atom("~"), [Number(6)])  # ~6 (110) = -7 (2の補数)
         assert self.math_interpreter.evaluate(expr_not, self.env) == -7
 
         # 左シフト
-        expr_lshift = Term(Atom("<<"), [Number(3), Number(2)]) # 3 (011) << 2 = 12 (1100)
+        expr_lshift = Term(
+            Atom("<<"), [Number(3), Number(2)]
+        )  # 3 (011) << 2 = 12 (1100)
         assert self.math_interpreter.evaluate(expr_lshift, self.env) == 12
 
         # 右シフト
-        expr_rshift = Term(Atom(">>"), [Number(6), Number(1)]) # 6 (110) >> 1 = 3 (011)
+        expr_rshift = Term(Atom(">>"), [Number(6), Number(1)])  # 6 (110) >> 1 = 3 (011)
         assert self.math_interpreter.evaluate(expr_rshift, self.env) == 3
 
     def test_advanced_operations(self):

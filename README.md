@@ -287,32 +287,100 @@ if __name__ == "__main__":
     main()
 ```
 
-## 6\. その他の `uv` コマンド (参考)
+## 5.3. 非ブロッキング入力機能（新機能）
 
-`uv` は他にも多くの便利な機能を提供しています。
+PyProlog 0.2.2 から、`peek_char/1` および `at_end_of_stream/0` 述語が追加されました。これにより、入力待ちでアプリケーションが停止することなく、条件付きの入力処理が可能になります。
 
-- **依存関係ツリーの表示**:
-  ```bash
-  uv pip tree
-  # またはプロジェクト依存関係の場合
-  # uv tree
-  ```
-- **インストール済みパッケージの一覧**:
-  ```bash
-  uv pip list
-  ```
-- **キャッシュの管理**:
-  ```bash
-  uv cache clean  # キャッシュエントリを削除
-  uv cache dir    # キャッシュディレクトリのパスを表示
-  ```
-- **`uv` 自体のアップデート**:
-  ```bash
-  uv self update
-  ```
+### 基本的な使用例
 
-詳細なコマンドやオプションについては、`uv --help` や [uv 公式ドキュメント](https://astral.sh/uv) を参照してください。
+```python
+from pyprolog.runtime.interpreter import Runtime
+from pyprolog.runtime.io_streams import StringStream
+from pyprolog.core.types import Variable
 
-## Acknowledgments
+# ランタイムの初期化
+runtime = Runtime()
 
-This was inspired and based on this [article](https://curiosity-driven.org/prolog-interpreter).
+# テスト用の文字列ストリームを設定
+runtime.io_manager.set_input_stream(StringStream("hello"))
+
+# peek_char/1: 次の文字を非破壊的に先読み
+peek_result = runtime.query("peek_char(X)")
+print(f"Next character: {peek_result[0][Variable('X')]}")  # 'h'
+
+# 同じ文字がもう一度取得される（ストリーム位置は変更されない）
+peek_again = runtime.query("peek_char(Y)")  
+print(f"Same character: {peek_again[0][Variable('Y')]}")  # 'h'
+
+# 実際に文字を消費
+consume_result = runtime.query("get_char(Z)")
+print(f"Consumed: {consume_result[0][Variable('Z')]}")  # 'h'
+
+# at_end_of_stream/0: EOF状態の確認
+eof_result = runtime.query("at_end_of_stream")
+print(f"At EOF: {len(eof_result) > 0}")  # False（まだデータあり）
+```
+
+### 条件付き読み取りパターン
+
+```python
+# 数字判定ルールの追加
+runtime.add_rule("""
+read_if_digit(Char) :-
+    peek_char(Next),
+    Next >= '0',
+    Next =< '9',
+    get_char(Char).
+""")
+
+# テストケース1: 数字がある場合
+runtime.io_manager.set_input_stream(StringStream("5abc"))
+digit_result = runtime.query("read_if_digit(D)")
+if digit_result:
+    print(f"Read digit: {digit_result[0][Variable('D')]}")  # '5'
+
+# テストケース2: 数字がない場合
+runtime.io_manager.set_input_stream(StringStream("abc"))
+letter_result = runtime.query("read_if_digit(L)")
+print(f"Failed to read digit: {len(letter_result) == 0}")  # True
+```
+
+### Prologでの使用例
+
+```prolog
+% パーサー実装パターン
+parse_number(Num) :-
+    peek_char(First),
+    First >= '0', First =< '9',
+    collect_digits(Digits),
+    atom_codes(Num, Digits).
+
+% 先読みによる条件分岐
+next_token_type(number) :-
+    peek_char(C),
+    C >= '0', C =< '9'.
+
+next_token_type(letter) :-
+    peek_char(C),
+    C >= 'a', C =< 'z'.
+
+next_token_type(eof) :-
+    at_end_of_stream.
+
+% 空白のスキップ
+skip_whitespace :-
+    peek_char(' '),
+    get_char(_),
+    skip_whitespace.
+
+skip_whitespace :-
+    peek_char(C),
+    C \= ' '.
+```
+
+### 利用場面
+
+- **対話的アプリケーション開発**: 入力待ちでUIが凍結しない制御
+- **パーサー・トークナイザー実装**: 先読みによる構文解析
+- **ライブラリとしての利用**: 予期しない入力待ちの回避
+- **条件付き入力処理**: 入力内容に応じた処理の分岐

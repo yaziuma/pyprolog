@@ -320,7 +320,7 @@ class TestParser:
 
         # ボディ: 症状(X, 発熱), 症状(X, 咳)
         assert isinstance(rule.body, Term)
-        assert rule.body.functor.name == "," # Conjunction
+        assert rule.body.functor.name == ","  # Conjunction
 
         # ボディ左側: 症状(X, 発熱)
         body_left = rule.body.args[0]
@@ -352,7 +352,9 @@ class TestParser:
         assert isinstance(fact, Fact)
         assert fact.head.functor.name == "説明"
         assert len(fact.head.args) == 1
-        assert isinstance(fact.head.args[0], Atom) # Single quoted strings are parsed as Atoms
+        assert isinstance(
+            fact.head.args[0], Atom
+        )  # Single quoted strings are parsed as Atoms
         assert fact.head.args[0].name == "これは日本語のテストです"
 
     def test_parse_mixed_japanese_english_terms(self):
@@ -367,7 +369,7 @@ class TestParser:
         assert len(fact.head.args) == 3
 
         assert isinstance(fact.head.args[0], Atom)
-        assert fact.head.args[0].name == "テスト" # Single quoted
+        assert fact.head.args[0].name == "テスト"  # Single quoted
 
         assert isinstance(fact.head.args[1], Variable)
         assert fact.head.args[1].name == "Variable"

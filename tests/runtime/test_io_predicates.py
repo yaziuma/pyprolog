@@ -163,10 +163,14 @@ class TestIOPredicates:
         self.runtime.io_manager.set_input_stream(input_stream)
 
         # First call
-        self.assertQueryTrue("read_line(FirstLine)", [{"FirstLine": Atom("first line")}])
-        
+        self.assertQueryTrue(
+            "read_line(FirstLine)", [{"FirstLine": Atom("first line")}]
+        )
+
         # Second call should read the next line
-        self.assertQueryTrue("read_line(SecondLine)", [{"SecondLine": Atom("second line")}])
+        self.assertQueryTrue(
+            "read_line(SecondLine)", [{"SecondLine": Atom("second line")}]
+        )
 
     def test_read_line_empty_line(self):
         """Test reading an empty line."""
@@ -226,7 +230,9 @@ class TestIOPredicates:
 
     def test_read_line_already_bound_fail(self):
         """Test read_line(BoundVar) where BoundVar is bound to a different line."""
-        self.runtime.add_rule("test_bound_line_fail(X) :- X = 'expected', read_line(X).")
+        self.runtime.add_rule(
+            "test_bound_line_fail(X) :- X = 'expected', read_line(X)."
+        )
         input_stream = StringStream("actual\n")
         self.runtime.io_manager.set_input_stream(input_stream)
         self.assertQueryFalse("test_bound_line_fail(What)")

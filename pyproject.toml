@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyprolog"
-version = "0.2.2"
+version = "0.3.0"
 description = "Prolog Interpreter in Python"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -63,5 +63,6 @@ include = ["pyprolog*"]
 dev = [
     "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
+    "pytest-timeout>=2.4.0",
     "ruff>=0.12.0",
 ]

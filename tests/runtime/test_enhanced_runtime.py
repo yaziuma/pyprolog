@@ -19,26 +19,23 @@ from pyprolog.runtime.enhanced_runtime import EnhancedRuntime
 
 class TestEnhancedRuntime:
     """強化されたランタイムのテストクラス"""
-    
+
     def setup_method(self):
         """各テストメソッドの前に実行"""
         self.runtime = EnhancedRuntime(debug_trace=True)
-    
+
     def test_initialization(self):
         """初期化テスト"""
         assert self.runtime is not None
-        assert hasattr(self.runtime, 'debug_trace')
-        assert hasattr(self.runtime, 'trace_stack')
-        assert hasattr(self.runtime, 'builtin_predicates')
-    
+        assert hasattr(self.runtime, "debug_trace")
+        assert hasattr(self.runtime, "trace_stack")
+        assert hasattr(self.runtime, "builtin_predicates")
+
     def test_trace_functionality(self):
         """トレース機能のテスト"""
         # シンプルなクエリでトレース機能を確認
-        test_queries = [
-            "member(X, [a, b, c])",
-            "append([1], [2], L)"
-        ]
-        
+        test_queries = ["member(X, [a, b, c])", "append([1], [2], L)"]
+
         for query in test_queries:
             try:
                 results = self.runtime.query_safe(query)
@@ -50,11 +47,8 @@ class TestEnhancedRuntime:
     def test_error_handling(self):
         """エラー処理のテスト"""
         # エラーを引き起こすクエリ
-        error_queries = [
-            "undefined_predicate(X)",
-            "malformed query"
-        ]
-        
+        error_queries = ["undefined_predicate(X)", "malformed query"]
+
         for query in error_queries:
             try:
                 results = self.runtime.query_safe(query)
@@ -65,14 +59,14 @@ class TestEnhancedRuntime:
 
     def test_builtin_predicates(self):
         """分析ファイルの提案：組み込み述語の個別テスト"""
-        
+
         # 各組み込み述語の単体テスト
         tests = [
             ("member(b, [a,b,c])", True),  # 成功が期待される
             ("append([1,2], [3,4], L)", True),  # 成功が期待される
             ("findall(X, member(X, [1,2,3]), L)", True),  # 成功が期待される
         ]
-        
+
         for test, should_succeed in tests:
             try:
                 result = self.runtime.query_safe(test)
@@ -87,13 +81,13 @@ class TestEnhancedRuntime:
 
     def test_complex_predicate_calls(self):
         """分析ファイルの提案：複雑な述語呼び出しパターンのテスト"""
-        
+
         # 5引数の複雑な述語テスト（エラーが発生することが期待される）
         test_cases = [
             "test_pred([a,b,c], 30, [cond1], var1, var2)",
             "nested_call(arg1, complex_term(x,y), [1,2,3], result)",
         ]
-        
+
         for test_case in test_cases:
             try:
                 result = self.runtime.query_safe(test_case)
@@ -108,7 +102,7 @@ class TestEnhancedRuntime:
             "疾患(風邪)",
             "症状(発熱)",
         ]
-        
+
         for i, test_case in enumerate(test_cases, 1):
             try:
                 results = self.runtime.query_safe(test_case)
@@ -119,20 +113,21 @@ class TestEnhancedRuntime:
     def test_enhanced_runtime_inheritance(self):
         """EnhancedRuntimeがRuntimeを正しく継承していることを確認"""
         from pyprolog.runtime.interpreter import Runtime
+
         assert isinstance(self.runtime, Runtime)
-        
+
         # 親クラスのメソッドが利用可能であることを確認
-        assert hasattr(self.runtime, 'query')
-        assert hasattr(self.runtime, 'execute')
-        assert hasattr(self.runtime, 'rules')
+        assert hasattr(self.runtime, "query")
+        assert hasattr(self.runtime, "execute")
+        assert hasattr(self.runtime, "rules")
 
     def test_builtin_predicates_initialization(self):
         """組み込み述語の初期化テスト"""
-        assert hasattr(self.runtime, 'builtin_predicates')
+        assert hasattr(self.runtime, "builtin_predicates")
         assert isinstance(self.runtime.builtin_predicates, dict)
-        
+
         # 基本的な組み込み述語がマップされていることを確認
-        expected_builtins = ['findall', 'member', 'append']
+        expected_builtins = ["findall", "member", "append"]
         for builtin in expected_builtins:
             # 実装されていなくても警告が出力されるべき
             print(f"Checking builtin: {builtin}")
@@ -140,12 +135,12 @@ class TestEnhancedRuntime:
 
 def test_enhanced_runtime_integration():
     """強化されたランタイムの統合テスト"""
-    
+
     print("=== pyprologインタープリター包括的テスト ===")
-    
+
     # デバッグトレース有効でランタイム作成
     runtime = EnhancedRuntime(debug_trace=True)
-    
+
     # 基本的な機能テスト
     try:
         # 簡単なクエリテスト
@@ -153,24 +148,24 @@ def test_enhanced_runtime_integration():
         print(f"Basic query test: {len(result)} solutions")
     except Exception as e:
         print(f"Basic query test failed: {e}")
-    
+
     print("\n=== テスト完了 ===")
 
 
 def test_minimal_diagnosis_approach():
     """分析ファイルの提案：段階的デバッグアプローチの実装"""
     print("\n=== 段階的デバッグアプローチテスト ===")
-    
+
     runtime = EnhancedRuntime(debug_trace=True)
-    
+
     # 段階的テストケース（実際のKBがない場合はエラーが期待される）
     minimal_tests = [
         "simple_test",
         "single_disease_test(Disease)",
         "symptom_match_test(Disease, Symptoms)",
-        "patient_diagnosis_minimal([発熱, 咳], Result)"
+        "patient_diagnosis_minimal([発熱, 咳], Result)",
     ]
-    
+
     for test in minimal_tests:
         try:
             result = runtime.query_safe(test)

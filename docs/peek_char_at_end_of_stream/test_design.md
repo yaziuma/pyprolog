@@ -825,7 +825,7 @@ def test_buffered_stream_with_various_sizes(buffer_size):
 
 ```bash
 # 基本テスト実行
-uvx pytest tests/runtime/test_peek_char.py --timeout=30
+uvx pytest tests/runtime/test_peek_char.py --timeout=30 -q
 
 # カバレッジ付きテスト
 uvx pytest tests/runtime/test_peek_char.py --timeout=30 --cov=pyprolog.runtime --cov-report=html

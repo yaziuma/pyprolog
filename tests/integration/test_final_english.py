@@ -2,13 +2,12 @@
 Final working test for English medical diagnosis system
 Using simpler approach that works with PyProlog's current capabilities
 """
+
 import unittest
-from pyprolog.core.types import Variable, Term, Atom
 from pyprolog.runtime.interpreter import Runtime
 
 
 class TestFinalEnglish(unittest.TestCase):
-    
     def setUp(self):
         """Set up Runtime for each test"""
         try:
@@ -43,12 +42,14 @@ class TestFinalEnglish(unittest.TestCase):
 
         print("\nEnglish medical diagnosis KB successfully demonstrates:")
         print("- English language Prolog syntax parsing")
-        print("- Fact storage and retrieval") 
+        print("- Fact storage and retrieval")
         print("- Basic predicate execution")
         print("- Write predicate functionality")
         print("\nThe English version works for basic functionality.")
-        print("Complex unification issues affect both Japanese and English versions equally.")
+        print(
+            "Complex unification issues affect both Japanese and English versions equally."
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
