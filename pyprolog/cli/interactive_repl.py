@@ -14,14 +14,16 @@ from typing import List, Dict, Any, Optional
 # coloramaは既存REPLで使用されているのでそのまま使用
 from colorama import Fore, Style, init
 
-from pyprolog.parser.parser import Parser # Not strictly needed here anymore for _execute_query
-from pyprolog.parser.scanner import Scanner # Not strictly needed here anymore for _execute_query
-from pyprolog.core.types import Variable, Term, Atom, Number # Added Term, Atom, Number
+from pyprolog.parser.parser import (
+    Parser,
+)  # Not strictly needed here anymore for _execute_query
+from pyprolog.parser.scanner import (
+    Scanner,
+)  # Not strictly needed here anymore for _execute_query
+from pyprolog.core.types import Variable, Term, Atom  # Added Term, Atom, Number
 from pyprolog.core.errors import InterpreterError, ScannerError, PrologError
-from pyprolog.parser.types import FALSE # Potentially unused after changes
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.util.variable_mapper import VariableMapper # Added VariableMapper
-from pyprolog.core.binding_environment import BindingEnvironment # Potentially unused after changes
+from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
 
 # カラー初期化
 init(autoreset=True)
@@ -32,7 +34,7 @@ class InteractiveProlog:
 
     def __init__(self):
         self.runtime: Optional[Runtime] = None
-        self.variable_mapper = VariableMapper() # Added VariableMapper instance
+        self.variable_mapper = VariableMapper()  # Added VariableMapper instance
         self.session_history: List[Dict[str, Any]] = []
         self.home_path = str(Path.home())
         self.session_start_time = datetime.now()
@@ -117,17 +119,27 @@ class InteractiveProlog:
                 # This parsing logic for rules might need adjustment if _parse_rule is not suitable for full file parsing.
                 # Assuming Runtime's consult or add_rule will be used instead for robust file handling.
                 # For now, this direct parsing is kept, but Runtime should handle it via its variable_mapper.
-                rules_text_for_scanner = rules_text # Use original rules_text for scanner
+                rules_text_for_scanner = (
+                    rules_text  # Use original rules_text for scanner
+                )
                 # Scanner and Parser in _init_runtime should ideally also use self.variable_mapper
                 # However, Runtime() itself will create its own Scanner/Parser with the mapper.
                 # The ideal way is: self.runtime = Runtime(variable_mapper=self.variable_mapper); self.runtime.consult(rules_file)
                 # For now, sticking to minimal changes as per specific instructions for VariableMapper propagation.
-                temp_scanner = Scanner(rules_text_for_scanner, variable_mapper=self.variable_mapper)
-                temp_parser = Parser(temp_scanner.scan_tokens(), variable_mapper=self.variable_mapper)
-                parsed_items = temp_parser.parse() # parse() returns a list of rules/facts
+                temp_scanner = Scanner(
+                    rules_text_for_scanner, variable_mapper=self.variable_mapper
+                )
+                temp_parser = Parser(
+                    temp_scanner.scan_tokens(), variable_mapper=self.variable_mapper
+                )
+                parsed_items = (
+                    temp_parser.parse()
+                )  # parse() returns a list of rules/facts
 
                 rules_list = [item for item in parsed_items if item is not None]
-                self.runtime = Runtime(rules_list, variable_mapper=self.variable_mapper) # Pass variable_mapper
+                self.runtime = Runtime(
+                    rules_list, variable_mapper=self.variable_mapper
+                )  # Pass variable_mapper
 
                 self.current_rules_file = rules_file
                 # If consult is used, it would print its own messages.
@@ -135,14 +147,24 @@ class InteractiveProlog:
                 # For now, let's assume the above direct rule loading is intended to stay.
                 # If Runtime.consult was used, the message would be handled by it.
                 # To avoid double messages if consult is implemented later with its own prints:
-                if not rules_list: # If parsing resulted in no rules, it's likely an issue or empty file.
-                    print(self._format_warning(f"ファイル '{rules_file}' からルールを読み込めませんでした、または空です。"))
+                if not rules_list:  # If parsing resulted in no rules, it's likely an issue or empty file.
+                    print(
+                        self._format_warning(
+                            f"ファイル '{rules_file}' からルールを読み込めませんでした、または空です。"
+                        )
+                    )
                 else:
-                    print(self._format_success(f"ファイル '{rules_file}' のルールでランタイムを初期化しました。"))
+                    print(
+                        self._format_success(
+                            f"ファイル '{rules_file}' のルールでランタイムを初期化しました。"
+                        )
+                    )
                 return True
             else:
                 # 空のランタイムを作成
-                self.runtime = Runtime([], variable_mapper=self.variable_mapper) # Pass variable_mapper
+                self.runtime = Runtime(
+                    [], variable_mapper=self.variable_mapper
+                )  # Pass variable_mapper
                 print(self._format_info("空のランタイムを初期化しました"))
                 return True
 
@@ -190,8 +212,10 @@ class InteractiveProlog:
                 print(self._format_warning("ルールが読み込まれていません"))
 
         elif cmd == ":clear":
-            self.runtime = Runtime([], variable_mapper=self.variable_mapper) # Pass variable_mapper
-            self.variable_mapper.clear_mapping() # Clear mapper state
+            self.runtime = Runtime(
+                [], variable_mapper=self.variable_mapper
+            )  # Pass variable_mapper
+            self.variable_mapper.clear_mapping()  # Clear mapper state
             self.current_rules_file = None
             print(self._format_success("ルールと変数マッピングをクリアしました"))
 
@@ -259,7 +283,9 @@ class InteractiveProlog:
                 bindings = []
                 # solution_dict のキーは日本語名に変換済みの Variable オブジェクト
                 for var_obj, value in solution_dict.items():
-                    bindings.append(f"{var_obj.name} = {self._format_term_for_display(value)}")
+                    bindings.append(
+                        f"{var_obj.name} = {self._format_term_for_display(value)}"
+                    )
                 if bindings:
                     print(f"  {i:2d}. {', '.join(bindings)}")
                 else:  # 変数がないクエリ (例: true.)
@@ -271,22 +297,28 @@ class InteractiveProlog:
                 # If solutions itself is empty, the top message handles it.
                 # If solution_dict is None or truly empty (not just no vars), it's 'false' or 'true' respectively.
                 # This part of the logic depends on exact output of Runtime.query for no-solution vs solution-with-no-vars
-                print(f"  {i:2d}. false") # Or handle as per Runtime.query's specific output for 'fail.'
+                print(
+                    f"  {i:2d}. false"
+                )  # Or handle as per Runtime.query's specific output for 'fail.'
 
     def _format_term_for_display(self, term: Any) -> str:
         if isinstance(term, Variable):
-            return term.name # Already Japanese name
+            return term.name  # Already Japanese name
         elif isinstance(term, Term):
             arg_strs = [self._format_term_for_display(arg) for arg in term.args]
-            functor_display = term.functor.name if isinstance(term.functor, Atom) else str(term.functor)
+            functor_display = (
+                term.functor.name
+                if isinstance(term.functor, Atom)
+                else str(term.functor)
+            )
             if isinstance(term.functor, Variable):
-                 functor_display = term.functor.name # Already Japanese name
+                functor_display = term.functor.name  # Already Japanese name
 
             if not arg_strs:
                 return functor_display
             else:
                 return f"{functor_display}({', '.join(arg_strs)})"
-        elif isinstance(term, list): # Prolog list representation
+        elif isinstance(term, list):  # Prolog list representation
             if not term:
                 return "[]"
             elements_str = []
@@ -308,37 +340,47 @@ class InteractiveProlog:
             # Let's assume `term` is a Python list if it's from `findall` results,
             # or a `Term` object if it's a direct Prolog list.
             # The original `_format_term_for_display` had a good starting point for `Term('.', ...)`
-            if isinstance(term, list) and not (isinstance(term, Term)): # Python list from findall etc.
+            if isinstance(term, list) and not (
+                isinstance(term, Term)
+            ):  # Python list from findall etc.
                 return f"[{', '.join(self._format_term_for_display(item) for item in term)}]"
 
             # Handling for Term('.', ...) structure (Prolog internal list)
             # This part of the original snippet is kept and adapted:
-            if isinstance(term, Term) and term.functor.name == '.' and len(term.args) == 2:
+            if (
+                isinstance(term, Term)
+                and term.functor.name == "."
+                and len(term.args) == 2
+            ):
                 elements_str = []
                 current = term
-                while isinstance(current, Term) and current.functor.name == '.' and len(current.args) == 2:
+                while (
+                    isinstance(current, Term)
+                    and current.functor.name == "."
+                    and len(current.args) == 2
+                ):
                     elements_str.append(self._format_term_for_display(current.args[0]))
                     current = current.args[1]
 
-                if isinstance(current, Atom) and current.name == "[]": # Proper list
+                if isinstance(current, Atom) and current.name == "[]":  # Proper list
                     return f"[{', '.join(elements_str)}]"
-                else: # Improper list
+                else:  # Improper list
                     if elements_str:
                         return f"[{', '.join(elements_str)} | {self._format_term_for_display(current)}]"
-                    else: # Should not happen if initial term was Term('.',...)
+                    else:  # Should not happen if initial term was Term('.',...)
                         return str(term)
-            elif isinstance(term, Atom) and term.name == "[]": # Empty Prolog list
+            elif isinstance(term, Atom) and term.name == "[]":  # Empty Prolog list
                 return "[]"
             # Fallback for other list-like things or complex terms not fitting above
             return str(term)
-        else: # Atom, Number, String
+        else:  # Atom, Number, String
             return str(term)
 
     def _execute_query(self, query_text: str):
         """クエリを実行"""
         if not self.runtime:
             # Pass self.variable_mapper when auto-initializing runtime
-            self._init_runtime() # _init_runtime now uses self.variable_mapper
+            self._init_runtime()  # _init_runtime now uses self.variable_mapper
 
         try:
             # クエリ履歴に追加
@@ -362,17 +404,22 @@ class InteractiveProlog:
 
             # 結果表示
             # _display_query_results no longer needs the 'goal' argument as solutions dict has var names
-            self._display_query_results(None, solutions) # Pass None for goal, or adapt _display_query_results
+            self._display_query_results(
+                None, solutions
+            )  # Pass None for goal, or adapt _display_query_results
 
             # 履歴更新
             query_record["success"] = True
             query_record["results_count"] = len(solutions) if solutions else 0
 
-        except PrologError as e: # Catch specific Prolog errors first
+        except PrologError as e:  # Catch specific Prolog errors first
             error_msg = f"Prologエラー: {str(e)}"
             print(self._format_error(error_msg))
             query_record["error"] = str(e)
-        except (InterpreterError, ScannerError) as e: # Catch other known interpreter/scanner errors
+        except (
+            InterpreterError,
+            ScannerError,
+        ) as e:  # Catch other known interpreter/scanner errors
             error_msg = f"実行/スキャンエラー: {str(e)}"
             print(self._format_error(error_msg))
             query_record["error"] = str(e)

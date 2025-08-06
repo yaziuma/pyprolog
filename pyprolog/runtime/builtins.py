@@ -531,9 +531,9 @@ class AppendPredicate(BuiltinPredicate):
                 )
                 yield final_env_clause1
             else:
-                logger.debug(f"APPEND_CP1: L2 and L3 failed to unify.")
+                logger.debug("APPEND_CP1: L2 and L3 failed to unify.")
         else:
-            logger.debug(f"APPEND_CP1: L1 failed to unify with [].")
+            logger.debug("APPEND_CP1: L1 failed to unify with [].")
 
         # --- Choice Point 2: append([H|T1], L2, [H|T3]) :- append(T1, L2, T3). ---
         logger.debug(
@@ -939,3 +939,128 @@ class DynamicRetractPredicate(BuiltinPredicate):
 
         logger.debug(f"RETRACT: No matching clause found for: {target_clause_struct}")
         return  # Failed to find a match
+
+
+class PeekCharPredicate(BuiltinPredicate):
+    """
+    peek_char/1述語実装
+    次の文字を非破壊的に読み取る（ストリームの位置は変更しない）
+    """
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self._validate_arguments()
+
+    def _validate_arguments(self):
+        """引数検証"""
+        arg_count = len(self.args)
+        if arg_count == 0:
+            raise PrologError("peek_char requires at least 1 argument")
+        elif arg_count > 2:
+            raise PrologError(f"peek_char takes 1-2 arguments, got {arg_count}")
+
+    def execute(
+        self, runtime: "Runtime", env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """メイン実行ロジック"""
+        try:
+            # ストリーム取得
+            stream = self._get_target_stream(runtime, env)
+
+            # 能力チェック
+            if not stream.supports_peek_operations():
+                from ..core.stream_errors import StreamOperationError
+
+                raise StreamOperationError(
+                    f"Stream {type(stream).__name__} does not support peek_char/1"
+                )
+
+            # peek操作実行
+            char_str = stream.peek_char()
+            target_atom = self._convert_to_atom(char_str)
+
+            # unification
+            char_arg = self.args[-1]  # 最後の引数が文字変数
+            unified, next_env = runtime.logic_interpreter.unify(
+                char_arg, target_atom, env
+            )
+
+            if unified:
+                yield next_env
+
+        except Exception as e:
+            # ストリーム操作エラーは予期される例外
+            if "not support" in str(e).lower():
+                logger.warning(f"peek_char/1 stream operation failed: {e}")
+                return  # 失敗として処理
+            else:
+                # 予期しない例外は再発生
+                logger.error(f"Unexpected error in peek_char/1: {e}", exc_info=True)
+                raise PrologError(f"peek_char/1 execution failed: {e}") from e
+
+    def _get_target_stream(self, runtime: "Runtime", env: BindingEnvironment):
+        """対象ストリームの特定"""
+        if len(self.args) == 1:
+            # peek_char(-Char) 形式
+            return runtime.io_manager.get_input_stream()
+        else:
+            # peek_char(+Stream, -Char) 形式（将来実装）
+            stream_arg = self.args[0]
+            # ストリーム引数の解決ロジック（将来実装）
+            raise NotImplementedError("Stream argument not yet supported")
+
+    def _convert_to_atom(self, char_str: str) -> Atom:
+        """文字列からAtomへの変換"""
+        if char_str == "":
+            return Atom("end_of_file")
+        elif len(char_str) == 1:
+            return Atom(char_str)
+        else:
+            # マルチバイト文字などの処理
+            return Atom(char_str[0])  # 最初の文字のみ
+
+
+class AtEndOfStreamPredicate(BuiltinPredicate):
+    """
+    at_end_of_stream/0述語実装
+    EOF状態を非破壊的に確認する
+    """
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        if len(self.args) > 1:
+            raise PrologError(
+                f"at_end_of_stream takes 0-1 arguments, got {len(self.args)}"
+            )
+
+    def execute(
+        self, runtime: "Runtime", env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """メイン実行ロジック"""
+        try:
+            # ストリーム取得
+            stream = self._get_target_stream(runtime, env)
+
+            # EOF状態確認
+            if stream.at_end_of_stream():
+                yield env  # 成功
+            # else: 失敗（何もyieldしない）
+
+        except Exception as e:
+            # ストリーム操作エラーは予期される例外
+            if "not support" in str(e).lower():
+                logger.warning(f"at_end_of_stream stream operation failed: {e}")
+                return  # 失敗として処理
+            else:
+                logger.error(
+                    f"Unexpected error in at_end_of_stream: {e}", exc_info=True
+                )
+                raise PrologError(f"at_end_of_stream execution failed: {e}") from e
+
+    def _get_target_stream(self, runtime: "Runtime", env: BindingEnvironment):
+        """対象ストリームの特定"""
+        if len(self.args) == 0:
+            return runtime.io_manager.get_input_stream()
+        else:
+            # at_end_of_stream(+Stream) 形式（将来実装）
+            raise NotImplementedError("Stream argument not yet supported")

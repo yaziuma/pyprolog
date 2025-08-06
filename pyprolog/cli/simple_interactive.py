@@ -6,16 +6,16 @@ Simple Interactive Prolog CLI
 
 import os
 import sys
-from typing import List, Optional, Any, Dict # Added Any, Dict
+from typing import List, Optional, Any, Dict  # Added Any, Dict
 
 from colorama import Fore, Style, init
 
-from pyprolog.parser.parser import Parser # Not strictly needed here anymore
-from pyprolog.parser.scanner import Scanner # Not strictly needed here anymore
-from pyprolog.core.types import Variable, Term, Atom, Number # Added Term, Atom, Number
+from pyprolog.parser.parser import Parser  # Not strictly needed here anymore
+from pyprolog.parser.scanner import Scanner  # Not strictly needed here anymore
+from pyprolog.core.types import Variable, Term, Atom  # Added Term, Atom, Number
 from pyprolog.core.errors import InterpreterError, ScannerError, PrologError
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.util.variable_mapper import VariableMapper # Added VariableMapper
+from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
 
 # カラー初期化
 init(autoreset=True)
@@ -26,8 +26,10 @@ class SimplePrologInteractive:
 
     def __init__(self):
         self.runtime: Optional[Runtime] = None
-        self.variable_mapper = VariableMapper() # Added VariableMapper instance
-        self.session_history: List[str] = [] # Consider changing to List[Dict[str, Any]] like enhanced REPL if more info is stored
+        self.variable_mapper = VariableMapper()  # Added VariableMapper instance
+        self.session_history: List[
+            str
+        ] = []  # Consider changing to List[Dict[str, Any]] like enhanced REPL if more info is stored
         self.current_rules_file: Optional[str] = None
 
         print(self._get_welcome_message())
@@ -107,21 +109,35 @@ class SimplePrologInteractive:
                 # Similar to enhanced REPL, using Runtime's own parsing capabilities is preferred.
                 # For now, direct parsing with the passed mapper.
                 temp_scanner = Scanner(rules_text, variable_mapper=self.variable_mapper)
-                temp_parser = Parser(temp_scanner.scan_tokens(), variable_mapper=self.variable_mapper)
+                temp_parser = Parser(
+                    temp_scanner.scan_tokens(), variable_mapper=self.variable_mapper
+                )
                 parsed_items = temp_parser.parse()
 
                 rules_list = [item for item in parsed_items if item is not None]
-                self.runtime = Runtime(rules_list, variable_mapper=self.variable_mapper) # Pass variable_mapper
+                self.runtime = Runtime(
+                    rules_list, variable_mapper=self.variable_mapper
+                )  # Pass variable_mapper
 
                 self.current_rules_file = rules_file
                 if not rules_list:
-                    print(self._format_warning(f"ファイル '{rules_file}' からルールを読み込めませんでした、または空です。"))
+                    print(
+                        self._format_warning(
+                            f"ファイル '{rules_file}' からルールを読み込めませんでした、または空です。"
+                        )
+                    )
                 else:
-                    print(self._format_success(f"ファイル '{rules_file}' のルールでランタイムを初期化しました。"))
+                    print(
+                        self._format_success(
+                            f"ファイル '{rules_file}' のルールでランタイムを初期化しました。"
+                        )
+                    )
                 return True
             else:
                 # 空のランタイムを作成
-                self.runtime = Runtime([], variable_mapper=self.variable_mapper) # Pass variable_mapper
+                self.runtime = Runtime(
+                    [], variable_mapper=self.variable_mapper
+                )  # Pass variable_mapper
                 print(self._format_info("空のランタイムを初期化しました"))
                 return True
 
@@ -169,8 +185,10 @@ class SimplePrologInteractive:
                 print(self._format_warning("ルールが読み込まれていません"))
 
         elif cmd == ":clear":
-            self.runtime = Runtime([], variable_mapper=self.variable_mapper) # Pass variable_mapper
-            self.variable_mapper.clear_mapping() # Clear mapper state
+            self.runtime = Runtime(
+                [], variable_mapper=self.variable_mapper
+            )  # Pass variable_mapper
+            self.variable_mapper.clear_mapping()  # Clear mapper state
             self.current_rules_file = None
             print(self._format_success("ルールと変数マッピングをクリアしました"))
 
@@ -193,46 +211,62 @@ class SimplePrologInteractive:
 
     def _format_term_for_display(self, term: Any) -> str:
         if isinstance(term, Variable):
-            return term.name # Already Japanese name
+            return term.name  # Already Japanese name
         elif isinstance(term, Term):
             arg_strs = [self._format_term_for_display(arg) for arg in term.args]
-            functor_display = term.functor.name if isinstance(term.functor, Atom) else str(term.functor)
+            functor_display = (
+                term.functor.name
+                if isinstance(term.functor, Atom)
+                else str(term.functor)
+            )
             if isinstance(term.functor, Variable):
-                 functor_display = term.functor.name # Already Japanese name
+                functor_display = term.functor.name  # Already Japanese name
 
             if not arg_strs:
                 return functor_display
             else:
                 return f"{functor_display}({', '.join(arg_strs)})"
-        elif isinstance(term, list): # Prolog list representation (from findall or direct)
-            if not term: # Empty Python list or empty Prolog list Atom('[]')
+        elif isinstance(
+            term, list
+        ):  # Prolog list representation (from findall or direct)
+            if not term:  # Empty Python list or empty Prolog list Atom('[]')
                 return "[]"
 
             # Handle Term('.', ...) structure for Prolog lists
-            if isinstance(term, Term) and term.functor.name == '.' and len(term.args) == 2:
+            if (
+                isinstance(term, Term)
+                and term.functor.name == "."
+                and len(term.args) == 2
+            ):
                 elements_str = []
                 current = term
-                while isinstance(current, Term) and current.functor.name == '.' and len(current.args) == 2:
+                while (
+                    isinstance(current, Term)
+                    and current.functor.name == "."
+                    and len(current.args) == 2
+                ):
                     elements_str.append(self._format_term_for_display(current.args[0]))
                     current = current.args[1]
 
-                if isinstance(current, Atom) and current.name == "[]": # Proper list
+                if isinstance(current, Atom) and current.name == "[]":  # Proper list
                     return f"[{', '.join(elements_str)}]"
-                else: # Improper list
+                else:  # Improper list
                     if elements_str:
-                         return f"[{', '.join(elements_str)} | {self._format_term_for_display(current)}]"
-                    else: # Should not happen with initial Term('.',...)
+                        return f"[{', '.join(elements_str)} | {self._format_term_for_display(current)}]"
+                    else:  # Should not happen with initial Term('.',...)
                         return str(term)
-            elif isinstance(term, Atom) and term.name == "[]": # Empty Prolog list Atom
+            elif isinstance(term, Atom) and term.name == "[]":  # Empty Prolog list Atom
                 return "[]"
             # If term is a Python list (e.g. from findall)
             elif isinstance(term, list) and not isinstance(term, Term):
-                 return f"[{', '.join(self._format_term_for_display(item) for item in term)}]"
-            return str(term) # Fallback
-        else: # Atom, Number, String
+                return f"[{', '.join(self._format_term_for_display(item) for item in term)}]"
+            return str(term)  # Fallback
+        else:  # Atom, Number, String
             return str(term)
 
-    def _display_query_results(self, solutions: List[Dict[Variable, Any]]): # Type hint for solutions
+    def _display_query_results(
+        self, solutions: List[Dict[Variable, Any]]
+    ):  # Type hint for solutions
         """クエリ結果を表示"""
         if not solutions:
             print(self._format_warning("解が見つかりませんでした"))
@@ -245,27 +279,30 @@ class SimplePrologInteractive:
                 bindings = []
                 for var_obj, value in solution_dict.items():
                     # var_obj.name should be Japanese here
-                    bindings.append(f"{var_obj.name} = {self._format_term_for_display(value)}")
+                    bindings.append(
+                        f"{var_obj.name} = {self._format_term_for_display(value)}"
+                    )
                 if bindings:
                     print(f"  {i:2d}. {', '.join(bindings)}")
-                else: # No variables in query, but it's true
+                else:  # No variables in query, but it's true
                     print(f"  {i:2d}. true")
-            else: # Query was false
-                  # This depends on how Runtime.query signals "false".
-                  # If it's an empty list, the top check handles it.
-                  # If it's a list containing None or an empty dict for false, this is needed.
-                  # For now, assume empty dict in list means "true", and truly no solution is empty list.
-                  # If solution_dict can be None or some other signal for "false":
+            else:  # Query was false
+                # This depends on how Runtime.query signals "false".
+                # If it's an empty list, the top check handles it.
+                # If it's a list containing None or an empty dict for false, this is needed.
+                # For now, assume empty dict in list means "true", and truly no solution is empty list.
+                # If solution_dict can be None or some other signal for "false":
                 print(f"  {i:2d}. false")
-
 
     def _execute_query(self, query_text: str):
         """クエリを実行"""
         if not self.runtime:
-            self._init_runtime() # Will use self.variable_mapper
+            self._init_runtime()  # Will use self.variable_mapper
 
         try:
-            self.session_history.append(query_text) # Simple history, just the query string
+            self.session_history.append(
+                query_text
+            )  # Simple history, just the query string
 
             solutions = []
             if self.runtime is not None:
@@ -277,10 +314,10 @@ class SimplePrologInteractive:
             else:
                 print(self._format_error("ランタイムが初期化されていません"))
 
-        except PrologError as e: # Catch specific Prolog errors
+        except PrologError as e:  # Catch specific Prolog errors
             error_msg = f"Prologエラー: {str(e)}"
             print(self._format_error(error_msg))
-        except (InterpreterError, ScannerError) as e: # Catch other known errors
+        except (InterpreterError, ScannerError) as e:  # Catch other known errors
             error_msg = f"実行/スキャンエラー: {str(e)}"
             error_msg = f"Prologエラー: {str(e)}"
             print(self._format_error(error_msg))

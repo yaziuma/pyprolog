@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Tuple, Set, Optional, List, Union
+from typing import Dict, Tuple, Set, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -7,18 +7,22 @@ logger = logging.getLogger(__name__)
 
 class FunctorMapper:
     """ファンクター名の非ASCII⇔英語マッピング管理"""
-    
+
     def __init__(self, existing_functors: Optional[Set[str]] = None):
         self._non_ascii_to_english: Dict[str, str] = {}
         self._english_to_non_ascii: Dict[str, str] = {}
         self._next_functor_index: int = 1
         self._existing_functors: Set[str] = existing_functors or set()
-        logger.debug(f"FunctorMapper initialized with {len(self._existing_functors)} existing functors")
+        logger.debug(
+            f"FunctorMapper initialized with {len(self._existing_functors)} existing functors"
+        )
 
     def register_existing_functors(self, functors: Set[str]):
         """既存ファンクター名を登録（衝突回避用）"""
         self._existing_functors.update(functors)
-        logger.debug(f"Registered {len(functors)} additional functors. Total: {len(self._existing_functors)}")
+        logger.debug(
+            f"Registered {len(functors)} additional functors. Total: {len(self._existing_functors)}"
+        )
 
     def _generate_safe_english_functor(self) -> str:
         """
@@ -30,13 +34,15 @@ class FunctorMapper:
         while True:
             # より安全なプレフィックスを使用
             candidate = f"MAPPED_F{self._next_functor_index}"
-            
+
             # 既存ファンクターとの衝突チェック
-            if (candidate not in self._english_to_non_ascii and 
-                candidate not in self._existing_functors):
+            if (
+                candidate not in self._english_to_non_ascii
+                and candidate not in self._existing_functors
+            ):
                 self._next_functor_index += 1
                 return candidate
-                
+
             self._next_functor_index += 1
 
     def map_non_ascii_to_english(self, functor: str) -> str:
@@ -68,40 +74,40 @@ class FunctorMapper:
         """
         if not name:
             return False
-        
+
         # ASCII範囲外の文字が含まれているかチェック
         has_non_ascii = any(ord(char) > 127 for char in name)
-        
+
         # Prolog識別子として問題のある文字をチェック（基本的な区切り文字）
         unsafe_chars = re.search(r'[()[\]{}.,;:!|"\'`~@#$%^&*+=<>?/\\]', name)
-        
+
         # ただし、既に登録済みの英語ファンクターは除外
         if name in self._existing_functors and not has_non_ascii:
             return False
-            
+
         return has_non_ascii or bool(unsafe_chars)
 
     def _is_valid_identifier_char(self, char: str) -> bool:
         """識別子として有効な文字かチェック"""
         if not char:
             return False
-        
+
         # 基本的な制御文字や区切り文字は除外
-        invalid_chars = set('()[]{}.,;:!|"\'`~@#$%^&*+-=<>?/\\')
+        invalid_chars = set("()[]{}.,;:!|\"'`~@#$%^&*+-=<>?/\\")
         return char not in invalid_chars and not char.isspace()
 
     def extract_functors_from_string(self, prolog_string: str) -> Set[str]:
         """Prolog文字列から基本的なファンクター名を抽出（簡易版）"""
         functors = set()
-        
+
         # 簡易的な正規表現でファンクター名を抽出
         # この実装は基本的なケースに対応し、完全な解析は後でParserで行う
-        functor_pattern = r'\b([a-zA-Z][a-zA-Z0-9_]*)\s*\('
+        functor_pattern = r"\b([a-zA-Z][a-zA-Z0-9_]*)\s*\("
         matches = re.findall(functor_pattern, prolog_string)
-        
+
         for match in matches:
             functors.add(match)
-            
+
         return functors
 
     def clear_mapping(self):
@@ -141,5 +147,5 @@ class FunctorMapper:
         if not name:
             return False
         # 日本語文字が含まれているかチェック
-        japanese_chars = re.search(r'[ぁ-ゟ゠-ヿ一-鿿]', name)
+        japanese_chars = re.search(r"[ぁ-ゟ゠-ヿ一-鿿]", name)
         return japanese_chars is not None

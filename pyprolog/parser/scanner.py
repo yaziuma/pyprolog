@@ -3,8 +3,8 @@ from pyprolog.parser.token import Token
 from pyprolog.parser.token_type import TokenType, ensure_operator_tokens
 from typing import List, Dict, Callable, Optional
 import logging
-from pyprolog.util import VariableMapper # Added import
-from pyprolog.util.functor_mapper import FunctorMapper # Added FunctorMapper import
+from pyprolog.util import VariableMapper  # Added import
+from pyprolog.util.functor_mapper import FunctorMapper  # Added FunctorMapper import
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,8 @@ class Scanner:
         self,
         source: str,
         report: Callable[[int, str], None] = default_error_handler,
-        variable_mapper: Optional[VariableMapper] = None, # Added variable_mapper
-        functor_mapper: Optional[FunctorMapper] = None, # Added functor_mapper
+        variable_mapper: Optional[VariableMapper] = None,  # Added variable_mapper
+        functor_mapper: Optional[FunctorMapper] = None,  # Added functor_mapper
     ):
         self._source = source
         self._tokens: List[Token] = []
@@ -29,8 +29,8 @@ class Scanner:
         self._current = 0
         self._line = 1
         self._report = report
-        self._variable_mapper = variable_mapper # Store variable_mapper
-        self._functor_mapper = functor_mapper # Store functor_mapper
+        self._variable_mapper = variable_mapper  # Store variable_mapper
+        self._functor_mapper = functor_mapper  # Store functor_mapper
 
         # 演算子トークンの初期化をキーワード定義より前に移動
         ensure_operator_tokens()
@@ -167,11 +167,14 @@ class Scanner:
     def _identifier(self):
         """識別子のスキャン（Unicode対応版）"""
         # Unicode文字を含む識別子をサポート
-        while (not self._is_at_end() and
-               (self._peek().isalnum() or
-                self._peek() == "_" or
-                (self._peek() and ord(self._peek()) > 127) or  # 非ASCII文字（空文字チェック追加）
-                self._is_valid_identifier_char(self._peek()))):
+        while not self._is_at_end() and (
+            self._peek().isalnum()
+            or self._peek() == "_"
+            or (
+                self._peek() and ord(self._peek()) > 127
+            )  # 非ASCII文字（空文字チェック追加）
+            or self._is_valid_identifier_char(self._peek())
+        ):
             self._advance()
 
         text = self._source[self._start : self._current]
@@ -189,13 +192,19 @@ class Scanner:
             elif self._functor_mapper and self._functor_mapper.needs_mapping(text):
                 token_type = TokenType.ATOM
                 literal_override = self._functor_mapper.map_non_ascii_to_english(text)
-                logger.debug(f"Mapped non-ASCII functor '{text}' to '{literal_override}'")
+                logger.debug(
+                    f"Mapped non-ASCII functor '{text}' to '{literal_override}'"
+                )
 
             # 日本語変数処理（既存）
-            elif self._variable_mapper and self._variable_mapper.is_japanese_variable(text):
+            elif self._variable_mapper and self._variable_mapper.is_japanese_variable(
+                text
+            ):
                 token_type = TokenType.VARIABLE
                 literal_override = self._variable_mapper.map_japanese_to_english(text)
-                logger.debug(f"Mapped Japanese variable '{text}' to '{literal_override}'")
+                logger.debug(
+                    f"Mapped Japanese variable '{text}' to '{literal_override}'"
+                )
 
             # 英語識別子処理（既存）
             elif text[0].isupper() or text[0] == "_":
@@ -212,11 +221,10 @@ class Scanner:
         """識別子として有効な文字かチェック"""
         if not char:
             return False
-        
-        # 基本的な制御文字や区切り文字は除外
-        invalid_chars = set('()[]{}.,;:!|"\'`~@#$%^&*+-=<>?/\\')
-        return char not in invalid_chars and not char.isspace()
 
+        # 基本的な制御文字や区切り文字は除外
+        invalid_chars = set("()[]{}.,;:!|\"'`~@#$%^&*+-=<>?/\\")
+        return char not in invalid_chars and not char.isspace()
 
     def _number(self):
         """数値のスキャン"""

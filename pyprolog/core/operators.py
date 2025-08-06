@@ -108,24 +108,60 @@ class OperatorRegistry:
                 "UNARY_PLUS",
             ),
             OperatorInfo(
-                "~", 200, Associativity.NON, OperatorType.ARITHMETIC, 1, None, "BITWISE_NOT"
+                "~",
+                200,
+                Associativity.NON,
+                OperatorType.ARITHMETIC,
+                1,
+                None,
+                "BITWISE_NOT",
             ),
             # ビット単位シフト演算子
             OperatorInfo(
-                "<<", 300, Associativity.LEFT, OperatorType.ARITHMETIC, 2, None, "LSHIFT"
+                "<<",
+                300,
+                Associativity.LEFT,
+                OperatorType.ARITHMETIC,
+                2,
+                None,
+                "LSHIFT",
             ),
             OperatorInfo(
-                ">>", 300, Associativity.LEFT, OperatorType.ARITHMETIC, 2, None, "RSHIFT"
+                ">>",
+                300,
+                Associativity.LEFT,
+                OperatorType.ARITHMETIC,
+                2,
+                None,
+                "RSHIFT",
             ),
             # 二項算術演算子 (ビット単位 AND, OR, XOR を追加)
             OperatorInfo(
-                "&", 400, Associativity.LEFT, OperatorType.ARITHMETIC, 2, None, "BITWISE_AND"
+                "&",
+                400,
+                Associativity.LEFT,
+                OperatorType.ARITHMETIC,
+                2,
+                None,
+                "BITWISE_AND",
             ),
             OperatorInfo(
-                "|", 400, Associativity.LEFT, OperatorType.ARITHMETIC, 2, None, "BITWISE_OR"
+                "|",
+                400,
+                Associativity.LEFT,
+                OperatorType.ARITHMETIC,
+                2,
+                None,
+                "BITWISE_OR",
             ),
             OperatorInfo(
-                "^", 400, Associativity.LEFT, OperatorType.ARITHMETIC, 2, None, "BITWISE_XOR"
+                "^",
+                400,
+                Associativity.LEFT,
+                OperatorType.ARITHMETIC,
+                2,
+                None,
+                "BITWISE_XOR",
             ),
             OperatorInfo(
                 "*", 400, Associativity.LEFT, OperatorType.ARITHMETIC, 2, None, "STAR"

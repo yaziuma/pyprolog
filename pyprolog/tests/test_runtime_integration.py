@@ -1,18 +1,21 @@
 import unittest
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.core.types import Variable, Atom, Term, Number
+from pyprolog.core.types import Variable, Atom
 from pyprolog.util.variable_mapper import VariableMapper
 
-class TestRuntimeIntegrationJapanese(unittest.TestCase):
 
+class TestRuntimeIntegrationJapanese(unittest.TestCase):
     def setUp(self):
         # 各テストで新しいRuntimeとVariableMapperインスタンスを使用する
         self.variable_mapper = VariableMapper()
         self.runtime = Runtime(variable_mapper=self.variable_mapper)
 
     def assertSolutionContains(self, solutions, expected_bindings_list):
-        self.assertEqual(len(solutions), len(expected_bindings_list),
-                         f"Expected {len(expected_bindings_list)} solutions, got {len(solutions)}")
+        self.assertEqual(
+            len(solutions),
+            len(expected_bindings_list),
+            f"Expected {len(expected_bindings_list)} solutions, got {len(solutions)}",
+        )
 
         processed_solutions = []
         for sol_dict in solutions:
@@ -25,12 +28,14 @@ class TestRuntimeIntegrationJapanese(unittest.TestCase):
             found_match = False
             for processed_sol_dict in processed_solutions:
                 if len(processed_sol_dict) != len(expected_bindings_dict):
-                    continue # Different number of bindings
+                    continue  # Different number of bindings
 
                 match_this_sol = True
                 for var_name_str, expected_val in expected_bindings_dict.items():
-                    if var_name_str not in processed_sol_dict or \
-                       processed_sol_dict[var_name_str] != expected_val:
+                    if (
+                        var_name_str not in processed_sol_dict
+                        or processed_sol_dict[var_name_str] != expected_val
+                    ):
                         match_this_sol = False
                         break
 
@@ -39,18 +44,17 @@ class TestRuntimeIntegrationJapanese(unittest.TestCase):
                     # Optionally, remove the matched solution to ensure all expected solutions are unique and present
                     # processed_solutions.remove(processed_sol_dict)
                     break
-            self.assertTrue(found_match, f"Expected solution containing {expected_bindings_dict} not found in actual solutions {solutions}")
-
+            self.assertTrue(
+                found_match,
+                f"Expected solution containing {expected_bindings_dict} not found in actual solutions {solutions}",
+            )
 
     def test_simple_japanese_variable_query(self):
         self.runtime.add_rule("favorite_food(apple).")
         self.runtime.add_rule("favorite_food(orange).")
-        solutions = self.runtime.query("favorite_food(何).") # 何 -> V1
+        solutions = self.runtime.query("favorite_food(何).")  # 何 -> V1
 
-        expected = [
-            {"何": Atom("apple")},
-            {"何": Atom("orange")}
-        ]
+        expected = [{"何": Atom("apple")}, {"何": Atom("orange")}]
         self.assertSolutionContains(solutions, expected)
 
     def test_japanese_variables_in_rule_and_query(self):
@@ -61,10 +65,7 @@ class TestRuntimeIntegrationJapanese(unittest.TestCase):
 
         solutions = self.runtime.query("sibling(ichiro, 誰か).")
         # The query should find that ichiro and jiro are siblings
-        expected = [
-            {"誰か": Atom("ichiro")}, 
-            {"誰か": Atom("jiro")}
-        ]
+        expected = [{"誰か": Atom("ichiro")}, {"誰か": Atom("jiro")}]
         self.assertSolutionContains(solutions, expected)
 
         # j_to_e, e_to_j = self.variable_mapper.get_all_mappings()
@@ -72,17 +73,13 @@ class TestRuntimeIntegrationJapanese(unittest.TestCase):
         # print("J->E:", j_to_e) # Should contain 兄,弟,親,誰か and their V forms
         # print("E->J:", e_to_j)
 
-
     def test_query_with_multiple_japanese_variables(self):
         self.runtime.add_rule("location(tokyo, japan).")
         self.runtime.add_rule("location(osaka, japan).")
         self.runtime.add_rule("location(paris, france).")
 
         solutions = self.runtime.query("location(都市, japan).")
-        expected = [
-            {"都市": Atom("tokyo")},
-            {"都市": Atom("osaka")}
-        ]
+        expected = [{"都市": Atom("tokyo")}, {"都市": Atom("osaka")}]
         self.assertSolutionContains(solutions, expected)
 
         self.setUp()
@@ -93,10 +90,9 @@ class TestRuntimeIntegrationJapanese(unittest.TestCase):
         expected2 = [
             {"どの都市": Atom("tokyo"), "どの国": Atom("japan")},
             {"どの都市": Atom("osaka"), "どの国": Atom("japan")},
-            {"どの都市": Atom("paris"), "どの国": Atom("france")}
+            {"どの都市": Atom("paris"), "どの国": Atom("france")},
         ]
         self.assertSolutionContains(solutions2, expected2)
-
 
     def test_mixed_japanese_and_english_variables(self):
         # In "likes(jiro, 何か) :- likes(taro, 何か)."
@@ -111,22 +107,21 @@ class TestRuntimeIntegrationJapanese(unittest.TestCase):
         # New goal: likes(taro, V1)
         # Fact: likes(taro, apple) -> V1 = apple
         # So, Food = apple.
-        expected = [
-            {"Food": Atom("apple")}
-        ]
+        expected = [{"Food": Atom("apple")}]
         self.assertSolutionContains(solutions, expected)
 
         # Check that "何か" was mapped, but "Food" was not.
         _, e_to_j = self.variable_mapper.get_all_mappings()
         self.assertIn("V1", e_to_j)
         self.assertEqual(e_to_j["V1"], "何か")
-        self.assertNotIn("Food", e_to_j) # English variables are not in the map
-
+        self.assertNotIn("Food", e_to_j)  # English variables are not in the map
 
     def test_no_solution_with_japanese_variables(self):
         self.runtime.add_rule("food(apple).")
         # Test that Japanese variable gets unified with existing fact
-        solutions = self.runtime.query("food(存在しないもの).") # 存在しないもの is a Japanese variable
+        solutions = self.runtime.query(
+            "food(存在しないもの)."
+        )  # 存在しないもの is a Japanese variable
         expected = [{"存在しないもの": Atom("apple")}]
         self.assertSolutionContains(solutions, expected)
 
@@ -177,31 +172,45 @@ class TestRuntimeIntegrationJapanese(unittest.TestCase):
         self.assertSolutionContains(solutions, expected)
 
         self.setUp()
-        solutions = self.runtime.query("都市 = 東京, 都市 = 日本の首都.") # All are variables
+        solutions = self.runtime.query(
+            "都市 = 東京, 都市 = 日本の首都."
+        )  # All are variables
         # 都市 -> V1, 東京 -> V2, 日本の首都 -> V3
         # V1 = V2, V1 = V3. All unified.
         # Result: {"都市": Variable("東京"), "東京": Variable("東京"), "日本の首都": Variable("東京")} (or any other var as representative)
         # The representative choice can be tricky. Let's assume one.
         # For assertSolutionContains, we need to be flexible or know the exact rep.
         # A simpler unification test:
-        solutions = self.runtime.query("Var = 日本語データ.") # 日本語データ is variable (V1)
+        solutions = self.runtime.query(
+            "Var = 日本語データ."
+        )  # 日本語データ is variable (V1)
         # Var (English) unifies with V1.
         # Result: Both variables are unified and bound to the same value
-        expected_var_data = Variable("日本語データ") # This is what the value should be
+        expected_var_data = Variable("日本語データ")  # This is what the value should be
         expected = [{"Var": expected_var_data, "日本語データ": expected_var_data}]
         self.assertSolutionContains(solutions, expected)
 
         self.setUp()
-        solutions = self.runtime.query("Var1 = 日本語データ1, Var2 = 日本語データ1, Var3 = 日本語データ2.")
+        solutions = self.runtime.query(
+            "Var1 = 日本語データ1, Var2 = 日本語データ1, Var3 = 日本語データ2."
+        )
         # Var1 (Eng) -> V1 (日本語データ1)
         # Var2 (Eng) -> V1 (日本語データ1)
         # Var3 (Eng) -> V2 (日本語データ2)
         # All variables are unified and bound to the same value
         expected_var_data1 = Variable("日本語データ1")
         expected_var_data2 = Variable("日本語データ2")
-        expected = [{"Var1": expected_var_data1, "Var2": expected_var_data1, "Var3": expected_var_data2, "日本語データ1": expected_var_data1, "日本語データ2": expected_var_data2}]
+        expected = [
+            {
+                "Var1": expected_var_data1,
+                "Var2": expected_var_data1,
+                "Var3": expected_var_data2,
+                "日本語データ1": expected_var_data1,
+                "日本語データ2": expected_var_data2,
+            }
+        ]
         self.assertSolutionContains(solutions, expected)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

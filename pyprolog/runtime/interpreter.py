@@ -3,8 +3,8 @@ from pyprolog.core.types import Term, Variable, Number, Rule, Fact, Atom
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.parser.scanner import Scanner
 from pyprolog.parser.parser import Parser
-from pyprolog.util.variable_mapper import VariableMapper # Added
-from pyprolog.util.functor_mapper import FunctorMapper # Added FunctorMapper
+from pyprolog.util.variable_mapper import VariableMapper  # Added
+from pyprolog.util.functor_mapper import FunctorMapper  # Added FunctorMapper
 from pyprolog.runtime.math_interpreter import MathInterpreter
 from pyprolog.runtime.logic_interpreter import LogicInterpreter
 from pyprolog.core.operators import operator_registry, OperatorType, OperatorInfo
@@ -24,9 +24,19 @@ from pyprolog.runtime.builtins import (
     FindallPredicate,
     GetCharPredicate,
     ReadLinePredicate,
+    PeekCharPredicate,
+    AtEndOfStreamPredicate,
 )
 from .io_manager import IOManager
-from typing import List, Iterator, Dict, Any, Union, Optional, Callable # Optional was already here
+from typing import (
+    List,
+    Iterator,
+    Dict,
+    Any,
+    Union,
+    Optional,
+    Callable,
+)  # Optional was already here
 import logging
 
 logger = logging.getLogger(__name__)
@@ -37,19 +47,25 @@ class Runtime:
         self,
         rules: Optional[List[Union[Rule, Fact]]] = None,
         variable_mapper: Optional[VariableMapper] = None,
-        functor_mapper: Optional[FunctorMapper] = None
+        functor_mapper: Optional[FunctorMapper] = None,
     ):
         self.rules: List[Union[Rule, Fact]] = rules if rules is not None else []
-        self.variable_mapper = variable_mapper if variable_mapper is not None else VariableMapper()
-        
+        self.variable_mapper = (
+            variable_mapper if variable_mapper is not None else VariableMapper()
+        )
+
         # 既存ルールからファンクター名を抽出して衝突回避
         existing_functors = self._extract_existing_functors()
-        self.functor_mapper = functor_mapper if functor_mapper is not None else FunctorMapper(existing_functors)
-        
+        self.functor_mapper = (
+            functor_mapper
+            if functor_mapper is not None
+            else FunctorMapper(existing_functors)
+        )
+
         # 既にマッパーが提供されている場合は、既存ファンクターを登録
         if functor_mapper is not None:
             self.functor_mapper.register_existing_functors(existing_functors)
-            
+
         self.math_interpreter = MathInterpreter()
         self.io_manager = IOManager()  # Initialize IOManager
         self.logic_interpreter = LogicInterpreter(
@@ -63,35 +79,35 @@ class Runtime:
     def _extract_existing_functors(self) -> set:
         """既存ルールからファンクター名を抽出"""
         functors = set()
-        
+
         for rule in self.rules:
             if isinstance(rule, Fact):
                 functors.update(self._extract_functors_from_term(rule.head))
             elif isinstance(rule, Rule):
                 functors.update(self._extract_functors_from_term(rule.head))
                 functors.update(self._extract_functors_from_term(rule.body))
-        
+
         return functors
 
     def _extract_functors_from_term(self, term) -> set:
         """項から再帰的にファンクター名を抽出"""
         functors = set()
-        
+
         if isinstance(term, Term):
             if isinstance(term.functor, Atom):
                 functors.add(term.functor.name)
-            
+
             # 引数も再帰的にチェック
             for arg in term.args:
                 functors.update(self._extract_functors_from_term(arg))
-                
+
         elif isinstance(term, Atom):
             functors.add(term.name)
-            
+
         elif isinstance(term, list):
             for item in term:
                 functors.update(self._extract_functors_from_term(item))
-        
+
         return functors
 
     def _build_unified_evaluator_system(self) -> Dict[str, Callable]:
@@ -567,6 +583,14 @@ class Runtime:
             read_line_pred = ReadLinePredicate(processed_goal.args[0])
             for item in read_line_pred.execute(self, env):
                 yield item
+        elif functor_name == "peek_char" and len(processed_goal.args) == 1:
+            peek_char_pred = PeekCharPredicate(processed_goal.args[0])
+            for item in peek_char_pred.execute(self, env):
+                yield item
+        elif functor_name == "at_end_of_stream" and len(processed_goal.args) == 0:
+            at_end_pred = AtEndOfStreamPredicate()
+            for item in at_end_pred.execute(self, env):
+                yield item
         elif functor_name == "retract" and len(processed_goal.args) == 1:
             retract_pred = DynamicRetractPredicate(processed_goal.args[0])
             for item in retract_pred.execute(self, env):  # self is runtime
@@ -594,8 +618,16 @@ class Runtime:
             # Ensure query ends with a dot for parsing consistency
             if not query_string.strip().endswith("."):
                 query_string += "."
-            tokens = Scanner(query_string, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).scan_tokens()
-            parsed_structures = Parser(tokens, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).parse()
+            tokens = Scanner(
+                query_string,
+                variable_mapper=self.variable_mapper,
+                functor_mapper=self.functor_mapper,
+            ).scan_tokens()
+            parsed_structures = Parser(
+                tokens,
+                variable_mapper=self.variable_mapper,
+                functor_mapper=self.functor_mapper,
+            ).parse()
             if not parsed_structures:
                 logger.warning("Query parsing failed")
                 return []
@@ -639,17 +671,23 @@ class Runtime:
                         continue
                     result = {}
                     for var_name_str in query_vars_names:
-                        var_obj = Variable(var_name_str) # This is the English (mapped) variable name
+                        var_obj = Variable(
+                            var_name_str
+                        )  # This is the English (mapped) variable name
                         value_fully_dereferenced = (
                             self.logic_interpreter.deep_dereference_term(
                                 var_obj, env_solution
                             )
                         )
                         # Convert variable name back to Japanese for display
-                        original_var_name = self.variable_mapper.map_english_to_japanese(var_obj.name)
+                        original_var_name = (
+                            self.variable_mapper.map_english_to_japanese(var_obj.name)
+                        )
                         display_var_obj = Variable(original_var_name)
                         # Convert any variables within the result term back to Japanese
-                        result[display_var_obj] = self._convert_vars_to_japanese(value_fully_dereferenced)
+                        result[display_var_obj] = self._convert_vars_to_japanese(
+                            value_fully_dereferenced
+                        )
                     solutions.append(result)
             except CutException:
                 logger.info(
@@ -690,8 +728,16 @@ class Runtime:
         try:
             if not rule_string.strip().endswith("."):
                 rule_string += "."
-            tokens = Scanner(rule_string, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).scan_tokens()
-            parsed_items = Parser(tokens, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).parse()
+            tokens = Scanner(
+                rule_string,
+                variable_mapper=self.variable_mapper,
+                functor_mapper=self.functor_mapper,
+            ).scan_tokens()
+            parsed_items = Parser(
+                tokens,
+                variable_mapper=self.variable_mapper,
+                functor_mapper=self.functor_mapper,
+            ).parse()
             added_count = 0
             if parsed_items:
                 for item in parsed_items:
@@ -716,8 +762,16 @@ class Runtime:
         try:
             with open(filename, "r", encoding="utf-8") as f:
                 source = f.read()
-            tokens = Scanner(source, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).scan_tokens()
-            new_rules_or_terms = Parser(tokens, variable_mapper=self.variable_mapper, functor_mapper=self.functor_mapper).parse()
+            tokens = Scanner(
+                source,
+                variable_mapper=self.variable_mapper,
+                functor_mapper=self.functor_mapper,
+            ).scan_tokens()
+            new_rules_or_terms = Parser(
+                tokens,
+                variable_mapper=self.variable_mapper,
+                functor_mapper=self.functor_mapper,
+            ).parse()
             added_count = 0
             for item in new_rules_or_terms:
                 if isinstance(item, (Rule, Fact)):
@@ -744,19 +798,23 @@ class Runtime:
             current_functor = term.functor
             if isinstance(current_functor, Variable):
                 # FunctorがVariableの場合は変数として変換
-                functor_display_name = self.variable_mapper.map_english_to_japanese(current_functor.name)
+                functor_display_name = self.variable_mapper.map_english_to_japanese(
+                    current_functor.name
+                )
                 return Term(Variable(functor_display_name), new_args)
             elif isinstance(current_functor, Atom):
                 # FunctorがAtomの場合は、まずファンクター名の日本語復元を試す
                 functor_name = current_functor.name
                 # FunctorMapperで日本語復元を試行
-                restored_functor_name = self.functor_mapper.map_english_to_non_ascii(functor_name)
+                restored_functor_name = self.functor_mapper.map_english_to_non_ascii(
+                    functor_name
+                )
                 return Term(Atom(restored_functor_name), new_args)
             else:
                 # その他の場合（通常は発生しない）
                 functor_display_name = str(current_functor)
                 return Term(Atom(functor_display_name), new_args)
-        elif isinstance(term, list): # For lists (e.g. from findall)
+        elif isinstance(term, list):  # For lists (e.g. from findall)
             return [self._convert_vars_to_japanese(item) for item in term]
         # Other types (Number, Atom, String) are returned as is.
         return term

@@ -1,12 +1,11 @@
 import unittest
 from pyprolog.parser.scanner import Scanner
 from pyprolog.parser.parser import Parser
-from pyprolog.parser.token_type import TokenType
 from pyprolog.core.types import Variable, Term, Atom
 from pyprolog.util.variable_mapper import VariableMapper
 
-class TestScannerParserIntegration(unittest.TestCase):
 
+class TestScannerParserIntegration(unittest.TestCase):
     def setUp(self):
         self.variable_mapper = VariableMapper()
         # スキャナとパーサで同じマッパーインスタンスを共有することが重要
@@ -23,7 +22,7 @@ class TestScannerParserIntegration(unittest.TestCase):
         # Ensure the prolog_code ends with a dot for the parser
         if not prolog_code.strip().endswith("."):
             prolog_code += "."
-            self.scanner._source = prolog_code # Update source if dot was added
+            self.scanner._source = prolog_code  # Update source if dot was added
 
         tokens = self.scanner.scan_tokens()
 
@@ -32,7 +31,7 @@ class TestScannerParserIntegration(unittest.TestCase):
         self.parser._current = 0
         parsed_rules = self.parser.parse()
         if parsed_rules:
-            return parsed_rules[0] # Fact or Rule object
+            return parsed_rules[0]  # Fact or Rule object
         return None
 
     def test_japanese_variable_in_simple_fact(self):
@@ -47,7 +46,9 @@ class TestScannerParserIntegration(unittest.TestCase):
         # Parser は Token.literal を使って Variable.name を設定する
         self.assertEqual(fact.head.args[0].name, "V1")
         # VariableMapper で逆引きできることを確認
-        self.assertEqual(self.variable_mapper.map_english_to_japanese("V1"), "日本語変数")
+        self.assertEqual(
+            self.variable_mapper.map_english_to_japanese("V1"), "日本語変数"
+        )
 
     def test_multiple_japanese_variables_in_fact(self):
         # Test multiple Japanese variables with English functor
@@ -62,29 +63,33 @@ class TestScannerParserIntegration(unittest.TestCase):
         self.assertIsInstance(fact.head, Term)
         self.assertEqual(fact.head.functor.name, "family")
         self.assertEqual(len(fact.head.args), 3)
-        self.assertIsInstance(fact.head.args[0], Variable) # ちち -> V1
+        self.assertIsInstance(fact.head.args[0], Variable)  # ちち -> V1
         self.assertEqual(fact.head.args[0].name, "V1")
-        self.assertIsInstance(fact.head.args[1], Variable) # はは -> V2
+        self.assertIsInstance(fact.head.args[1], Variable)  # はは -> V2
         self.assertEqual(fact.head.args[1].name, "V2")
-        self.assertIsInstance(fact.head.args[2], Variable) # こども -> V3
+        self.assertIsInstance(fact.head.args[2], Variable)  # こども -> V3
         self.assertEqual(fact.head.args[2].name, "V3")
         self.assertEqual(self.variable_mapper.map_english_to_japanese("V1"), "ちち")
         self.assertEqual(self.variable_mapper.map_english_to_japanese("V2"), "はは")
         self.assertEqual(self.variable_mapper.map_english_to_japanese("V3"), "こども")
 
         # Test second fact with English functor
-        self.setUp() # Reset mapper for next part of test
+        self.setUp()  # Reset mapper for next part of test
         fact2 = self._scan_and_parse_fact("relation(へんすうA, へんすうB).")
         self.assertIsNotNone(fact2)
         self.assertIsInstance(fact2.head, Term)
         self.assertEqual(fact2.head.functor.name, "relation")
         self.assertEqual(len(fact2.head.args), 2)
         self.assertIsInstance(fact2.head.args[0], Variable)
-        self.assertEqual(fact2.head.args[0].name, "V1") # "へんすうA" -> V1
+        self.assertEqual(fact2.head.args[0].name, "V1")  # "へんすうA" -> V1
         self.assertIsInstance(fact2.head.args[1], Variable)
-        self.assertEqual(fact2.head.args[1].name, "V2") # "へんすうB" -> V2
-        self.assertEqual(self.variable_mapper.map_english_to_japanese("V1"), "へんすうA")
-        self.assertEqual(self.variable_mapper.map_english_to_japanese("V2"), "へんすうB")
+        self.assertEqual(fact2.head.args[1].name, "V2")  # "へんすうB" -> V2
+        self.assertEqual(
+            self.variable_mapper.map_english_to_japanese("V1"), "へんすうA"
+        )
+        self.assertEqual(
+            self.variable_mapper.map_english_to_japanese("V2"), "へんすうB"
+        )
 
     def test_mixed_variables_and_atoms_in_fact(self):
         # "data(value1, 日本語データ, X)."
@@ -96,14 +101,17 @@ class TestScannerParserIntegration(unittest.TestCase):
         self.assertEqual(len(fact.head.args), 3)
         self.assertIsInstance(fact.head.args[0], Atom)
         self.assertEqual(fact.head.args[0].name, "value1")
-        self.assertIsInstance(fact.head.args[1], Variable) # 日本語データ is a variable
+        self.assertIsInstance(fact.head.args[1], Variable)  # 日本語データ is a variable
         self.assertEqual(fact.head.args[1].name, "V1")
-        self.assertIsInstance(fact.head.args[2], Variable) # VarX is a variable
-        self.assertEqual(fact.head.args[2].name, "VarX") # English variable name remains as is
-        self.assertEqual(self.variable_mapper.map_english_to_japanese("V1"), "日本語データ")
+        self.assertIsInstance(fact.head.args[2], Variable)  # VarX is a variable
+        self.assertEqual(
+            fact.head.args[2].name, "VarX"
+        )  # English variable name remains as is
+        self.assertEqual(
+            self.variable_mapper.map_english_to_japanese("V1"), "日本語データ"
+        )
         # VarX は日本語変数ではないのでマッピングされない
         self.assertEqual(self.variable_mapper.map_english_to_japanese("VarX"), "VarX")
-
 
     def test_english_variable_does_not_get_mapped(self):
         fact = self._scan_and_parse_fact("english_fact(AnEnglishVar).")
@@ -130,12 +138,14 @@ class TestScannerParserIntegration(unittest.TestCase):
         self.assertEqual(fact.head.args[0].name, "an_atom")
 
         # 日本語アトム: VariableMapperが日本語を変数として扱うため、これは変数になる
-        self.setUp() # Reset mapper
-        fact_jp_var = self._scan_and_parse_fact("q(日本語アトム名).") # This will be V1
+        self.setUp()  # Reset mapper
+        fact_jp_var = self._scan_and_parse_fact("q(日本語アトム名).")  # This will be V1
         self.assertIsNotNone(fact_jp_var)
         self.assertIsInstance(fact_jp_var.head.args[0], Variable)
         self.assertEqual(fact_jp_var.head.args[0].name, "V1")
-        self.assertEqual(self.variable_mapper.map_english_to_japanese("V1"), "日本語アトム名")
+        self.assertEqual(
+            self.variable_mapper.map_english_to_japanese("V1"), "日本語アトム名"
+        )
 
         # 明示的にアトムとして扱いたい日本語はシングルクォートで囲む必要がある
         # Current scanner tokenizes 'text' as STRING then Parser converts STRING token to Atom.
@@ -146,5 +156,5 @@ class TestScannerParserIntegration(unittest.TestCase):
         self.assertEqual(fact_jp_quoted_atom.head.args[0].name, "これはアトム")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

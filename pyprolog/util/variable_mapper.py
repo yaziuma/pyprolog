@@ -1,6 +1,7 @@
 import re
 from typing import Dict, Tuple
 
+
 class VariableMapper:
     def __init__(self):
         self._japanese_to_english: Dict[str, str] = {}
@@ -16,7 +17,6 @@ class VariableMapper:
                 self._next_var_index += 1
                 return var_name
             self._next_var_index += 1
-
 
     def map_japanese_to_english(self, japanese_var: str) -> str:
         if not self.is_japanese_variable(japanese_var):
@@ -49,14 +49,14 @@ class VariableMapper:
         # ゠-ヿ : Katakana
         # 一-鿿 : CJK Unified Ideographs
         # 々-〇 : CJK Symbols and Punctuation (々, 〆, 〇) - これらも変数名に含めるか検討
-        first_char_is_japanese = bool(re.match(r'^[぀-ゟ゠-ヿ一-鿿]', var_name[0]))
+        first_char_is_japanese = bool(re.match(r"^[぀-ゟ゠-ヿ一-鿿]", var_name[0]))
 
         if not first_char_is_japanese:
             return False
 
         # 2文字目以降は英数字、アンダースコア、日本語文字が使える
         # ^[日本語文字][日本語文字_英数字]*$
-        return bool(re.match(r'^[぀-ゟ゠-ヿ一-鿿][぀-ゟ゠-ヿ一-鿿\w]*$', var_name))
+        return bool(re.match(r"^[぀-ゟ゠-ヿ一-鿿][぀-ゟ゠-ヿ一-鿿\w]*$", var_name))
 
     def clear_mapping(self):
         self._japanese_to_english.clear()

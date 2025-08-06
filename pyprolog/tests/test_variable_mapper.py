@@ -1,8 +1,8 @@
 import unittest
 from pyprolog.util.variable_mapper import VariableMapper
 
-class TestVariableMapper(unittest.TestCase):
 
+class TestVariableMapper(unittest.TestCase):
     def setUp(self):
         self.mapper = VariableMapper()
 
@@ -24,8 +24,10 @@ class TestVariableMapper(unittest.TestCase):
         self.assertFalse(self.mapper.is_japanese_variable("_Variable"))
         self.assertFalse(self.mapper.is_japanese_variable("1Variable"))
         self.assertFalse(self.mapper.is_japanese_variable(""))
-        self.assertFalse(self.mapper.is_japanese_variable(" Variable")) # 先頭スペース
-        self.assertFalse(self.mapper.is_japanese_variable("English変数")) # 英語で始まる
+        self.assertFalse(self.mapper.is_japanese_variable(" Variable"))  # 先頭スペース
+        self.assertFalse(
+            self.mapper.is_japanese_variable("English変数")
+        )  # 英語で始まる
 
     def test_map_japanese_to_english_basic(self):
         self.assertEqual(self.mapper.map_japanese_to_english("変数"), "V1")
@@ -38,12 +40,14 @@ class TestVariableMapper(unittest.TestCase):
 
     def test_map_japanese_to_english_consistent_mapping(self):
         self.assertEqual(self.mapper.map_japanese_to_english("変数"), "V1")
-        self.assertEqual(self.mapper.map_japanese_to_english("変数"), "V1") # 再度同じものをマップ
+        self.assertEqual(
+            self.mapper.map_japanese_to_english("変数"), "V1"
+        )  # 再度同じものをマップ
         self.assertEqual(self.mapper.map_japanese_to_english("テスト"), "V2")
 
     def test_map_english_to_japanese_basic(self):
-        self.mapper.map_japanese_to_english("変数") # V1
-        self.mapper.map_japanese_to_english("テスト") # V2
+        self.mapper.map_japanese_to_english("変数")  # V1
+        self.mapper.map_japanese_to_english("テスト")  # V2
         self.assertEqual(self.mapper.map_english_to_japanese("V1"), "変数")
         self.assertEqual(self.mapper.map_english_to_japanese("V2"), "テスト")
 
@@ -55,7 +59,9 @@ class TestVariableMapper(unittest.TestCase):
         self.mapper.map_japanese_to_english("変数")
         self.mapper.map_japanese_to_english("テスト")
         self.mapper.clear_mapping()
-        self.assertEqual(self.mapper.map_japanese_to_english("変数"), "V1") # クリア後はV1から
+        self.assertEqual(
+            self.mapper.map_japanese_to_english("変数"), "V1"
+        )  # クリア後はV1から
         self.assertEqual(self.mapper.map_english_to_japanese("V1"), "変数")
         j_to_e, e_to_j = self.mapper.get_all_mappings()
         self.assertEqual(len(j_to_e), 1)
@@ -65,10 +71,9 @@ class TestVariableMapper(unittest.TestCase):
         self.assertEqual(len(j_to_e), 0)
         self.assertEqual(len(e_to_j), 0)
 
-
     def test_get_all_mappings(self):
-        self.mapper.map_japanese_to_english("変数１") # V1
-        self.mapper.map_japanese_to_english("変数２") # V2
+        self.mapper.map_japanese_to_english("変数１")  # V1
+        self.mapper.map_japanese_to_english("変数２")  # V2
         j_to_e, e_to_j = self.mapper.get_all_mappings()
         self.assertEqual(j_to_e, {"変数１": "V1", "変数２": "V2"})
         self.assertEqual(e_to_j, {"V1": "変数１", "V2": "変数２"})
@@ -79,11 +84,14 @@ class TestVariableMapper(unittest.TestCase):
         # このテストは現在の VariableMapper の実装では直接テストしづらいが、
         # _generate_english_var が _english_to_japanese を参照しているため、
         # map_japanese_to_english を繰り返せば内部的に衝突回避が行われるはず。
-        self.mapper._english_to_japanese["V1"] = "外部変数1" # 外部でV1が使われたと仮定
-        self.mapper._next_var_index = 1 # インデックスをリセットして衝突を誘発
+        self.mapper._english_to_japanese["V1"] = "外部変数1"  # 外部でV1が使われたと仮定
+        self.mapper._next_var_index = 1  # インデックスをリセットして衝突を誘発
 
-        self.assertEqual(self.mapper.map_japanese_to_english("最初の内部変数"), "V2") # V1を避けてV2になるはず
+        self.assertEqual(
+            self.mapper.map_japanese_to_english("最初の内部変数"), "V2"
+        )  # V1を避けてV2になるはず
         self.assertEqual(self.mapper.map_japanese_to_english("次の内部変数"), "V3")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
