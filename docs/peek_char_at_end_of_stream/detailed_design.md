@@ -192,22 +192,31 @@ class StringStream(IOStream):
         )
 ```
 
-### 3.2 BufferedConsoleStream新規実装
+### 3.2 BufferedConsoleStream新規実装（クロスプラットフォーム対応）
 
 ```python
+import platform
+
 class BufferedConsoleStream(IOStream):
     """
     バッファ付きコンソールストリーム（新規実装）
-    - select()による非ブロッキング読み取り
+    - クロスプラットフォーム非ブロッキング読み取り
     - 循環バッファによる効率的なデータ管理
-    - タイムアウト対応
+    - Windows/Unix両対応
     """
     
-    def __init__(self, buffer_size: int = 1024, read_timeout: float = 0.0):
+    def __init__(self, buffer_size: int = 1024):
         self.buffer = StreamBuffer(buffer_size)
-        self.read_timeout = read_timeout
         self.eof_reached = False
         self._last_operation = "init"
+        self._platform_handler = self._create_platform_handler()
+    
+    def _create_platform_handler(self):
+        """プラットフォーム固有ハンドラー作成"""
+        if platform.system() == 'Windows':
+            return WindowsInputHandler()
+        else:
+            return UnixInputHandler()
     
     def _fill_buffer_non_blocking(self) -> bool:
         """
@@ -220,78 +229,173 @@ class BufferedConsoleStream(IOStream):
             return False
             
         try:
-            import select
-            ready, _, _ = select.select([sys.stdin], [], [], self.read_timeout)
-            
-            if ready:
-                data = sys.stdin.read(self.buffer.available_space())
-                if data:
-                    self.buffer.write(data)
+            if self._platform_handler.is_input_available():
+                char = self._platform_handler.read_char_nonblocking()
+                if char:
+                    self.buffer.put(char)
                     return True
                 else:
                     self.eof_reached = True
                     return False
-            return False  # タイムアウト
+            return False  # 入力なし
             
-        except (OSError, IOError) as e:
+        except Exception as e:
             raise StreamOperationError(f"Buffer fill failed: {e}")
     
     def peek_char(self) -> str:
         """実装方針: バッファから非破壊的読み取り"""
         # バッファに文字があるかチェック
-        if self.buffer.has_data():
-            return self.buffer.peek_char()
+        if not self.buffer.is_empty():
+            return self.buffer.peek()
         
         # バッファ充填を試行
         if self._fill_buffer_non_blocking():
-            return self.buffer.peek_char()
+            return self.buffer.peek()
         
-        # EOFまたはタイムアウト
-        return "" if self.eof_reached else ""
+        # EOFまたは入力なし
+        return ""
     
     def at_end_of_stream(self) -> bool:
         """実装方針: バッファ状態とEOFフラグの組み合わせ"""
-        if self.buffer.has_data():
+        if not self.buffer.is_empty():
             return False
         
         # バッファが空の場合、充填を試行
         self._fill_buffer_non_blocking()
-        return self.eof_reached and not self.buffer.has_data()
-```
-
-### 3.3 StreamBufferクラス実装
-
-```python
-class StreamBuffer:
-    """
-    効率的な文字バッファ管理
-    - 循環バッファによるメモリ効率
-    - peek操作の高速化
-    - スレッドセーフ操作
-    """
-    
-    def __init__(self, size: int):
-        self.buffer = [''] * size
-        self.size = size
-        self.read_pos = 0
-        self.write_pos = 0
-        self.data_count = 0
-        self._lock = threading.Lock()
-    
-    def peek_char(self) -> str:
-        """先頭文字をpeek（位置変更なし）"""
-        with self._lock:
-            if self.data_count > 0:
-                return self.buffer[self.read_pos]
-            return ""
+        return self.eof_reached and self.buffer.is_empty()
     
     def read_char(self) -> str:
-        """先頭文字を読み取り（位置を進める）"""
-        with self._lock:
-            if self.data_count > 0:
-                char = self.buffer[self.read_pos]
-                self.read_pos = (self.read_pos + 1) % self.size
-                self.data_count -= 1
+        """バッファ優先の文字読み取り"""
+        if not self.buffer.is_empty():
+            return self.buffer.get()
+        
+        # バッファが空の場合はプラットフォーム固有の読み取り
+        return self._platform_handler.read_char_blocking()
+    
+    def supports_peek_operations(self) -> bool:
+        return True
+```
+
+### 3.3 プラットフォーム固有ハンドラー
+
+```python
+from abc import ABC, abstractmethod
+
+class InputHandler(ABC):
+    """入力ハンドラー抽象基底クラス"""
+    
+    @abstractmethod
+    def is_input_available(self) -> bool:
+        """入力が利用可能かチェック"""
+        pass
+    
+    @abstractmethod
+    def read_char_nonblocking(self) -> str:
+        """非ブロッキング文字読み込み"""
+        pass
+    
+    @abstractmethod
+    def read_char_blocking(self) -> str:
+        """ブロッキング文字読み込み"""
+        pass
+
+class UnixInputHandler(InputHandler):
+    """Unix系システム用入力ハンドラー"""
+    
+    def is_input_available(self) -> bool:
+        """select()による入力判定"""
+        import select
+        import sys
+        ready, _, _ = select.select([sys.stdin], [], [], 0.0)
+        return bool(ready)
+    
+    def read_char_nonblocking(self) -> str:
+        """非ブロッキング読み込み"""
+        if self.is_input_available():
+            import sys
+            return sys.stdin.read(1)
+        return ""
+    
+    def read_char_blocking(self) -> str:
+        """通常のブロッキング読み込み"""
+        import sys
+        return sys.stdin.read(1)
+
+class WindowsInputHandler(InputHandler):
+    """Windows用入力ハンドラー"""
+    
+    def __init__(self):
+        try:
+            import msvcrt
+            self._msvcrt = msvcrt
+        except ImportError:
+            raise StreamCapabilityError("Windows input handler requires msvcrt")
+    
+    def is_input_available(self) -> bool:
+        """msvcrt.kbhit()による入力判定"""
+        return self._msvcrt.kbhit()
+    
+    def read_char_nonblocking(self) -> str:
+        """非ブロッキング読み込み"""
+        if self.is_input_available():
+            return self._msvcrt.getch().decode('utf-8', errors='ignore')
+        return ""
+    
+    def read_char_blocking(self) -> str:
+        """ブロッキング読み込み"""
+        return self._msvcrt.getch().decode('utf-8', errors='ignore')
+
+### 3.4 StreamBufferクラス実装（シングルスレッド用）
+
+```python
+from collections import deque
+from typing import Optional
+
+class StreamBuffer:
+    """
+    効率的な文字バッファ管理（シングルスレッド用）
+    - dequeによる効率的なデータ管理
+    - peek操作の高速化
+    - シンプルなインタフェース
+    """
+    
+    def __init__(self, capacity: int = 1024):
+        self._buffer = deque(maxlen=capacity)
+        self._capacity = capacity
+    
+    def peek(self) -> Optional[str]:
+        """先頭文字をpeek（位置変更なし）"""
+        try:
+            return self._buffer[0]
+        except IndexError:
+            return None
+    
+    def get(self) -> Optional[str]:
+        """先頭文字を読み取り（除去）"""
+        try:
+            return self._buffer.popleft()
+        except IndexError:
+            return None
+    
+    def put(self, char: str) -> bool:
+        """文字をバッファに追加"""
+        try:
+            self._buffer.append(char)
+            return True
+        except:
+            return False
+    
+    def is_empty(self) -> bool:
+        """バッファが空かチェック"""
+        return len(self._buffer) == 0
+    
+    def size(self) -> int:
+        """現在のバッファサイズ"""
+        return len(self._buffer)
+    
+    def clear(self) -> None:
+        """バッファクリア"""
+        self._buffer.clear()
                 return char
             return ""
     
@@ -617,71 +721,77 @@ class IOStream(ABC):
 
 **段階的移行サポート**
 ```python
-class MigrationHelper:
-    """移行をサポートするユーティリティ"""
+class StreamFactory:
+    """peek機能対応ストリームの作成"""
     
     @staticmethod
-    def wrap_legacy_stream(stream: IOStream) -> IOStream:
-        """レガシーストリームをラップして基本機能を提供"""
-        if hasattr(stream, 'peek_char'):
-            return stream  # 既に対応済み
+    def create_console_stream() -> IOStream:
+        """非ブロッキングコンソールストリームの作成"""
+        import logging
+        logger = logging.getLogger(__name__)
         
-        return LegacyStreamWrapper(stream)
+        logger.info("Creating BufferedConsoleStream for peek support")
+        return BufferedConsoleStream()
+    
+    @staticmethod
+    def create_string_stream(content: str = "") -> IOStream:
+        """peek機能付き文字列ストリームの作成"""
+        return StringStream(content)
+    
+    @staticmethod
+    def get_optimal_stream(stream_type: str) -> IOStream:
+        """最適なストリーム実装を取得"""
+        if stream_type == "string":
+            return StreamFactory.create_string_stream()
+        elif stream_type == "console":
+            return StreamFactory.create_console_stream()
+        else:
+            raise ValueError(f"Unsupported stream type: {stream_type}")
 
-class LegacyStreamWrapper(IOStream):
-    """レガシーストリームのラッパー"""
-    
-    def __init__(self, wrapped_stream: IOStream):
-        self._wrapped = wrapped_stream
-        self._buffer = ""
-        self._buffer_valid = False
-    
-    def peek_char(self) -> str:
-        """限定的なpeek実装（1文字のみ）"""
-        if not self._buffer_valid:
-            try:
-                self._buffer = self._wrapped.read_char()
-                self._buffer_valid = True
-            except:
-                return ""
-        return self._buffer
-    
-    def read_char(self) -> str:
-        if self._buffer_valid:
-            char = self._buffer
-            self._buffer_valid = False
-            return char
-        return self._wrapped.read_char()
+def create_peek_capable_stream(stream_type: str = 'console') -> IOStream:
+    """peek機能対応ストリームの作成"""
+    return StreamFactory.get_optimal_stream(stream_type)
 ```
 
-### 7.2 設定ベース機能切り替え
+### 7.2 IOManager統合
 
 ```python
-# pyprolog/config/stream_config.py
+# pyprolog/runtime/io_manager.pyの拡張
 
-@dataclass
-class StreamConfiguration:
-    """ストリーム機能の設定"""
+class IOManager:
+    """拡張されたIOManager（peek機能サポート）"""
     
-    enable_peek_operations: bool = True
-    enable_buffering: bool = True
-    default_buffer_size: int = 1024
-    enable_performance_monitoring: bool = False
-    strict_compatibility_mode: bool = False
+    def __init__(self):
+        self._input_stream = None
+        self._output_stream = None
     
-    @classmethod
-    def from_dict(cls, config_dict: dict) -> 'StreamConfiguration':
-        return cls(**{k: v for k, v in config_dict.items() if k in cls.__dataclass_fields__})
-
-# 設定による機能の有効/無効制御
-def create_stream_with_config(stream_type: str, config: StreamConfiguration) -> IOStream:
-    if stream_type == 'console':
-        if config.enable_buffering and config.enable_peek_operations:
-            return BufferedConsoleStream(buffer_size=config.default_buffer_size)
-        else:
-            return ConsoleStream()  # 既存実装
-    elif stream_type == 'string':
-        return StringStream()  # peek機能は標準で有効
+    def initialize_with_peek_support(self):
+        """peek機能サポート付きでIOManagerを初期化"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info("Initializing IOManager with peek support")
+        self._input_stream = BufferedConsoleStream()
+        self._output_stream = ConsoleStream()  # 出力は既存で十分
+    
+    def get_input_stream(self) -> IOStream:
+        """peek機能対応入力ストリーム取得"""
+        if self._input_stream is None:
+            self._input_stream = BufferedConsoleStream()
+        return self._input_stream
+    
+    def set_string_input(self, content: str):
+        """文字列入力ストリームを設定（テスト用）"""
+        self._input_stream = StringStream(content)
+    
+    def upgrade_input_stream(self):
+        """入力ストリームをpeek対応にアップグレード"""
+        current = self._input_stream
+        if not hasattr(current, 'peek_char') or not current.supports_peek_operations():
+            self._input_stream = BufferedConsoleStream()
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info("Input stream upgraded to BufferedConsoleStream")
 ```
 
 ---
