@@ -322,6 +322,14 @@ class LogicInterpreter:
                             f"CutException propagated from patched rule body: {rule_body_from_fact_structure}. Re-raising."
                         )
                         raise
+                    except Exception as e:
+                        # IOManager例外などの重要な例外は伝播
+                        if "Input required" in str(e) or hasattr(e, 'input_type'):
+                            logger.debug(f"Critical exception propagated from patched rule body: {e}")
+                            raise
+                        # その他の例外もログ出力して伝播
+                        logger.debug(f"Exception in patched rule body execution: {e}")
+                        raise
                 elif isinstance(renamed_entry, Fact):  # Genuine Fact
                     logger.debug(
                         f"LOGIC_INTERP: Unified Fact {actual_goal} with {effective_head}. Yielding env: {new_env_after_unify.bindings}"
@@ -339,6 +347,14 @@ class LogicInterpreter:
                         logger.debug(
                             f"CutException propagated from rule body: {renamed_entry.body}. Re-raising."
                         )
+                        raise
+                    except Exception as e:
+                        # IOManager例外などの重要な例外は伝播
+                        if "Input required" in str(e) or hasattr(e, 'input_type'):
+                            logger.debug(f"Critical exception propagated from rule body: {e}")
+                            raise
+                        # その他の例外もログ出力して伝播
+                        logger.debug(f"Exception in rule body execution: {e}")
                         raise
 
         # If we've iterated through all rules and no solution was yielded by this path,

@@ -422,6 +422,22 @@ class Runtime:
         elif isinstance(goal, Term):
             processed_goal = goal
         elif isinstance(goal, Atom):
+            # IOオペレータの特別処理を追加
+            if goal.name in self._operator_evaluators:
+                logger.debug(f"EXECUTE Atom IO Operator: {goal.name}")
+                # AtomをTermに変換してIOオペレータとして処理
+                processed_goal = Term(goal, [])
+                evaluator = self._operator_evaluators[goal.name]
+                try:
+                    for item in evaluator(processed_goal.args, env):
+                        logger.debug(f"EXECUTE Atom IO op {goal.name}: Yielding: {item.bindings if item else 'None'}")
+                        yield item
+                except Exception as e:
+                    logger.debug(f"Exception in Atom IO operator {goal.name}: {e}")
+                    raise
+                return
+            
+            # 既存の通常述語処理
             logger.debug(
                 f"EXECUTE Atom: Attempting Normal Predicate solve_goal for Atom: {goal}"
             )
@@ -480,6 +496,10 @@ class Runtime:
                 )
                 raise
             except Exception as e:
+                # IOManager例外などの重要な例外は伝播
+                if "Input required" in str(e) or hasattr(e, 'input_type'):
+                    logger.debug(f"Critical exception in operator {functor_name}: {e}")
+                    raise
                 logger.error(
                     f"Error evaluating operator {functor_name}: {e}", exc_info=True
                 )
@@ -577,12 +597,22 @@ class Runtime:
                 yield item
         elif functor_name == "get_char" and len(processed_goal.args) == 1:
             get_char_pred = GetCharPredicate(processed_goal.args[0])
-            for item in get_char_pred.execute(self, env):
-                yield item
+            try:
+                for item in get_char_pred.execute(self, env):
+                    yield item
+            except Exception as e:
+                # IOManager例外などをそのまま伝播
+                logger.debug(f"Exception in {functor_name}: {e}")
+                raise
         elif functor_name == "read_line" and len(processed_goal.args) == 1:
             read_line_pred = ReadLinePredicate(processed_goal.args[0])
-            for item in read_line_pred.execute(self, env):
-                yield item
+            try:
+                for item in read_line_pred.execute(self, env):
+                    yield item
+            except Exception as e:
+                # IOManager例外などをそのまま伝播
+                logger.debug(f"Exception in {functor_name}: {e}")
+                raise
         elif functor_name == "peek_char" and len(processed_goal.args) == 1:
             peek_char_pred = PeekCharPredicate(processed_goal.args[0])
             for item in peek_char_pred.execute(self, env):
