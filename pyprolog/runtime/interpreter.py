@@ -28,6 +28,8 @@ from pyprolog.runtime.builtins import (
     AtEndOfStreamPredicate,
 )
 from .io_manager import IOManager
+from .tracer import Tracer
+from .trace_formatter import TraceFormatter
 from typing import (
     List,
     Iterator,
@@ -36,6 +38,7 @@ from typing import (
     Union,
     Optional,
     Callable,
+    Tuple,
 )  # Optional was already here
 import logging
 
@@ -68,12 +71,13 @@ class Runtime:
 
         self.math_interpreter = MathInterpreter()
         self.io_manager = IOManager()  # Initialize IOManager
+        self.tracer = Tracer()  # Initialize Tracer
         self.logic_interpreter = LogicInterpreter(
             self.rules, self
         )  # Pass self (Runtime) to LogicInterpreter
         self._operator_evaluators = self._build_unified_evaluator_system()
         logger.info(
-            f"Runtime initialized with {len(self.rules)} rules, IOManager, VariableMapper, FunctorMapper, and {len(self._operator_evaluators)} operator evaluators"
+            f"Runtime initialized with {len(self.rules)} rules, IOManager, VariableMapper, FunctorMapper, Tracer, and {len(self._operator_evaluators)} operator evaluators"
         )
 
     def _extract_existing_functors(self) -> set:
@@ -740,6 +744,23 @@ class Runtime:
             )
             # Re-raise the exception to make it visible in test output
             raise e
+
+    def query_with_trace(self, query_string: str, max_depth: Optional[int] = None) -> Tuple[List[Dict[Variable, Any]], List]:
+        """トレース付きでクエリを実行"""
+        from .tracer import TraceEvent
+        
+        logger.debug(f"TRACE QUERY: Executing query with trace: {query_string}")
+        
+        # 新しいTracerインスタンスを作成
+        self.tracer = Tracer(max_depth)
+        self.tracer.start_trace()
+        
+        try:
+            solutions = self.query(query_string)
+            trace_events = self.tracer.get_events()
+            return solutions, trace_events
+        finally:
+            self.tracer.stop_trace()
 
     def _extract_variables_names(self, term) -> List[str]:
         variables = set()

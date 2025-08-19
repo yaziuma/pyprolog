@@ -37,9 +37,20 @@ def main():
         description="Simple Prolog interpreter",
     )
     ap.add_argument("Path", type=str, help="Path to file with Prolog rules")
+    ap.add_argument('--explain', action='store_true', 
+                   help='Enable query explanation mode')
+    ap.add_argument('--trace-depth', type=int, 
+                   help='Maximum trace depth')
+    ap.add_argument('--trace-format', choices=['text', 'tree', 'json'],
+                   default='text', help='Trace output format')
     args = ap.parse_args()
     input_path = args.Path
-    run_repl(start(input_path))
+    
+    # Pass args to repl for explain functionality
+    if args.explain:
+        run_repl(start(input_path), explain_mode=True, args=args)
+    else:
+        run_repl(start(input_path))
 
 
 if __name__ == "__main__":

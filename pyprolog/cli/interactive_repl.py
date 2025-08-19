@@ -24,6 +24,7 @@ from pyprolog.core.types import Variable, Term, Atom  # Added Term, Atom, Number
 from pyprolog.core.errors import InterpreterError, ScannerError, PrologError
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
+from pyprolog.tools.explain_tool import ExplainTool
 
 # カラー初期化
 init(autoreset=True)
@@ -35,6 +36,7 @@ class InteractiveProlog:
     def __init__(self):
         self.runtime: Optional[Runtime] = None
         self.variable_mapper = VariableMapper()  # Added VariableMapper instance
+        self.explain_tool: Optional[ExplainTool] = None
         self.session_history: List[Dict[str, Any]] = []
         self.home_path = str(Path.home())
         self.session_start_time = datetime.now()
@@ -76,6 +78,12 @@ class InteractiveProlog:
   :clear              - 現在のルールをクリア
   :status             - システム状態を表示
   :debug_on/off       - デバッグモードの切り替え
+
+{Fore.YELLOW}推論可視化:{Style.RESET_ALL}
+  :explain <クエリ> [format] [depth] - クエリの実行過程を説明
+    format: text/tree/json (デフォルト: text)
+    depth: トレースの最大深度 (デフォルト: 無制限)
+    例: :explain member(X, [1,2,3]) tree 5
 
 {Fore.YELLOW}REPL制御:{Style.RESET_ALL}
   :help               - このヘルプを表示
@@ -140,6 +148,7 @@ class InteractiveProlog:
                 self.runtime = Runtime(
                     rules_list, variable_mapper=self.variable_mapper
                 )  # Pass variable_mapper
+                self.explain_tool = ExplainTool(self.runtime)
 
                 self.current_rules_file = rules_file
                 # If consult is used, it would print its own messages.
@@ -165,6 +174,7 @@ class InteractiveProlog:
                 self.runtime = Runtime(
                     [], variable_mapper=self.variable_mapper
                 )  # Pass variable_mapper
+                self.explain_tool = ExplainTool(self.runtime)
                 print(self._format_info("空のランタイムを初期化しました"))
                 return True
 
@@ -215,6 +225,7 @@ class InteractiveProlog:
             self.runtime = Runtime(
                 [], variable_mapper=self.variable_mapper
             )  # Pass variable_mapper
+            self.explain_tool = ExplainTool(self.runtime)
             self.variable_mapper.clear_mapping()  # Clear mapper state
             self.current_rules_file = None
             print(self._format_success("ルールと変数マッピングをクリアしました"))
@@ -229,6 +240,34 @@ class InteractiveProlog:
             debug_state = "ON" if cmd == ":debug_on" else "OFF"
             print(self._format_info(f"デバッグモード: {debug_state}"))
             # TODO: 実際のデバッグ制御を実装
+
+        elif cmd == ":explain":
+            if len(parts) < 2:
+                print(self._format_error("使用法: :explain <クエリ> [format] [depth]"))
+                print("例: :explain member(X, [1,2,3]) text 10")
+                return True
+            
+            if not self.runtime or not self.explain_tool:
+                print(self._format_error("ランタイムが初期化されていません。:load でファイルを読み込んでください"))
+                return True
+            
+            # パラメータ解析
+            query = parts[1]
+            format_type = parts[2] if len(parts) > 2 else "text"
+            depth = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else None
+            
+            # 説明実行
+            result = self.explain_tool.explain_query(query, format_type, depth)
+            
+            if result.get("success"):
+                print(f"{Fore.GREEN}=== Query Explanation ==={Style.RESET_ALL}")
+                print(f"Query: {result['query']}")
+                print(f"Solutions found: {len(result['solutions'])}")
+                print(f"Trace events: {result['event_count']}")
+                print()
+                print(result['trace'])
+            else:
+                print(self._format_error(f"説明実行エラー: {result.get('error', '不明なエラー')}"))
 
         else:
             print(self._format_error(f"不明なコマンド: {cmd}"))
