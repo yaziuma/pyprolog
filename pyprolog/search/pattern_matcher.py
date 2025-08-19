@@ -5,9 +5,7 @@ Prolog述語名、引数パターン、全文検索のマッチング処理を�
 """
 import re
 from typing import Tuple, List, Union
-from pyprolog.core.term import Term
-from pyprolog.core.atom import Atom
-from pyprolog.core.variable import Variable
+from pyprolog.core.types import Term, Atom, Variable
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.util.logger import get_logger
 

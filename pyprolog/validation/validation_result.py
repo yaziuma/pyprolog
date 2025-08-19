@@ -6,8 +6,7 @@ Prologルールと事実の静的解析結果を格納・管理します。
 import json
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Union, Any
-from pyprolog.core.rule import Rule
-from pyprolog.core.fact import Fact
+from pyprolog.core.types import Rule, Fact
 
 
 @dataclass

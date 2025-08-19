@@ -7,10 +7,7 @@ from typing import List, Set, Dict, Any
 from pyprolog.validation.validation_result import ValidationIssue
 from pyprolog.validation.symbol_table import SymbolTable, PredicateInfo
 from pyprolog.validation.dependency_graph import DependencyGraph
-from pyprolog.core.rule import Rule
-from pyprolog.core.fact import Fact
-from pyprolog.core.term import Term
-from pyprolog.core.atom import Atom
+from pyprolog.core.types import Rule, Fact, Term, Atom
 from pyprolog.util.logger import get_logger
 
 logger = get_logger(__name__)

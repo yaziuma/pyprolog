@@ -4,7 +4,8 @@ InteractiveREPLコマンドのテスト
 拡張されたREPLコマンド（:explain、:search、:validate）のテストです。
 """
 import pytest
-from unittest.mock import Mock, patch, StringIO
+from unittest.mock import Mock, patch
+from io import StringIO
 import tempfile
 import os
 from pyprolog.cli.interactive_repl import InteractiveProlog

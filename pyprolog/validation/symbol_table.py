@@ -5,8 +5,7 @@ Prologプログラムの述語定義と参照を管理します。
 """
 from dataclasses import dataclass, field
 from typing import Dict, List, Set, Union, Optional
-from pyprolog.core.rule import Rule
-from pyprolog.core.fact import Fact
+from pyprolog.core.types import Rule, Fact
 from pyprolog.util.logger import get_logger
 
 logger = get_logger(__name__)
@@ -90,8 +89,14 @@ class SymbolTable:
     def add_reference(self, name: str, arity: int, referenced_in: Union[Rule, Fact],
                      file_path: Optional[str] = None, line_number: int = 0, context: str = "body") -> None:
         """述語参照を追加"""
-        key = predicate_key(name, arity)
-        
+        # Find the PredicateInfo for the rule/fact that contains this reference
+        container_rule_head = referenced_in.head
+        container_key = predicate_key(container_rule_head.functor.name, len(container_rule_head.args))
+
+        if container_key not in self.predicates:
+            logger.warning(f"Attempted to add reference to a container rule '{container_key}' that is not in the symbol table.")
+            return
+
         reference = PredicateReference(
             name=name,
             arity=arity,
@@ -101,12 +106,12 @@ class SymbolTable:
             context=context
         )
         
-        # 定義が存在する場合は参照を追加
-        if key in self.predicates:
-            for predicate_info in self.predicates[key]:
+        # Add the reference to all definitions of the container predicate
+        for predicate_info in self.predicates[container_key]:
+            if reference not in predicate_info.references:
                 predicate_info.references.append(reference)
         
-        logger.debug(f"述語参照を追加: {key} in {context}")
+        logger.debug(f"述語参照を追加: {name}/{arity} in {container_key}")
     
     def get_predicate_info(self, name: str, arity: int) -> Optional[List[PredicateInfo]]:
         """述語情報を取得"""
