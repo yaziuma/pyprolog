@@ -6,9 +6,7 @@ Prologクエリの実行過程を記録・可視化するためのトレース�
 import time
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Dict, Any
-from pyprolog.core.term import Term
-from pyprolog.core.rule import Rule
-from pyprolog.core.fact import Fact
+from pyprolog.core.types import Term, Rule, Fact
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.util.logger import get_logger
 

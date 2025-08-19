@@ -26,6 +26,7 @@ from pyprolog.runtime.interpreter import Runtime
 from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
 from pyprolog.tools.explain_tool import ExplainTool
 from pyprolog.tools.search_tool import SearchTool
+from pyprolog.tools.validate_tool import ValidateTool
 
 # カラー初期化
 init(autoreset=True)
@@ -39,6 +40,7 @@ class InteractiveProlog:
         self.variable_mapper = VariableMapper()  # Added VariableMapper instance
         self.explain_tool: Optional[ExplainTool] = None
         self.search_tool: Optional[SearchTool] = None
+        self.validate_tool: Optional[ValidateTool] = None
         self.session_history: List[Dict[str, Any]] = []
         self.home_path = str(Path.home())
         self.session_start_time = datetime.now()
@@ -94,6 +96,14 @@ class InteractiveProlog:
     例: :search location predicate 10
   :search_stats                     - 検索エンジンの統計情報表示
   :rebuild_index                    - 検索インデックスの再構築
+
+{Fore.YELLOW}コード検証:{Style.RESET_ALL}
+  :validate [type] [detailed] [format] - コードの静的解析・検証
+    type: all/conflicts/unreachable/undefined (デフォルト: all)
+    detailed: true/false (デフォルト: false)
+    format: text/json/detailed (デフォルト: text)
+    例: :validate conflicts true detailed
+  :validate_stats                   - 検証エンジンの統計情報表示
 
 {Fore.YELLOW}REPL制御:{Style.RESET_ALL}
   :help               - このヘルプを表示
@@ -160,6 +170,7 @@ class InteractiveProlog:
                 )  # Pass variable_mapper
                 self.explain_tool = ExplainTool(self.runtime)
                 self.search_tool = SearchTool(self.runtime)
+                self.validate_tool = ValidateTool(self.runtime)
 
                 self.current_rules_file = rules_file
                 # If consult is used, it would print its own messages.
@@ -187,6 +198,7 @@ class InteractiveProlog:
                 )  # Pass variable_mapper
                 self.explain_tool = ExplainTool(self.runtime)
                 self.search_tool = SearchTool(self.runtime)
+                self.validate_tool = ValidateTool(self.runtime)
                 print(self._format_info("空のランタイムを初期化しました"))
                 return True
 
@@ -332,6 +344,62 @@ class InteractiveProlog:
                 print(self._format_success("検索インデックスの再構築が完了しました"))
             else:
                 print(self._format_error("検索インデックスの再構築に失敗しました"))
+
+        elif cmd == ":validate":
+            if not self.runtime or not self.validate_tool:
+                print(self._format_error("ランタイムが初期化されていません。:load でファイルを読み込んでください"))
+                return True
+            
+            # パラメータ解析
+            check_type = parts[1] if len(parts) > 1 else "all"
+            detailed = len(parts) > 2 and parts[2].lower() in ["true", "yes", "detailed"]
+            format_type = parts[3] if len(parts) > 3 else "text"
+            
+            if check_type not in ["all", "conflicts", "unreachable", "undefined"]:
+                print(self._format_error("使用法: :validate [type] [detailed] [format]"))
+                print("type: all/conflicts/unreachable/undefined")
+                print("detailed: true/false, format: text/json/detailed")
+                return True
+            
+            print(self._format_info(f"検証を実行中... (タイプ: {check_type})"))
+            
+            # 検証実行
+            result = self.validate_tool.validate_query(check_type, detailed)
+            
+            if result.get("success"):
+                formatted_result = self.validate_tool.format_results(result, format_type)
+                print(formatted_result)
+            else:
+                print(self._format_error(f"検証実行エラー: {result.get('error', '不明なエラー')}"))
+
+        elif cmd == ":validate_stats":
+            if not self.validate_tool:
+                print(self._format_error("検証ツールが初期化されていません"))
+                return True
+            
+            stats = self.validate_tool.get_validation_statistics()
+            if "error" in stats:
+                print(self._format_error(f"統計情報取得エラー: {stats['error']}"))
+            else:
+                print(f"{Fore.CYAN}=== 検証エンジン統計 ==={Style.RESET_ALL}")
+                
+                # シンボルテーブル統計
+                symbol_stats = stats.get('symbol_table', {})
+                print("📋 シンボルテーブル:")
+                print(f"  総述語数: {symbol_stats.get('total_predicates', 0)}")
+                print(f"  総定義数: {symbol_stats.get('total_definitions', 0)}")
+                print(f"  総参照数: {symbol_stats.get('total_references', 0)}")
+                print(f"  ビルトイン述語数: {symbol_stats.get('builtin_predicates', 0)}")
+                print(f"  ユーザー定義述語数: {symbol_stats.get('user_defined_predicates', 0)}")
+                
+                # 依存関係グラフ統計
+                graph_stats = stats.get('dependency_graph', {})
+                print("\n🔗 依存関係グラフ:")
+                print(f"  総ノード数: {graph_stats.get('total_nodes', 0)}")
+                print(f"  総エッジ数: {graph_stats.get('total_edges', 0)}")
+                print(f"  循環数: {graph_stats.get('cycles', 0)}")
+                print(f"  強連結成分数: {graph_stats.get('strongly_connected_components', 0)}")
+                print(f"  孤立ノード数: {graph_stats.get('isolated_nodes', 0)}")
 
         else:
             print(self._format_error(f"不明なコマンド: {cmd}"))
