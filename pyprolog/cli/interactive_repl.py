@@ -271,28 +271,36 @@ class InteractiveProlog:
                 print(self._format_error("使用法: :explain <クエリ> [format] [depth]"))
                 print("例: :explain member(X, [1,2,3]) text 10")
                 return True
-            
+
             if not self.runtime or not self.explain_tool:
-                print(self._format_error("ランタイムが初期化されていません。:load でファイルを読み込んでください"))
+                print(
+                    self._format_error(
+                        "ランタイムが初期化されていません。:load でファイルを読み込んでください"
+                    )
+                )
                 return True
-            
+
             # パラメータ解析
             query = parts[1]
             format_type = parts[2] if len(parts) > 2 else "text"
             depth = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else None
-            
+
             # 説明実行
             result = self.explain_tool.explain_query(query, format_type, depth)
-            
+
             if result.get("success"):
                 print(f"{Fore.GREEN}=== Query Explanation ==={Style.RESET_ALL}")
                 print(f"Query: {result['query']}")
                 print(f"Solutions found: {len(result['solutions'])}")
                 print(f"Trace events: {result['event_count']}")
                 print()
-                print(result['trace'])
+                print(result["trace"])
             else:
-                print(self._format_error(f"説明実行エラー: {result.get('error', '不明なエラー')}"))
+                print(
+                    self._format_error(
+                        f"説明実行エラー: {result.get('error', '不明なエラー')}"
+                    )
+                )
 
         elif cmd == ":search":
             if len(parts) < 2:
@@ -300,31 +308,39 @@ class InteractiveProlog:
                 print("例: :search location predicate 10")
                 print("type: predicate/argument/full_text, limit: 結果数制限")
                 return True
-            
+
             if not self.runtime or not self.search_tool:
-                print(self._format_error("ランタイムが初期化されていません。:load でファイルを読み込んでください"))
+                print(
+                    self._format_error(
+                        "ランタイムが初期化されていません。:load でファイルを読み込んでください"
+                    )
+                )
                 return True
-            
+
             # パラメータ解析
             pattern = parts[1]
             search_type = parts[2] if len(parts) > 2 else "predicate"
             limit = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 100
-            
+
             # 検索実行
             result = self.search_tool.search_query(pattern, search_type, limit)
-            
+
             if result.get("success"):
                 print(f"{Fore.GREEN}=== 検索結果 ==={Style.RESET_ALL}")
                 formatted_result = self.search_tool.format_results(result, "text")
                 print(formatted_result)
             else:
-                print(self._format_error(f"検索実行エラー: {result.get('error', '不明なエラー')}"))
+                print(
+                    self._format_error(
+                        f"検索実行エラー: {result.get('error', '不明なエラー')}"
+                    )
+                )
 
         elif cmd == ":search_stats":
             if not self.search_tool:
                 print(self._format_error("検索ツールが初期化されていません"))
                 return True
-            
+
             stats = self.search_tool.get_search_statistics()
             print(f"{Fore.CYAN}=== 検索エンジン統計 ==={Style.RESET_ALL}")
             print(f"インデックス構築済み: {'はい' if stats['indexed'] else 'いいえ'}")
@@ -338,7 +354,7 @@ class InteractiveProlog:
             if not self.search_tool:
                 print(self._format_error("検索ツールが初期化されていません"))
                 return True
-            
+
             print(self._format_info("検索インデックスを再構築中..."))
             if self.search_tool.rebuild_index():
                 print(self._format_success("検索インデックスの再構築が完了しました"))
@@ -347,58 +363,80 @@ class InteractiveProlog:
 
         elif cmd == ":validate":
             if not self.runtime or not self.validate_tool:
-                print(self._format_error("ランタイムが初期化されていません。:load でファイルを読み込んでください"))
+                print(
+                    self._format_error(
+                        "ランタイムが初期化されていません。:load でファイルを読み込んでください"
+                    )
+                )
                 return True
-            
+
             # パラメータ解析
             check_type = parts[1] if len(parts) > 1 else "all"
-            detailed = len(parts) > 2 and parts[2].lower() in ["true", "yes", "detailed"]
+            detailed = len(parts) > 2 and parts[2].lower() in [
+                "true",
+                "yes",
+                "detailed",
+            ]
             format_type = parts[3] if len(parts) > 3 else "text"
-            
+
             if check_type not in ["all", "conflicts", "unreachable", "undefined"]:
-                print(self._format_error("使用法: :validate [type] [detailed] [format]"))
+                print(
+                    self._format_error("使用法: :validate [type] [detailed] [format]")
+                )
                 print("type: all/conflicts/unreachable/undefined")
                 print("detailed: true/false, format: text/json/detailed")
                 return True
-            
+
             print(self._format_info(f"検証を実行中... (タイプ: {check_type})"))
-            
+
             # 検証実行
             result = self.validate_tool.validate_query(check_type, detailed)
-            
+
             if result.get("success"):
-                formatted_result = self.validate_tool.format_results(result, format_type)
+                formatted_result = self.validate_tool.format_results(
+                    result, format_type
+                )
                 print(formatted_result)
             else:
-                print(self._format_error(f"検証実行エラー: {result.get('error', '不明なエラー')}"))
+                print(
+                    self._format_error(
+                        f"検証実行エラー: {result.get('error', '不明なエラー')}"
+                    )
+                )
 
         elif cmd == ":validate_stats":
             if not self.validate_tool:
                 print(self._format_error("検証ツールが初期化されていません"))
                 return True
-            
+
             stats = self.validate_tool.get_validation_statistics()
             if "error" in stats:
                 print(self._format_error(f"統計情報取得エラー: {stats['error']}"))
             else:
                 print(f"{Fore.CYAN}=== 検証エンジン統計 ==={Style.RESET_ALL}")
-                
+
                 # シンボルテーブル統計
-                symbol_stats = stats.get('symbol_table', {})
+                symbol_stats = stats.get("symbol_table", {})
                 print("📋 シンボルテーブル:")
                 print(f"  総述語数: {symbol_stats.get('total_predicates', 0)}")
                 print(f"  総定義数: {symbol_stats.get('total_definitions', 0)}")
                 print(f"  総参照数: {symbol_stats.get('total_references', 0)}")
-                print(f"  ビルトイン述語数: {symbol_stats.get('builtin_predicates', 0)}")
-                print(f"  ユーザー定義述語数: {symbol_stats.get('user_defined_predicates', 0)}")
-                
+                print(
+                    f"  ビルトイン述語数: {symbol_stats.get('builtin_predicates', 0)}"
+                )
+                print(
+                    f"  ユーザー定義述語数: {symbol_stats.get('user_defined_predicates', 0)}"
+                )
+
                 # 依存関係グラフ統計
-                graph_stats = stats.get('dependency_graph', {})
+                graph_stats = stats.get("dependency_graph", {})
                 print("\n🔗 依存関係グラフ:")
                 print(f"  総ノード数: {graph_stats.get('total_nodes', 0)}")
                 print(f"  総エッジ数: {graph_stats.get('total_edges', 0)}")
                 print(f"  循環数: {graph_stats.get('cycles', 0)}")
-                print(f"  強連結成分数: {graph_stats.get('strongly_connected_components', 0)}")
+                print(
+                    f"  強連結成分数: {graph_stats.get('strongly_connected_components', 0)}"
+                )
                 print(f"  孤立ノード数: {graph_stats.get('isolated_nodes', 0)}")
 
         else:

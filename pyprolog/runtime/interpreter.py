@@ -29,7 +29,6 @@ from pyprolog.runtime.builtins import (
 )
 from .io_manager import IOManager
 from .tracer import Tracer
-from .trace_formatter import TraceFormatter
 from typing import (
     List,
     Iterator,
@@ -434,13 +433,15 @@ class Runtime:
                 evaluator = self._operator_evaluators[goal.name]
                 try:
                     for item in evaluator(processed_goal.args, env):
-                        logger.debug(f"EXECUTE Atom IO op {goal.name}: Yielding: {item.bindings if item else 'None'}")
+                        logger.debug(
+                            f"EXECUTE Atom IO op {goal.name}: Yielding: {item.bindings if item else 'None'}"
+                        )
                         yield item
                 except Exception as e:
                     logger.debug(f"Exception in Atom IO operator {goal.name}: {e}")
                     raise
                 return
-            
+
             # 既存の通常述語処理
             logger.debug(
                 f"EXECUTE Atom: Attempting Normal Predicate solve_goal for Atom: {goal}"
@@ -501,7 +502,7 @@ class Runtime:
                 raise
             except Exception as e:
                 # IOManager例外などの重要な例外は伝播
-                if "Input required" in str(e) or hasattr(e, 'input_type'):
+                if "Input required" in str(e) or hasattr(e, "input_type"):
                     logger.debug(f"Critical exception in operator {functor_name}: {e}")
                     raise
                 logger.error(
@@ -745,16 +746,17 @@ class Runtime:
             # Re-raise the exception to make it visible in test output
             raise e
 
-    def query_with_trace(self, query_string: str, max_depth: Optional[int] = None) -> Tuple[List[Dict[Variable, Any]], List]:
+    def query_with_trace(
+        self, query_string: str, max_depth: Optional[int] = None
+    ) -> Tuple[List[Dict[Variable, Any]], List]:
         """トレース付きでクエリを実行"""
-        from .tracer import TraceEvent
-        
+
         logger.debug(f"TRACE QUERY: Executing query with trace: {query_string}")
-        
+
         # 新しいTracerインスタンスを作成
         self.tracer = Tracer(max_depth)
         self.tracer.start_trace()
-        
+
         try:
             solutions = self.query(query_string)
             trace_events = self.tracer.get_events()

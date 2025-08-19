@@ -3,7 +3,6 @@ from pyprolog.parser.token import Token
 from pyprolog.parser.token_type import TokenType
 from pyprolog.core.types import Term, Variable, Atom, Number, String, Rule, Fact
 from pyprolog.core.operators import operator_registry, Associativity
-from pyprolog.core.errors import PrologError
 from typing import List, Optional, Callable, Union  # Added Optional
 from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
 from pyprolog.util.functor_mapper import FunctorMapper  # Added FunctorMapper

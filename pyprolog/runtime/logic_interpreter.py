@@ -252,22 +252,22 @@ class LogicInterpreter:
         logger.debug(
             f"LOGIC_INTERP: Attempting to solve actual_goal: {actual_goal} with env: {env.bindings}"
         )
-        
+
         # トレース: ゴール呼び出し記録
-        if hasattr(self.runtime, 'tracer') and self.runtime.tracer.enabled:
+        if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
             self.runtime.tracer.record_call(actual_goal, env)
 
         if actual_goal.functor.name == "true" and not actual_goal.args:
             logger.debug(f"Goal {actual_goal} is true, yielding current env.")
             # トレース: 成功記録
-            if hasattr(self.runtime, 'tracer') and self.runtime.tracer.enabled:
+            if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
                 self.runtime.tracer.record_exit(actual_goal, env, Fact(actual_goal))
             yield env
             return
         elif actual_goal.functor.name == "fail" and not actual_goal.args:
             logger.debug(f"Goal {actual_goal} is fail, returning.")
             # トレース: 失敗記録
-            if hasattr(self.runtime, 'tracer') and self.runtime.tracer.enabled:
+            if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
                 self.runtime.tracer.record_fail(actual_goal)
             return
 
@@ -334,8 +334,10 @@ class LogicInterpreter:
                         raise
                     except Exception as e:
                         # IOManager例外などの重要な例外は伝播
-                        if "Input required" in str(e) or hasattr(e, 'input_type'):
-                            logger.debug(f"Critical exception propagated from patched rule body: {e}")
+                        if "Input required" in str(e) or hasattr(e, "input_type"):
+                            logger.debug(
+                                f"Critical exception propagated from patched rule body: {e}"
+                            )
                             raise
                         # その他の例外もログ出力して伝播
                         logger.debug(f"Exception in patched rule body execution: {e}")
@@ -345,8 +347,10 @@ class LogicInterpreter:
                         f"LOGIC_INTERP: Unified Fact {actual_goal} with {effective_head}. Yielding env: {new_env_after_unify.bindings}"
                     )
                     # トレース: 事実による成功記録
-                    if hasattr(self.runtime, 'tracer') and self.runtime.tracer.enabled:
-                        self.runtime.tracer.record_exit(actual_goal, new_env_after_unify, renamed_entry)
+                    if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                        self.runtime.tracer.record_exit(
+                            actual_goal, new_env_after_unify, renamed_entry
+                        )
                     yield new_env_after_unify
                 elif isinstance(renamed_entry, Rule):  # Properly parsed Rule
                     logger.debug(
@@ -363,8 +367,10 @@ class LogicInterpreter:
                         raise
                     except Exception as e:
                         # IOManager例外などの重要な例外は伝播
-                        if "Input required" in str(e) or hasattr(e, 'input_type'):
-                            logger.debug(f"Critical exception propagated from rule body: {e}")
+                        if "Input required" in str(e) or hasattr(e, "input_type"):
+                            logger.debug(
+                                f"Critical exception propagated from rule body: {e}"
+                            )
                             raise
                         # その他の例外もログ出力して伝播
                         logger.debug(f"Exception in rule body execution: {e}")
@@ -421,9 +427,9 @@ class LogicInterpreter:
             )
 
         # トレース: 最終的に失敗した場合の記録
-        if hasattr(self.runtime, 'tracer') and self.runtime.tracer.enabled:
+        if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
             self.runtime.tracer.record_fail(actual_goal)
-        
+
         logger.debug(
             f"LOGIC_INTERP: Finished iterating DB for goal {actual_goal}. No more (or no) solutions found from this path."
         )
