@@ -5,8 +5,7 @@ Prologルールと事実の検索結果を格納・管理します。
 """
 from dataclasses import dataclass, field
 from typing import Union, Optional, List
-from pyprolog.core.rule import Rule
-from pyprolog.core.fact import Fact
+from pyprolog.core.types import Rule, Fact
 
 
 @dataclass

@@ -4,10 +4,7 @@
 Prologルールと事実の効率的な検索のためのインデックス構築を提供します。
 """
 from typing import Dict, List, Set, Union, Optional, Any
-from pyprolog.core.rule import Rule
-from pyprolog.core.fact import Fact
-from pyprolog.core.term import Term
-from pyprolog.core.atom import Atom
+from pyprolog.core.types import Rule, Fact, Term, Atom
 from pyprolog.search.search_result import SearchResult
 from pyprolog.util.logger import get_logger
 import re

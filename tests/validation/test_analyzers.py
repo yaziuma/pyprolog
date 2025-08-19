@@ -104,8 +104,6 @@ class TestReachabilityAnalyzer:
     
     def test_is_entry_point(self):
         """エントリーポイント判定のテスト"""
-        from pyprolog.core.fact import Fact
-        
         # 事実のエントリーポイント判定
         fact_info = type('PredicateInfo', (), {
             'definition': Fact(Term(Atom("test"), [])),

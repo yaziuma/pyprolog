@@ -261,7 +261,6 @@ class LogicInterpreter:
             logger.debug(f"Goal {actual_goal} is true, yielding current env.")
             # トレース: 成功記録
             if hasattr(self.runtime, 'tracer') and self.runtime.tracer.enabled:
-                from pyprolog.core.fact import Fact
                 self.runtime.tracer.record_exit(actual_goal, env, Fact(actual_goal))
             yield env
             return
