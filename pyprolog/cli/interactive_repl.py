@@ -25,6 +25,7 @@ from pyprolog.core.errors import InterpreterError, ScannerError, PrologError
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
 from pyprolog.tools.explain_tool import ExplainTool
+from pyprolog.tools.search_tool import SearchTool
 
 # カラー初期化
 init(autoreset=True)
@@ -37,6 +38,7 @@ class InteractiveProlog:
         self.runtime: Optional[Runtime] = None
         self.variable_mapper = VariableMapper()  # Added VariableMapper instance
         self.explain_tool: Optional[ExplainTool] = None
+        self.search_tool: Optional[SearchTool] = None
         self.session_history: List[Dict[str, Any]] = []
         self.home_path = str(Path.home())
         self.session_start_time = datetime.now()
@@ -84,6 +86,14 @@ class InteractiveProlog:
     format: text/tree/json (デフォルト: text)
     depth: トレースの最大深度 (デフォルト: 無制限)
     例: :explain member(X, [1,2,3]) tree 5
+
+{Fore.YELLOW}ルール検索:{Style.RESET_ALL}
+  :search <パターン> [type] [limit] - ルールと事実を検索
+    type: predicate/argument/full_text (デフォルト: predicate)
+    limit: 結果数制限 (デフォルト: 100)
+    例: :search location predicate 10
+  :search_stats                     - 検索エンジンの統計情報表示
+  :rebuild_index                    - 検索インデックスの再構築
 
 {Fore.YELLOW}REPL制御:{Style.RESET_ALL}
   :help               - このヘルプを表示
@@ -149,6 +159,7 @@ class InteractiveProlog:
                     rules_list, variable_mapper=self.variable_mapper
                 )  # Pass variable_mapper
                 self.explain_tool = ExplainTool(self.runtime)
+                self.search_tool = SearchTool(self.runtime)
 
                 self.current_rules_file = rules_file
                 # If consult is used, it would print its own messages.
@@ -175,6 +186,7 @@ class InteractiveProlog:
                     [], variable_mapper=self.variable_mapper
                 )  # Pass variable_mapper
                 self.explain_tool = ExplainTool(self.runtime)
+                self.search_tool = SearchTool(self.runtime)
                 print(self._format_info("空のランタイムを初期化しました"))
                 return True
 
@@ -226,6 +238,7 @@ class InteractiveProlog:
                 [], variable_mapper=self.variable_mapper
             )  # Pass variable_mapper
             self.explain_tool = ExplainTool(self.runtime)
+            self.search_tool = SearchTool(self.runtime)
             self.variable_mapper.clear_mapping()  # Clear mapper state
             self.current_rules_file = None
             print(self._format_success("ルールと変数マッピングをクリアしました"))
@@ -268,6 +281,57 @@ class InteractiveProlog:
                 print(result['trace'])
             else:
                 print(self._format_error(f"説明実行エラー: {result.get('error', '不明なエラー')}"))
+
+        elif cmd == ":search":
+            if len(parts) < 2:
+                print(self._format_error("使用法: :search <パターン> [type] [limit]"))
+                print("例: :search location predicate 10")
+                print("type: predicate/argument/full_text, limit: 結果数制限")
+                return True
+            
+            if not self.runtime or not self.search_tool:
+                print(self._format_error("ランタイムが初期化されていません。:load でファイルを読み込んでください"))
+                return True
+            
+            # パラメータ解析
+            pattern = parts[1]
+            search_type = parts[2] if len(parts) > 2 else "predicate"
+            limit = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 100
+            
+            # 検索実行
+            result = self.search_tool.search_query(pattern, search_type, limit)
+            
+            if result.get("success"):
+                print(f"{Fore.GREEN}=== 検索結果 ==={Style.RESET_ALL}")
+                formatted_result = self.search_tool.format_results(result, "text")
+                print(formatted_result)
+            else:
+                print(self._format_error(f"検索実行エラー: {result.get('error', '不明なエラー')}"))
+
+        elif cmd == ":search_stats":
+            if not self.search_tool:
+                print(self._format_error("検索ツールが初期化されていません"))
+                return True
+            
+            stats = self.search_tool.get_search_statistics()
+            print(f"{Fore.CYAN}=== 検索エンジン統計 ==={Style.RESET_ALL}")
+            print(f"インデックス構築済み: {'はい' if stats['indexed'] else 'いいえ'}")
+            print(f"総ルール数: {stats['total_rules']}")
+            print(f"述語インデックスサイズ: {stats['predicate_index_size']}")
+            print(f"引数インデックスサイズ: {stats['argument_index_size']}")
+            print(f"テキストインデックスサイズ: {stats['text_index_size']}")
+            print(f"キャッシュ有効: {'はい' if stats['cache_valid'] else 'いいえ'}")
+
+        elif cmd == ":rebuild_index":
+            if not self.search_tool:
+                print(self._format_error("検索ツールが初期化されていません"))
+                return True
+            
+            print(self._format_info("検索インデックスを再構築中..."))
+            if self.search_tool.rebuild_index():
+                print(self._format_success("検索インデックスの再構築が完了しました"))
+            else:
+                print(self._format_error("検索インデックスの再構築に失敗しました"))
 
         else:
             print(self._format_error(f"不明なコマンド: {cmd}"))
