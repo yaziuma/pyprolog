@@ -252,13 +252,24 @@ class LogicInterpreter:
         logger.debug(
             f"LOGIC_INTERP: Attempting to solve actual_goal: {actual_goal} with env: {env.bindings}"
         )
+        
+        # トレース: ゴール呼び出し記録
+        if hasattr(self.runtime, 'tracer') and self.runtime.tracer.enabled:
+            self.runtime.tracer.record_call(actual_goal, env)
 
         if actual_goal.functor.name == "true" and not actual_goal.args:
             logger.debug(f"Goal {actual_goal} is true, yielding current env.")
+            # トレース: 成功記録
+            if hasattr(self.runtime, 'tracer') and self.runtime.tracer.enabled:
+                from pyprolog.core.fact import Fact
+                self.runtime.tracer.record_exit(actual_goal, env, Fact(actual_goal))
             yield env
             return
         elif actual_goal.functor.name == "fail" and not actual_goal.args:
             logger.debug(f"Goal {actual_goal} is fail, returning.")
+            # トレース: 失敗記録
+            if hasattr(self.runtime, 'tracer') and self.runtime.tracer.enabled:
+                self.runtime.tracer.record_fail(actual_goal)
             return
 
         # カットの特別扱いは Runtime.execute で行うので、ここでは不要
@@ -334,6 +345,9 @@ class LogicInterpreter:
                     logger.debug(
                         f"LOGIC_INTERP: Unified Fact {actual_goal} with {effective_head}. Yielding env: {new_env_after_unify.bindings}"
                     )
+                    # トレース: 事実による成功記録
+                    if hasattr(self.runtime, 'tracer') and self.runtime.tracer.enabled:
+                        self.runtime.tracer.record_exit(actual_goal, new_env_after_unify, renamed_entry)
                     yield new_env_after_unify
                 elif isinstance(renamed_entry, Rule):  # Properly parsed Rule
                     logger.debug(
@@ -407,6 +421,10 @@ class LogicInterpreter:
                 f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
             )
 
+        # トレース: 最終的に失敗した場合の記録
+        if hasattr(self.runtime, 'tracer') and self.runtime.tracer.enabled:
+            self.runtime.tracer.record_fail(actual_goal)
+        
         logger.debug(
             f"LOGIC_INTERP: Finished iterating DB for goal {actual_goal}. No more (or no) solutions found from this path."
         )
