@@ -1,13 +1,16 @@
 import os
 import sys
+
 try:
     from colorama import Fore, init
+
     init(autoreset=True)
 except ImportError:
     # Set dummy Fore class if colorama is not available
     class DummyFore:
         def __getattr__(self, name):
             return ""
+
     Fore = DummyFore()
 
 from prompt_toolkit import prompt
