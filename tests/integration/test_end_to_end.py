@@ -362,59 +362,59 @@ class TestEndToEnd:
         )
         # --- End Basic KB Integrity Check ---
 
-        # Query 1: 患者診断([発熱, 咳], 30, [], [], 結果). - Added empty list for Lifestyles for arity 5
-        query1_str = "患者診断([発熱, 咳], 30, [], [], 結果)."
+        # Query 1: 患者診断([発熱, 咳], 30, [], [], Result). - Added empty list for Lifestyles for arity 5
+        query1_str = "患者診断([発熱, 咳], 30, [], [], Result)."
         solutions1 = self.runtime.query(query1_str)
 
         assert solutions1 is not None, (
             "Query 1 returned None instead of a list of solutions."
         )
         assert len(solutions1) > 0, (
-            "Query 1 '患者診断([発熱, 咳], 30, [], [], 結果).' returned no solutions."
+            "Query 1 '患者診断([発熱, 咳], 30, [], [], Result).' returned no solutions."
         )
 
-        result_var1 = Variable("結果")
+        result_var1 = Variable("Result")
         solution1 = solutions1[0]
         assert result_var1 in solution1, (
-            "Variable '結果' not found in solution1 for Query 1."
+            "Variable 'Result' not found in solution1 for Query 1."
         )
         result_value1 = solution1[result_var1]
         assert isinstance(result_value1, Term) and result_value1.functor.name == ".", (
-            "結果 from Query 1 should be a Prolog list."
+            "Result from Query 1 should be a Prolog list."
         )
 
-        # Query 2: 患者診断([息切れ, 発熱], 70, [糖尿病], [], 結果). - Added empty list for Lifestyles for arity 5
-        query2_str = "患者診断([息切れ, 発熱], 70, [糖尿病], [], 結果)."
+        # Query 2: 患者診断([息切れ, 発熱], 70, [糖尿病], [], Result). - Added empty list for Lifestyles for arity 5
+        query2_str = "患者診断([息切れ, 発熱], 70, [糖尿病], [], Result)."
         solutions2 = self.runtime.query(query2_str)
         assert solutions2 is not None, "Query 2 returned None."
         assert len(solutions2) > 0, (
-            "Query 2 '患者診断([息切れ, 発熱], 70, [糖尿病], [], 結果).' returned no solutions."
+            "Query 2 '患者診断([息切れ, 発熱], 70, [糖尿病], [], Result).' returned no solutions."
         )
-        result_var2 = Variable("結果")
+        result_var2 = Variable("Result")
         solution2 = solutions2[0]
         assert result_var2 in solution2, (
-            "Variable '結果' not found in solution2 for Query 2."
+            "Variable 'Result' not found in solution2 for Query 2."
         )
         result_value2 = solution2[result_var2]
         assert isinstance(result_value2, Term) and result_value2.functor.name == ".", (
-            "結果 from Query 2 should be a Prolog list."
+            "Result from Query 2 should be a Prolog list."
         )
 
-        # Query 3: 診断([発熱, 咳, のどの痛み], 45, [喫煙], 診断リスト). - This uses 診断/4 which correctly calls 患者診断/5
-        query3_str = "診断([発熱, 咳, のどの痛み], 45, [喫煙], 診断リスト)."
+        # Query 3: 診断([発熱, 咳, のどの痛み], 45, [喫煙], DiagnosisList). - This uses 診断/4 which correctly calls 患者診断/5
+        query3_str = "診断([発熱, 咳, のどの痛み], 45, [喫煙], DiagnosisList)."
         solutions3 = self.runtime.query(query3_str)
         assert solutions3 is not None, "Query 3 returned None."
         assert len(solutions3) > 0, (
-            "Query 3 '診断([発熱, 咳, のどの痛み], 45, [喫煙], 診断リスト).' returned no solutions."
+            "Query 3 '診断([発熱, 咳, のどの痛み], 45, [喫煙], DiagnosisList).' returned no solutions."
         )
-        result_var3 = Variable("診断リスト")
+        result_var3 = Variable("DiagnosisList")
         solution3 = solutions3[0]
         assert result_var3 in solution3, (
-            "Variable '診断リスト' not found in solution3 for Query 3."
+            "Variable 'DiagnosisList' not found in solution3 for Query 3."
         )
         result_value3 = solution3[result_var3]
         assert isinstance(result_value3, Term) and result_value3.functor.name == ".", (
-            "診断リスト from Query 3 should be a Prolog list."
+            "DiagnosisList from Query 3 should be a Prolog list."
         )
 
 

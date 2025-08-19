@@ -144,29 +144,20 @@ get_recommended_tests([診断(Disease, Prob) | RestProbs], Tests) :-
 % Custom comparator for sort/4
 my_greater_equal(X, Y) :- X >= Y.
 
-% メインの診断述語
-患者診断(Symptoms, Age, Conditions, Lifestyles, 結果) :-
-    write('Debug: Entering 患者診断'), % Removed nl here
-    write('Debug: Calling gadp_test/5...'), nl,
-    gadp_test(atom1, 99, atom2, atom3, TestOutput),
-    write('Debug: gadp_test/5 returned, TestOutput = '), write(TestOutput), nl,
-    DiseaseProbs = TestOutput,
+% メインの診断述語  
+患者診断(Symptoms, Age, Conditions, Lifestyles, Result) :-
+    gadp_test(atom1, 99, atom2, atom3, DiseaseProbs),
+    Result = [診断結果(DiseaseProbs), 緊急度(低), 検査([])].
 
-    write('Debug: 患者診断 - DiseaseProbs = '), write(DiseaseProbs), nl,
-    (DiseaseProbs = [] ->
-        write('Debug: 患者診断 - DiseaseProbs is empty'), nl,
-        結果 = [診断結果なし, 緊急度(低), 検査([])]
-    ;
-        write('Debug: 患者診断 - DiseaseProbs is NOT empty, processing...'), nl,
-        sort(2, my_greater_equal, DiseaseProbs, SortedDiseaseProbs),
-        write('Debug: 患者診断 - SortedDiseaseProbs = '), write(SortedDiseaseProbs), nl,
-        determine_urgency(SortedDiseaseProbs, UrgencyLevel),
-        write('Debug: 患者診断 - UrgencyLevel = '), write(UrgencyLevel), nl,
-        get_recommended_tests(SortedDiseaseProbs, RecommendedTests),
-        write('Debug: 患者診断 - RecommendedTests = '), write(RecommendedTests), nl,
-        結果 = [診断結果(SortedDiseaseProbs), 緊急度(UrgencyLevel), 検査(RecommendedTests)],
-        write('Debug: 患者診断 - 結果 unified = '), write(結果), nl
-    ).
+% Simple test predicate
+simple_test(hello).
+
+% Safe wrappers that don't propagate cuts - just direct calls
+safe_determine_urgency(DiseaseProbs, UrgencyLevel) :-
+    determine_urgency(DiseaseProbs, UrgencyLevel).
+
+safe_get_recommended_tests(DiseaseProbs, RecommendedTests) :-
+    get_recommended_tests(DiseaseProbs, RecommendedTests).
 
 % 別のメイン述語
 診断(Symptoms, Age, Conditions, DiagnosisList) :-
@@ -185,9 +176,10 @@ product_list([H|T], Product) :-
 
 union([], L, L).
 union([H|T], L2, L3) :-
-    member(H, L2), !,
+    member(H, L2),
     union(T, L2, L3).
 union([H|T], L2, [H|L3]) :-
+    \+ member(H, L2),
     union(T, L2, L3).
 
 % Custom sort/4 is a NO-OP for testing.
