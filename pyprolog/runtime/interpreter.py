@@ -13,6 +13,7 @@ from pyprolog.runtime.builtins import (
     VarPredicate,
     AtomPredicate,
     NumberPredicate,
+    AtomNumberPredicate,
     FunctorPredicate,
     ArgPredicate,
     UnivPredicate,
@@ -379,12 +380,16 @@ class Runtime:
                 if len(args) != 1:
                     raise PrologError("write/1 requires exactly 1 argument")
                 arg_deref = self.logic_interpreter.dereference(args[0], env)
-                print(str(arg_deref), end="")
+                # Use IOManager's write method instead of print
+                text = str(arg_deref)
+                for char in text:
+                    self.io_manager.write_char_to_current(char)
                 yield env
             elif op_info.symbol == "nl":
                 if len(args) != 0:
                     raise PrologError("nl/0 requires no arguments")
-                print()
+                # Use IOManager's write method instead of print
+                self.io_manager.write_char_to_current('\n')
                 yield env
             elif op_info.symbol == "tab":
                 if len(args) > 1:
@@ -529,6 +534,12 @@ class Runtime:
             )
             num_pred = NumberPredicate(dereferenced_arg)
             for item in num_pred.execute(self, env):
+                yield item
+        elif functor_name == "atom_number" and len(processed_goal.args) == 2:
+            atom_number_pred = AtomNumberPredicate(
+                processed_goal.args[0], processed_goal.args[1]
+            )
+            for item in atom_number_pred.execute(self, env):
                 yield item
         elif functor_name == "functor" and len(processed_goal.args) == 3:
             functor_pred = FunctorPredicate(
