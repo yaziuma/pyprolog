@@ -19,19 +19,21 @@
 - **`prolog_validate`**: 静的解析による品質チェック
 
 ### 🎯 実用機能
-- **包括的な組み込み述語**: 35種類以上の標準述語
+- **包括的な組み込み述語**: 36種類以上の標準述語（`atom_number/2`新追加）
+- **自動型変換**: 数値文字列の自動判定・変換機能
 - **高速CLIインターフェース**: インタラクティブREPLと一括処理
-- **豊富なI/O機能**: ファイル読み書き、ストリーム処理
+- **豊富なI/O機能**: ファイル読み書き、ストリーム処理、複数回入力対応
 - **メタ述語サポート**: `findall/3`, 動的述語管理
 
 ## 📊 プロジェクト状況（最新）
 
-**2025年8月19日 - 全機能安定化完了**
+**2025年8月21日 - 入力システム大幅強化 (v0.5.0)**
 
-✅ **全112テスト合格**: 統合テスト、日本語サポート、ツール機能すべて正常動作  
-✅ **日本語医療診断システム**: カット演算子問題を修正、完全動作  
-✅ **開発ツール完全実装**: explain、search、validateツールが本格稼働  
-✅ **パフォーマンス最適化**: 大規模知識ベース処理の安定性向上
+✅ **型変換システム追加**: `atom_number/2`述語で安全な文字列⇔数値変換  
+✅ **自動入力変換**: `read_line/1`と`get_char/1`で数値文字列を自動判定  
+✅ **複数入力対応**: 繰り返し入力・バリデーション処理を完全サポート  
+✅ **IOシステム統合**: write/nl演算子がストリーム処理と完全統合  
+✅ **全124テスト合格**: 新機能含む全テストが正常動作
 
 ## 🚀 クイックスタート
 
@@ -454,7 +456,77 @@ if __name__ == "__main__":
     main()
 ```
 
-## 5.3. 非ブロッキング入力機能（新機能）
+## 5.3. 型変換と複数入力機能（v0.5.0新機能）
+
+PyProlog 0.5.0から、`atom_number/2`述語による型変換と、入力述語の自動数値変換機能が追加されました。
+
+### atom_number/2述語の使用例
+
+```python
+from pyprolog import Runtime
+
+runtime = Runtime()
+
+# 文字列 → 数値変換
+results = runtime.query("atom_number('42', X)")
+print(f"X = {results[0]['X']}")  # X = 42
+
+# 数値 → 文字列変換  
+results = runtime.query("atom_number(Atom, 3.14)")
+print(f"Atom = {results[0]['Atom']}")  # Atom = '3.14'
+
+# 型チェック（成功例）
+results = runtime.query("atom_number('100', 100)")
+print(f"Success: {len(results) > 0}")  # Success: True
+
+# 型チェック（失敗例）
+results = runtime.query("atom_number('abc', 123)")
+print(f"Success: {len(results) > 0}")  # Success: False
+```
+
+### 自動数値変換機能
+
+```python
+from pyprolog.runtime.io_streams import StringStream
+
+# 数値文字列の自動変換
+runtime.io_manager.set_input_stream(StringStream("42\nabc\n3.14\n"))
+
+# read_line/1で自動変換される
+for i in range(3):
+    results = runtime.query("read_line(X)")
+    if results:
+        val = results[0]['X']
+        print(f"Input {i+1}: {val} (Type: {type(val).__name__})")
+# Output:
+# Input 1: 42 (Type: Number)    <- 自動変換
+# Input 2: abc (Type: Atom)     <- 文字列のまま  
+# Input 3: 3.14 (Type: Number)  <- 自動変換
+```
+
+### 複数入力プログラムの例
+
+複数回の入力を必要とするPrologプログラムも簡単に作成できます：
+
+```prolog
+% multiple_input_calculator.pl
+calculate_sum :-
+    write('数値を2つ入力してください'), nl,
+    read_line(First),
+    read_line(Second), 
+    Sum is First + Second,
+    write('合計: '), write(Sum), nl.
+```
+
+```python
+# Python側での使用
+runtime.consult("multiple_input_calculator.pl")
+runtime.io_manager.set_input_stream(StringStream("10\n20\n"))
+results = runtime.query("calculate_sum")
+# 出力: "数値を2つ入力してください\n合計: 30"
+```
+
+## 5.4. 非ブロッキング入力機能（新機能）
 
 PyProlog 0.2.2 から、`peek_char/1` および `at_end_of_stream/0` 述語が追加されました。これにより、入力待ちでアプリケーションが停止することなく、条件付きの入力処理が可能になります。
 
