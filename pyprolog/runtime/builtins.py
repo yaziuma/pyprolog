@@ -4,13 +4,35 @@ from pyprolog.core.errors import (
     PrologError,
     CutException,
 )  # Assuming CutException might be relevant for some builtins
-from typing import TYPE_CHECKING, Iterator, List
+from typing import TYPE_CHECKING, Iterator, List, Union, Optional
 import logging
+import ast
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from pyprolog.runtime.interpreter import Runtime
+
+
+def try_convert_atom_to_number(atom_value: str) -> Optional[Union[int, float]]:
+    """
+    標準的なPython方式でatom文字列を数値に変換する。
+    ast.literal_eval()を使用して安全に数値変換を行う。
+    
+    Args:
+        atom_value: 変換対象の文字列
+        
+    Returns:
+        変換成功時は数値(int/float)、失敗時はNone
+    """
+    try:
+        result = ast.literal_eval(atom_value)
+        # 数値のみを受け入れる
+        if isinstance(result, (int, float)):
+            return result
+        return None
+    except (ValueError, SyntaxError):
+        return None
 
 
 class BuiltinPredicate:
@@ -57,6 +79,56 @@ class NumberPredicate(BuiltinPredicate):
         arg1 = self.args[0]
         if isinstance(arg1, Number):
             yield env
+
+
+class AtomNumberPredicate(BuiltinPredicate):
+    """
+    Built-in predicate atom_number/2.
+    Converts between atoms and numbers: atom_number(+Atom, ?Number) or atom_number(?Atom, +Number).
+    """
+    
+    def __init__(self, atom_arg: PrologType, number_arg: PrologType):
+        super().__init__(atom_arg, number_arg)
+        if len(self.args) != 2:
+            raise PrologError(f"atom_number/2 expects 2 arguments, got {len(self.args)}")
+
+    def execute(
+        self, runtime: "Runtime", env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        atom_arg = runtime.logic_interpreter.dereference(self.args[0], env)
+        number_arg = runtime.logic_interpreter.dereference(self.args[1], env)
+
+        # Case 1: atom_number(+Atom, ?Number) - convert atom to number
+        if isinstance(atom_arg, Atom) and not isinstance(number_arg, Number):
+            number_value = try_convert_atom_to_number(atom_arg.value)
+            if number_value is not None:
+                target_number = Number(number_value)
+                unified, final_env = runtime.logic_interpreter.unify(
+                    self.args[1], target_number, env
+                )
+                if unified:
+                    yield final_env
+            return
+
+        # Case 2: atom_number(?Atom, +Number) - convert number to atom
+        elif isinstance(number_arg, Number) and not isinstance(atom_arg, Atom):
+            target_atom = Atom(str(number_arg.value))
+            unified, final_env = runtime.logic_interpreter.unify(
+                self.args[0], target_atom, env
+            )
+            if unified:
+                yield final_env
+            return
+
+        # Case 3: atom_number(+Atom, +Number) - check consistency
+        elif isinstance(atom_arg, Atom) and isinstance(number_arg, Number):
+            number_value = try_convert_atom_to_number(atom_arg.value)
+            if number_value == number_arg.value:
+                yield env
+            return
+
+        # Case 4: Both are variables - fail (insufficient instantiation)
+        # No solutions yielded
 
 
 class FunctorPredicate(BuiltinPredicate):
@@ -721,12 +793,16 @@ class GetCharPredicate(BuiltinPredicate):
         # or an empty string for EOF.
         char_str = runtime.io_manager.read_char_from_current()
 
-        # 2. Determine the target Prolog Atom based on the character string
-        target_atom: Atom
+        # 2. Determine the target Prolog term based on the character string
+        target_term: PrologType
         if char_str == "":  # EOF
-            target_atom = Atom("end_of_file")
+            target_term = Atom("end_of_file")
         elif len(char_str) == 1:  # Standard case: single character
-            target_atom = Atom(char_str)
+            # Try to convert digit characters to numbers, keep others as atoms
+            if char_str.isdigit():
+                target_term = Number(int(char_str))
+            else:
+                target_term = Atom(char_str)
         else:
             # This case should ideally not happen if read_char_from_current adheres to
             # returning a single char or empty string. If it can return more,
@@ -741,7 +817,7 @@ class GetCharPredicate(BuiltinPredicate):
             # If for some reason it doesn't, this is a point of potential failure/unexpected behavior.
             # For robustness, if it could return None or other non-string types:
             if char_str is None:  # Defensive, if read_char could return None
-                target_atom = Atom("end_of_file")  # Treat None like EOF
+                target_term = Atom("end_of_file")  # Treat None like EOF
             else:  # Should be multi-character string if not "" or len 1
                 # This path indicates an unexpected return from read_char_from_current
                 # For now, we'll be strict and expect single chars or EOF marker.
@@ -749,15 +825,19 @@ class GetCharPredicate(BuiltinPredicate):
                 # If the underlying stream gives more than one char, get_char usually takes one.
                 # To be safe and simple for now, if it's not empty, take the first char.
                 # This part might need refinement based on stream behavior.
-                target_atom = Atom(char_str[0])
+                char_to_use = char_str[0]
+                if char_to_use.isdigit():
+                    target_term = Number(int(char_to_use))
+                else:
+                    target_term = Atom(char_to_use)
 
         # 3. Get the argument to get_char/1 (the Prolog variable or term)
         prolog_arg = self.args[0]
 
-        # 4. Attempt to unify the argument with the target_atom
+        # 4. Attempt to unify the argument with the target_term
         # unify returns a tuple: (bool_success, resulting_environment)
         unified, next_env = runtime.logic_interpreter.unify(
-            prolog_arg, target_atom, env
+            prolog_arg, target_term, env
         )
 
         # 5. Yield successful unifications
@@ -783,16 +863,21 @@ class ReadLinePredicate(BuiltinPredicate):
         # 1. Read a line from the IOManager
         line_str = runtime.io_manager.read_line_from_current()
 
-        # 2. Determine the target Prolog Atom based on the line string
-        target_atom: Atom
+        # 2. Determine the target Prolog term based on the line string
+        target_term: PrologType
         if line_str is None:  # EOF
-            target_atom = Atom("end_of_file")
+            target_term = Atom("end_of_file")
         else:
-            target_atom = Atom(line_str)
+            # Try to convert to number first, fall back to atom
+            number_value = try_convert_atom_to_number(line_str)
+            if number_value is not None:
+                target_term = Number(number_value)
+            else:
+                target_term = Atom(line_str)
 
-        # 3. Unify the target atom with the argument
+        # 3. Unify the target term with the argument
         unified, final_env = runtime.logic_interpreter.unify(
-            self.args[0], target_atom, env
+            self.args[0], target_term, env
         )
         if unified:
             yield final_env
