@@ -6,6 +6,14 @@
 
 ## 最新の更新情報
 
+**2025年8月21日** - atom_number/2述語の実装と入力システム改良:
+- 新しい組み込み述語 `atom_number/2` を追加（文字列⇔数値変換）
+- `ast.literal_eval()` を使用した標準Python方式の安全な数値変換
+- `read_line/1` と `get_char/1` で数値文字列の自動変換機能を追加
+- `write/1` と `nl/0` 演算子がIOManagerストリームを使用するよう改良
+- 複数回入力を必要とするPrologプログラムの完全サポート
+- 包括的テストスイートによる品質保証
+
 **2025年8月7日** - 非ブロッキング入力述語の実装:
 - 新しい入出力述語 `peek_char/1` および `at_end_of_stream/0` を追加
 - 非破壊的な文字先読みとEOF状態確認機能を実装
@@ -81,6 +89,12 @@
 | `var/1`    | 1        | [`VarPredicate`](../pyprolog/runtime/builtins.py:26)    | 引数が変数かどうかをテスト   |
 | `atom/1`   | 1        | [`AtomPredicate`](../pyprolog/runtime/builtins.py:38)   | 引数がアトムかどうかをテスト |
 | `number/1` | 1        | [`NumberPredicate`](../pyprolog/runtime/builtins.py:50) | 引数が数値かどうかをテスト   |
+
+### 型変換述語
+
+| 述語           | アリティ | 実装クラス                                                     | 説明                           |
+| -------------- | -------- | -------------------------------------------------------------- | ------------------------------ |
+| `atom_number/2`| 2        | [`AtomNumberPredicate`](../pyprolog/runtime/builtins.py:84)   | アトム⇔数値の相互変換         |
 
 ### 項操作述語
 
@@ -303,6 +317,27 @@ print(f"X = {results[0]['X']}")  # X = こんにちは世界
 runtime.io_manager.set_input_stream(StringStream(""))
 results = runtime.query("read_line(X)")
 print(f"X = {results[0]['X']}")  # X = end_of_file
+```
+
+### 型変換操作例
+
+```python
+# atom_number/2述語（アトム⇔数値変換）
+results = runtime.query("atom_number('42', X)")
+print(f"X = {results[0]['X']}")  # X = 42
+
+results = runtime.query("atom_number(Atom, 3.14)")
+print(f"Atom = {results[0]['Atom']}")  # Atom = '3.14'
+
+# 自動数値変換を利用した入力処理
+from pyprolog.runtime.io_streams import StringStream
+runtime.io_manager.set_input_stream(StringStream("42\n"))
+results = runtime.query("read_line(X)")
+print(f"X = {results[0]['X']}, Type: {type(results[0]['X'])}")  # X = 42, Type: <class 'pyprolog.core.types.Number'>
+
+# 複数回入力処理の例
+runtime.consult("multiple_input_calculator.pl")
+# このファイルは数値入力を繰り返し、無効入力時は再入力を求める
 ```
 
 ### 新しい演算子の使用例
