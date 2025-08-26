@@ -1149,3 +1149,328 @@ class AtEndOfStreamPredicate(BuiltinPredicate):
         else:
             # at_end_of_stream(+Stream) 形式（将来実装）
             raise NotImplementedError("Stream argument not yet supported")
+
+
+class ListingPredicate(BuiltinPredicate):
+    """
+    listing/0述語実装
+    知識ベース内の全ルール・事実を標準Prolog形式で出力
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def execute(
+        self, runtime: "Runtime", env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """メイン実行ロジック"""
+        try:
+            from ..util.formatters import PrologFormatter
+            
+            # フォーマッターを初期化
+            formatter = PrologFormatter(
+                variable_mapper=getattr(runtime, 'variable_mapper', None),
+                functor_mapper=getattr(runtime, 'functor_mapper', None)
+            )
+            
+            # 全ルール・事実を整形
+            formatted_output = formatter.format_rules_list(runtime.rules)
+            
+            # IOManagerを通じて出力
+            for char in formatted_output:
+                runtime.io_manager.write_char_to_current(char)
+            
+            # 成功
+            yield env
+            
+        except Exception as e:
+            logger.error(f"Error in listing/0: {e}", exc_info=True)
+            return  # 失敗時は何もyieldしない
+
+
+class ListingWithPredicatePredicate(BuiltinPredicate):
+    """
+    listing/1述語実装
+    指定述語のルール・事実のみを標準Prolog形式で出力
+    """
+
+    def __init__(self, predicate_spec: PrologType):
+        super().__init__(predicate_spec)
+
+    def execute(
+        self, runtime: "Runtime", env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """メイン実行ロジック"""
+        try:
+            from ..util.formatters import PrologFormatter
+            
+            # 述語指定を解析
+            predicate_name, arity = self._parse_predicate_spec(self.args[0], env, runtime)
+            if predicate_name is None:
+                return  # 解析失敗
+            
+            # フォーマッターを初期化
+            formatter = PrologFormatter(
+                variable_mapper=getattr(runtime, 'variable_mapper', None),
+                functor_mapper=getattr(runtime, 'functor_mapper', None)
+            )
+            
+            # 指定述語のルール・事実を整形
+            formatted_output = formatter.format_predicate_rules(runtime.rules, predicate_name, arity)
+            
+            # IOManagerを通じて出力
+            for char in formatted_output:
+                runtime.io_manager.write_char_to_current(char)
+            
+            # 成功
+            yield env
+            
+        except Exception as e:
+            logger.error(f"Error in listing/1: {e}", exc_info=True)
+            return  # 失敗時は何もyieldしない
+
+    def _parse_predicate_spec(self, spec: PrologType, env: BindingEnvironment, runtime: "Runtime") -> tuple:
+        """
+        述語指定を解析してname/arityを取得
+        
+        Args:
+            spec: 述語指定（例: person/2）
+            env: 環境
+            runtime: Runtime
+            
+        Returns:
+            (predicate_name, arity) または (None, None)
+        """
+        try:
+            # 変数の場合は参照解決
+            dereferenced_spec = runtime.logic_interpreter.dereference(spec, env)
+            
+            # functor/arity 形式のチェック
+            if isinstance(dereferenced_spec, Term):
+                if (isinstance(dereferenced_spec.functor, Atom) 
+                    and dereferenced_spec.functor.name == "/" 
+                    and len(dereferenced_spec.args) == 2):
+                    
+                    functor_arg = runtime.logic_interpreter.dereference(dereferenced_spec.args[0], env)
+                    arity_arg = runtime.logic_interpreter.dereference(dereferenced_spec.args[1], env)
+                    
+                    # ファンクター名の取得
+                    if isinstance(functor_arg, Atom):
+                        predicate_name = functor_arg.name
+                    else:
+                        logger.warning(f"Invalid functor in predicate spec: {functor_arg}")
+                        return (None, None)
+                    
+                    # アリティの取得（整数または整数値の浮動小数点を許可）
+                    if isinstance(arity_arg, Number) and arity_arg.value >= 0:
+                        # 浮動小数点でも整数値なら許可
+                        if float(arity_arg.value).is_integer():
+                            arity = int(arity_arg.value)
+                        else:
+                            logger.warning(f"Invalid arity in predicate spec: {arity_arg}")
+                            return (None, None)
+                    else:
+                        logger.warning(f"Invalid arity in predicate spec: {arity_arg}")
+                        return (None, None)
+                    
+                    return (predicate_name, arity)
+            
+            logger.warning(f"Invalid predicate specification format: {dereferenced_spec}")
+            return (None, None)
+            
+        except Exception as e:
+            logger.warning(f"Failed to parse predicate spec {spec}: {e}")
+            return (None, None)
+
+
+class ExportFactsPredicate(BuiltinPredicate):
+    """
+    export_facts/2述語実装
+    指定述語の事実データを外部形式でエクスポート
+    """
+
+    def __init__(self, predicate_spec: PrologType, file_spec: PrologType):
+        super().__init__(predicate_spec, file_spec)
+
+    def execute(
+        self, runtime: "Runtime", env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """メイン実行ロジック"""
+        try:
+            from ..util.data_exporter import DataExporter
+            
+            # 述語指定を解析
+            predicate_name, arity = self._parse_predicate_spec(self.args[0], env, runtime)
+            if predicate_name is None:
+                return  # 解析失敗
+            
+            # ファイル指定を取得
+            file_spec = runtime.logic_interpreter.dereference(self.args[1], env)
+            
+            # 指定述語の事実を抽出
+            target_facts = self._extract_facts(runtime.rules, predicate_name, arity, runtime)
+            
+            # エクスポーターでファイル出力
+            exporter = DataExporter(runtime)
+            success = exporter.export_facts(target_facts, file_spec)
+            
+            if success:
+                yield env  # 成功
+            else:
+                return  # 失敗
+                
+        except Exception as e:
+            logger.error(f"Error in export_facts/2: {e}", exc_info=True)
+            return  # 失敗時は何もyieldしない
+
+    def _parse_predicate_spec(self, spec: PrologType, env: BindingEnvironment, runtime: "Runtime") -> tuple:
+        """
+        述語指定を解析してname/arityを取得（listing/1と同じ）
+        
+        Args:
+            spec: 述語指定（例: person/2）
+            env: 環境
+            runtime: Runtime
+            
+        Returns:
+            (predicate_name, arity) または (None, None)
+        """
+        try:
+            # 変数の場合は参照解決
+            dereferenced_spec = runtime.logic_interpreter.dereference(spec, env)
+            
+            # functor/arity 形式のチェック
+            if isinstance(dereferenced_spec, Term):
+                if (isinstance(dereferenced_spec.functor, Atom) 
+                    and dereferenced_spec.functor.name == "/" 
+                    and len(dereferenced_spec.args) == 2):
+                    
+                    functor_arg = runtime.logic_interpreter.dereference(dereferenced_spec.args[0], env)
+                    arity_arg = runtime.logic_interpreter.dereference(dereferenced_spec.args[1], env)
+                    
+                    # ファンクター名の取得
+                    if isinstance(functor_arg, Atom):
+                        predicate_name = functor_arg.name
+                    else:
+                        logger.warning(f"Invalid functor in predicate spec: {functor_arg}")
+                        return (None, None)
+                    
+                    # アリティの取得（整数または整数値の浮動小数点を許可）
+                    if isinstance(arity_arg, Number) and arity_arg.value >= 0:
+                        # 浮動小数点でも整数値なら許可
+                        if float(arity_arg.value).is_integer():
+                            arity = int(arity_arg.value)
+                        else:
+                            logger.warning(f"Invalid arity in predicate spec: {arity_arg}")
+                            return (None, None)
+                    else:
+                        logger.warning(f"Invalid arity in predicate spec: {arity_arg}")
+                        return (None, None)
+                    
+                    return (predicate_name, arity)
+            
+            logger.warning(f"Invalid predicate specification format: {dereferenced_spec}")
+            return (None, None)
+            
+        except Exception as e:
+            logger.warning(f"Failed to parse predicate spec {spec}: {e}")
+            return (None, None)
+
+    def _extract_facts(self, rules: List[Union[Rule, Fact]], predicate_name: str, arity: int, runtime: "Runtime") -> List[Fact]:
+        """
+        指定述語の事実のみを抽出
+        
+        Args:
+            rules: 全ルール・事実リスト
+            predicate_name: 対象述語名
+            arity: 対象アリティ
+            runtime: Runtime
+            
+        Returns:
+            マッチする事実のリスト
+        """
+        facts = []
+        
+        for rule in rules:
+            try:
+                # 事実のみを対象とする
+                if not isinstance(rule, Fact):
+                    continue
+                
+                head = rule.head
+                
+                # 述語名・アリティをチェック
+                if self._matches_predicate(head, predicate_name, arity, runtime):
+                    facts.append(rule)
+                    
+            except Exception as e:
+                logger.warning(f"Error checking rule {rule}: {e}")
+                continue
+        
+        return facts
+
+    def _matches_predicate(self, term: Term, predicate_name: str, arity: int, runtime: "Runtime") -> bool:
+        """
+        項が指定述語にマッチするかチェック
+        
+        Args:
+            term: チェック対象の項
+            predicate_name: 対象述語名
+            arity: 対象アリティ
+            runtime: Runtime
+            
+        Returns:
+            マッチする場合True
+        """
+        try:
+            if isinstance(term, Term):
+                term_functor_name = self._get_functor_name(term.functor, runtime)
+                term_arity = len(term.args)
+            elif isinstance(term, Atom):
+                term_functor_name = self._get_functor_name(term, runtime)
+                term_arity = 0
+            else:
+                return False
+            
+            # 名前の完全一致またはマッピング一致をチェック
+            name_match = (term_functor_name == predicate_name)
+            
+            # ファンクターマッピングがある場合は双方向チェック
+            if not name_match and hasattr(runtime, 'functor_mapper') and runtime.functor_mapper:
+                # 日本語→英語マッピング
+                mapped_predicate = runtime.functor_mapper.map_non_ascii_to_english(predicate_name)
+                name_match = (term_functor_name == mapped_predicate)
+                
+                # 英語→日本語マッピング
+                if not name_match:
+                    mapped_term = runtime.functor_mapper.map_english_to_non_ascii(term_functor_name)
+                    name_match = (mapped_term == predicate_name)
+            
+            return name_match and term_arity == arity
+            
+        except Exception as e:
+            logger.warning(f"Error matching predicate for term {term}: {e}")
+            return False
+
+    def _get_functor_name(self, functor: PrologType, runtime: "Runtime") -> str:
+        """
+        ファンクターから名前を取得
+        
+        Args:
+            functor: ファンクター
+            runtime: Runtime
+            
+        Returns:
+            ファンクター名
+        """
+        if isinstance(functor, Atom):
+            functor_name = functor.name
+            
+            # ファンクターマッピングで日本語復元を試行
+            if hasattr(runtime, 'functor_mapper') and runtime.functor_mapper:
+                original_name = runtime.functor_mapper.map_english_to_non_ascii(functor_name)
+                return original_name
+            
+            return functor_name
+        else:
+            return str(functor)
