@@ -27,6 +27,9 @@ from pyprolog.runtime.builtins import (
     ReadLinePredicate,
     PeekCharPredicate,
     AtEndOfStreamPredicate,
+    ListingPredicate,
+    ListingWithPredicatePredicate,
+    ExportFactsPredicate,
 )
 from .io_manager import IOManager
 from .tracer import Tracer
@@ -640,6 +643,18 @@ class Runtime:
         elif functor_name == "retract" and len(processed_goal.args) == 1:
             retract_pred = DynamicRetractPredicate(processed_goal.args[0])
             for item in retract_pred.execute(self, env):  # self is runtime
+                yield item
+        elif functor_name == "listing" and len(processed_goal.args) == 0:
+            listing_pred = ListingPredicate()
+            for item in listing_pred.execute(self, env):
+                yield item
+        elif functor_name == "listing" and len(processed_goal.args) == 1:
+            listing_pred = ListingWithPredicatePredicate(processed_goal.args[0])
+            for item in listing_pred.execute(self, env):
+                yield item
+        elif functor_name == "export_facts" and len(processed_goal.args) == 2:
+            export_pred = ExportFactsPredicate(processed_goal.args[0], processed_goal.args[1])
+            for item in export_pred.execute(self, env):
                 yield item
         else:
             logger.debug(

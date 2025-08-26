@@ -182,3 +182,8 @@ class Fact:
 
     def __hash__(self):
         return hash(self.head)
+
+
+# Standard Prolog constants
+TRUE_TERM = Atom("true")
+FALSE_TERM = Atom("false")

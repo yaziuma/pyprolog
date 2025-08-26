@@ -1,5 +1,6 @@
 import os
 import sys
+import io
 
 try:
     from colorama import Fore, init
@@ -40,12 +41,20 @@ else:
     import tty
     import termios
 
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
+    try:
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+    except (io.UnsupportedOperation, OSError):
+        # テスト環境などでstdinがリダイレクトされている場合のフォールバック
+        fd = None
+        old_settings = None
 
     def wait_for_char():
+        if fd is None or old_settings is None:
+            # テスト環境などではフォールバック
+            return input("Press Enter to continue...")[:1] or " "
         try:
-            tty.setraw(sys.stdin.fileno())
+            tty.setraw(fd)
             ch = sys.stdin.read(1)
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
@@ -147,3 +156,19 @@ def run_repl(runtime):
                 print(failure(f"Error: {str(e)}"))
     except KeyboardInterrupt:
         print("\nExiting...")
+
+
+class REPL:
+    """Simple Prolog REPL wrapper class"""
+    
+    def __init__(self, runtime=None):
+        self.runtime = runtime
+    
+    def run(self):
+        """Run the REPL with the provided runtime"""
+        if self.runtime:
+            run_repl(self.runtime)
+        else:
+            from pyprolog.runtime.interpreter import Runtime
+            runtime = Runtime()
+            run_repl(runtime)

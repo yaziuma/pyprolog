@@ -147,3 +147,21 @@ class TermFunction(Term):
         # 実行前に関数を呼び出す
         self._execute_func()
         return super().match(other, bindings)
+
+
+class Dot(Term):
+    """リスト構築子 '.' を表すTerm"""
+    
+    def __init__(self, head, tail):
+        super().__init__(".", head, tail)
+        self.head = head
+        self.tail = tail
+
+
+class Bar(Term):
+    """リストの区切り文字 '|' を表すTerm"""
+    
+    def __init__(self, elements, tail):
+        super().__init__("|", *elements, tail)
+        self.elements = elements
+        self.tail = tail

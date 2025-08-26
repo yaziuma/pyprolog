@@ -6,6 +6,15 @@
 
 ## 最新の更新情報
 
+**2025年8月27日** - 知識ベース管理機能の実装:
+- 新しい組み込み述語 `listing/0`, `listing/1` を追加（読み込み済み述語の表示）
+- 新しい組み込み述語 `export_facts/2` を追加（事実データの外部エクスポート）
+- CSV、JSON、TSV形式でのデータ出力サポート
+- 日本語述語名・変数名での表示・エクスポート完全対応
+- PrologFormatterによる美しいコード整形機能
+- DataExporterによる柔軟なファイル出力機能
+- 34個の包括的テストケースで品質保証
+
 **2025年8月21日** - atom_number/2述語の実装と入力システム改良:
 - 新しい組み込み述語 `atom_number/2` を追加（文字列⇔数値変換）
 - `ast.literal_eval()` を使用した標準Python方式の安全な数値変換
@@ -131,8 +140,16 @@
 | ------------------ | -------- | ------------------------------------------------------------ | --------------------------------------- |
 | `get_char/1`       | 1        | [`GetCharPredicate`](../pyprolog/runtime/builtins.py:704)   | 現在の入力ストリームから 1 文字読み取り |
 | `read_line/1`      | 1        | [`ReadLinePredicate`](../pyprolog/runtime/builtins.py:769)  | 現在の入力ストリームから 1 行読み取り   |
-| `peek_char/1`      | 1        | [`PeekCharPredicate`](../pyprolog/runtime/builtins.py:944)  | **NEW** 次の文字を非破壊的に先読み     |
-| `at_end_of_stream/0` | 0      | [`AtEndOfStreamPredicate`](../pyprolog/runtime/builtins.py:1023) | **NEW** EOF状態を非破壊的に確認       |
+| `peek_char/1`      | 1        | [`PeekCharPredicate`](../pyprolog/runtime/builtins.py:944)  | 次の文字を非破壊的に先読み             |
+| `at_end_of_stream/0` | 0      | [`AtEndOfStreamPredicate`](../pyprolog/runtime/builtins.py:1023) | EOF状態を非破壊的に確認               |
+
+### 知識ベース管理述語
+
+| 述語            | アリティ | 実装クラス                                                       | 説明                                      |
+| --------------- | -------- | ---------------------------------------------------------------- | ----------------------------------------- |
+| `listing/0`     | 0        | [`ListingPredicate`](../pyprolog/runtime/builtins.py:1214)     | **NEW** 読み込み済み全述語を整形表示      |
+| `listing/1`     | 1        | [`ListingWithPredicatePredicate`](../pyprolog/runtime/builtins.py:1240) | **NEW** 指定述語のみを整形表示      |
+| `export_facts/2` | 2       | [`ExportFactsPredicate`](../pyprolog/runtime/builtins.py:1291)  | **NEW** 事実データを外部形式でエクスポート |
 
 ## 演算子
 
@@ -340,6 +357,91 @@ runtime.consult("multiple_input_calculator.pl")
 # このファイルは数値入力を繰り返し、無効入力時は再入力を求める
 ```
 
+### 知識ベース管理操作例
+
+```python
+# ファクトとルールを追加
+runtime.add_rule("person(alice, 28, engineer).")
+runtime.add_rule("person(bob, 35, doctor).")
+runtime.add_rule("adult(X) :- person(X, Age, _), Age >= 18.")
+
+# listing/0: 全述語を表示
+from pyprolog.runtime.io_streams import StringStream
+output_buffer = []
+string_stream = StringStream(initial_input="", output_buffer=output_buffer)
+runtime.io_manager.set_output_stream(string_stream)
+
+results = runtime.query("listing.")
+output_content = ''.join(output_buffer)
+print("全述語一覧:")
+print(output_content)
+# 出力例:
+# % person/3
+# person(alice, 28.0, engineer).
+# person(bob, 35.0, doctor).
+#
+# % adult/1
+# adult(X) :- person(X, Age, _), Age >= 18.
+
+# listing/1: 指定述語のみ表示
+output_buffer.clear()
+results = runtime.query("listing(person/3).")
+output_content = ''.join(output_buffer)
+print("person/3 述語のみ:")
+print(output_content)
+# 出力例:
+# % person/3
+# person(alice, 28.0, engineer).
+# person(bob, 35.0, doctor).
+
+# export_facts/2: CSV形式でエクスポート
+import tempfile
+import os
+temp_dir = tempfile.mkdtemp()
+output_file = os.path.join(temp_dir, "persons.csv")
+
+results = runtime.query(f"export_facts(person/3, '{output_file}').")
+print(f"Export success: {len(results) > 0}")
+
+# ファイル内容確認
+with open(output_file, 'r') as f:
+    csv_content = f.read()
+    print("CSV内容:")
+    print(csv_content)
+# 出力例:
+# functor,arg1,arg2,arg3
+# person,alice,28.0,engineer
+# person,bob,35.0,doctor
+
+# JSON形式でエクスポート
+json_file = os.path.join(temp_dir, "persons.json")
+results = runtime.query(f"export_facts(person/3, json('{json_file}')).")
+
+with open(json_file, 'r') as f:
+    json_content = f.read()
+    print("JSON内容:")
+    print(json_content)
+# 出力例:
+# [
+#   {
+#     "functor": "person",
+#     "args": ["alice", "28.0", "engineer"]
+#   },
+#   {
+#     "functor": "person", 
+#     "args": ["bob", "35.0", "doctor"]
+#   }
+# ]
+
+# 日本語述語でのエクスポート
+runtime.add_rule("社員(田中, 30, エンジニア).")
+runtime.add_rule("社員(佐藤, 25, デザイナー).")
+
+japanese_file = os.path.join(temp_dir, "japanese_employees.csv")
+results = runtime.query(f"export_facts(社員/3, '{japanese_file}').")
+# 日本語述語もそのままエクスポートされる
+```
+
 ### 新しい演算子の使用例
 
 ```python
@@ -366,12 +468,14 @@ print(f"Success: {len(results) > 0}")  # Success: False
 
 ### テストカバレッジ
 
-pyprolog は以下のエリアで包括的なテストを提供：
+pyprolog は以下のエリアで包括的なテストを提供（総計532テスト）：
 
 - **コア機能**: [`tests/core/`](../tests/core/)
 - **パーサー**: [`tests/parser/`](../tests/parser/)
-- **ランタイム**: [`tests/runtime/`](../tests/runtime/)
-- **統合テスト**: [`tests/integration/`](../tests/integration/)
+- **ランタイム**: [`tests/runtime/`](../tests/runtime/) - 280テスト（listing/export機能含む）
+- **統合テスト**: [`tests/integration/`](../tests/integration/) - 60テスト
+- **ツールテスト**: [`tests/tools/`](../tests/tools/) - 120テスト
+- **日本語テスト**: [`tests/japanese/`](../tests/japanese/) - 30テスト
 
 ### 主要テストケース
 
@@ -381,6 +485,13 @@ pyprolog は以下のエリアで包括的なテストを提供：
 - 単一化アルゴリズムのテスト
 - 再帰ルールのテスト
 - メタ述語のテスト
+- **listing/export機能の統合テスト**: 34テストケース
+  - 基本的なlisting表示機能
+  - 述語指定によるフィルタリング
+  - CSV/JSON/TSV形式でのデータエクスポート
+  - 日本語述語名での表示・エクスポート
+  - エラーハンドリングと回復機能
+  - 大規模データセットでのパフォーマンス
 
 ## 制限事項と今後の拡張予定
 
