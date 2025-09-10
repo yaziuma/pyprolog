@@ -23,7 +23,7 @@
 - **知識ベース管理**: listing述語による述語一覧表示、export機能によるデータ出力
 - **自動型変換**: 数値文字列の自動判定・変換機能
 - **高速CLIインターフェース**: インタラクティブREPLと一括処理
-- **豊富なI/O機能**: ファイル読み書き、ストリーム処理、複数回入力対応
+- **豊富なI/O機能**: ファイル読み書き、ストリーム処理、複数回入力対応、**入力待ち検知**
 - **メタ述語サポート**: `findall/3`, 動的述語管理
 
 ## 📊 プロジェクト状況（最新）
@@ -104,6 +104,24 @@ results = tool.search("patient", search_type="predicate")
 from pyprolog.tools.validate_tool import ValidateTool
 tool = ValidateTool(runtime)
 issues = tool.validate(check_type="all")
+```
+
+### 入力待ち検知: 動的入力対応 (NEW) ✅
+```python
+from pyprolog.runtime.interpreter import Runtime
+from pyprolog.runtime.io_streams import IOStream
+
+# カスタム入力ハンドラで入力待ちを検知（動作確認済み）
+class MyInputHandler(IOStream):
+    def read_line(self):
+        print("🔍 入力待ちを検知しました！")
+        return get_input_from_gui()  # GUI、Web、DB等から取得
+    # その他メソッド実装...
+
+runtime = Runtime()
+runtime.io_manager.set_input_stream(MyInputHandler())
+
+# 📖 詳細ガイド: docs/入力待ち検知ガイド.md（推奨方法のみ記載）
 ```
 
 ## 📋 インストール・セットアップ
@@ -671,8 +689,10 @@ skip_whitespace :-
 
 ### プロジェクト内ドキュメント
 - [`CLAUDE.md`](CLAUDE.md): 開発者向け詳細ガイド
-- [`docs/tool_enhancement_proposals/`](docs/tool_enhancement_proposals/): ツール設計書
-- [`sample_usage/`](sample_usage/): 使用例とデモ
+- [`docs/入力待ち検知ガイド.md`](docs/入力待ち検知ガイド.md): **NEW** 入力待ち検知・動的入力の完全ガイド
+- [`docs/pyprolog_実装済み機能・述語リスト.md`](docs/pyprolog_実装済み機能・述語リスト.md): 実装済み機能・述語の詳細リスト
+- [`docs/examples/`](docs/examples/): 実用的な使用例とサンプルコード
+- [`sample_usage/`](sample_usage/): 基本使用例とデモ
 - [`tests/`](tests/): 包括的なテスト例
 
 ### 外部リンク
