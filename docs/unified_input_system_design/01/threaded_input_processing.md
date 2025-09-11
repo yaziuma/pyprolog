@@ -117,38 +117,31 @@ def _prolog_execution_thread(self, query: str):
 
 def _execute_query_with_input_support(self, query: str):
     """入力対応クエリ実行"""
-    try:
-        # 通常のProlog実行
-        return self.interpreter.query(query)
-        
-    except InputRequiredException as e:
-        # 入力要求処理
-        input_value = self._handle_input_request(e)
-        
-        # 入力値でProlog実行継続
-        return self._continue_with_input(input_value)
+    # 通常のProlog実行
+    # request_input()呼び出し時に自動的にスレッドブロッキング
+    return self.interpreter.query(query)
 
-def _handle_input_request(self, input_exception) -> str:
-    """入力要求処理（ブロッキング）"""
+def request_input(self, input_type: str, predicate_name: str, **kwargs) -> str:
+    """入力要求処理（直接ブロッキング）"""
     # 入力要求を設定
     self.input_request = InputRequest(
-        input_type=input_exception.input_type,
-        predicate_name=input_exception.predicate_name,
-        prompt=input_exception.prompt,
+        input_type=input_type,
+        predicate_name=predicate_name,
+        prompt=kwargs.get("prompt", "入力: "),
         timestamp=time.time()
     )
     
     with self.state_lock:
         self.execution_state = ExecutionState.WAITING_INPUT
     
-    # 通信スレッドに通知
+    # 入力処理スレッドに通知
     self.input_event.set()
     
-    # 入力応答を待機（ブロッキング）
+    # 入力応答を待機（直接ブロッキング）
     self.response_event.wait()
     self.response_event.clear()
     
-    # 応答を取得
+    # 応答を取得して自然にreturn
     response = self.input_response
     self.input_response = None
     
@@ -340,13 +333,16 @@ class ThreadedInputHandler(InputHandler):
     
     def handle_input_request(self, event: InputEvent) -> Optional[str]:
         """入力要求処理（真の継続実行）"""
-        # この例外により、Prologスレッドは一時停止
-        # しかし、スタックフレームは完全に保持される
-        raise InputRequiredException(
-            input_type=event.input_type,
-            predicate_name=event.predicate_name,
-            prompt=event.args.get("prompt", "入力: ")
-        )
+        # 標準入力、GUI、MCP等での実際の入力処理
+        # 例: 標準入力の場合
+        prompt = event.args.get("prompt", f"{event.predicate_name}: ")
+        return input(prompt)
+        
+        # 例: GUIの場合
+        # return self.gui_dialog.get_input(prompt)
+        
+        # 例: MCP統合の場合 
+        # return self.mcp_handler.request_input_from_client(event)
 
 # Runtime統合
 class ContinuationRuntime(Runtime):
