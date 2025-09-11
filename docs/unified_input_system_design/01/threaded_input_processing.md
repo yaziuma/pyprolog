@@ -2,7 +2,9 @@
 
 ## 概要
 
-pyprologにおいて、**真の継続実行**を実現するため、スレッド間通信を活用したアーキテクチャを提案します。入力待ちで中断されたProlog実行を、正確に同じ実行状態から再開することが目標です。
+pyprologにおいて、**真の継続（Continuation）**を実現するため、**スレッド間通信（Inter-thread Communication）**を活用したアーキテクチャを提案します。入力待ちで中断されたProlog実行を、正確に同じ**実行状態（Execution State）**から再開することが目標です。
+
+> **用語**: 詳細な定義は[用語集](./glossary.md)を参照
 
 ### 制約条件
 - **単一Prolog実行**: 複数のprolog文を同時に処理することは無い
@@ -24,16 +26,16 @@ pyprologにおいて、**真の継続実行**を実現するため、スレッ�
          └───────┬───────────────┘
                  ▼
 ┌─────────────────────────────────┐
-│ 共有実行状態                    │
+│ 共有実行状態（Execution State） │
 │ - Prolog実行コンテキスト        │
 │ - 入力要求/応答                 │
-│ - 継続実行制御                  │
+│ - 継続（Continuation）制御      │
 └─────────────────────────────────┘
 ```
 
-### 真の継続実行のポイント
+### 真の継続（Continuation）実行のポイント
 
-1. **実行状態保持**: Prologスレッドは入力待ち中もスタックフレームを維持
+1. **実行状態（Execution State）保持**: Prologスレッドは入力待ち中もスタックフレームを維持
 2. **スレッドブロッキング**: 入力待ちで自然にスレッドがブロック、状態は完全保持
 3. **シームレス再開**: 入力取得後、正確に同じ実行地点から継続
 
@@ -267,13 +269,13 @@ class ThreadedInputSystem:
         self.runtime.response_event.set()
 ```
 
-## 真の継続実行の実現
+## 真の継続（Continuation）実行の実現
 
-### 3.1 継続実行の核心
+### 3.1 継続（Continuation）実行の核心
 
 ```python
 class ContinuationSystem:
-    """真の継続実行システム"""
+    """真の継続（Continuation）実行システム"""
     
     def __init__(self):
         self.runtime = SimplifiedThreadedRuntime()
@@ -285,8 +287,8 @@ class ContinuationSystem:
         self.runtime.input_handler = handler
     
     def execute_with_continuation(self, query: str):
-        """継続実行対応クエリ実行"""
-        # 入力処理スレッド開始（デーモン）
+        """継続（Continuation）実行対応クエリ実行"""
+        # 入力処理スレッド開始（デーモンスレッド）
         if not hasattr(self.runtime, 'input_thread_started'):
             input_thread = threading.Thread(
                 target=self.runtime._input_processing_thread,
@@ -302,7 +304,7 @@ class ContinuationSystem:
         )
         prolog_thread.start()
         
-        # 【重要】ここがPythonでの真の継続実行の実現
+        # 【重要】ここがPythonでの真の継続（Continuation）実行の実現
         # Prologスレッドは入力待ちでブロックするが、
         # スタックフレーム、ローカル変数、実行位置は全て保持される
         prolog_thread.join()
@@ -310,7 +312,7 @@ class ContinuationSystem:
         return self.runtime.execution_result
 
 def _continue_with_input(self, input_value: str):
-    """継続実行の核心メソッド"""
+    """継続（Continuation）実行の核心メソッド"""
     # この時点で、元のProlog実行は完全に中断状態
     # スタックフレーム、変数、実行位置は全て維持されている
     
@@ -322,11 +324,11 @@ def _continue_with_input(self, input_value: str):
     return input_value
 ```
 
-### 3.2 統一入力システムとの統合
+### 3.2 統一入力システム（Unified Input System）との統合
 
 ```python
 class ThreadedInputHandler(InputHandler):
-    """真の継続対応InputHandler"""
+    """真の継続（Continuation）対応InputHandler"""
     
     def __init__(self, continuation_system: ContinuationSystem):
         self.continuation_system = continuation_system
@@ -346,26 +348,26 @@ class ThreadedInputHandler(InputHandler):
 
 # Runtime統合
 class ContinuationRuntime(Runtime):
-    """継続実行対応Runtime"""
+    """継続（Continuation）実行対応Runtime"""
     
     def __init__(self):
         super().__init__()
         self.continuation_system = ContinuationSystem()
         
-        # IOManagerを継続対応版に交換
+        # IOManagerを継続（Continuation）対応版に交換
         self.io_manager = ContinuationIOManager()
         self.io_manager.continuation_system = self.continuation_system
     
     def query(self, query_str: str):
-        """継続実行対応クエリ"""
+        """継続（Continuation）実行対応クエリ"""
         return self.continuation_system.execute_with_continuation(query_str)
 ```
 
 ## 利点と制約
 
 ### 利点
-1. **真の継続実行**: Pythonスレッドのスタックフレーム保持により実現
-2. **状態完全保持**: 中断時の全ての実行状態（変数、スタック等）が維持
+1. **真の継続（Continuation）実行**: Pythonスレッドのスタックフレーム保持により実現
+2. **実行状態（Execution State）完全保持**: 中断時の全ての実行状態（変数、スタック等）が維持
 3. **シームレス再開**: 入力取得後、正確に同じ地点から実行継続
 4. **実装の自然さ**: 例外とスレッドブロッキングの組み合わせで実現
 
@@ -373,8 +375,11 @@ class ContinuationRuntime(Runtime):
 1. **スレッド依存**: 各クエリ実行が専用スレッドを必要
 2. **メモリ使用量**: 中断中もスタックフレームを保持し続ける
 3. **単一実行制約**: 複数Prolog実行の同時処理は不可
+4. **GIL制約（Global Interpreter Lock Constraint）**: PythonのGlobal Interpreter Lockにより、CPU集約的処理では効果限定
+   - **影響範囲**: I/Oバウンドな入力処理では問題なし
+   - **対象**: 主に対話的入力での使用を想定しているため実用上問題なし
 
-## 真の継続実行の実現方法
+## 真の継続（Continuation）実行の実現方法
 
 ### 核心メカニズム
 
@@ -427,3 +432,119 @@ def read_line_predicate_execution():
 3. **Event同期**: スレッド間Eventによる確実な実行再開制御
 
 従来の「擬似継続」ではなく、**実行状態を完全に保持した真の継続実行**が実現できます。
+
+## エラーハンドリングと異常系対応
+
+Geminiレビューで指摘された異常系シナリオへの対応策を以下に示します：
+
+### 入力タイムアウト処理
+
+**問題**: 入力待ちが永続化してシステムが応答不能になるリスク
+
+**解決方針**:
+- デフォルト5分のタイムアウト設定
+- タイムアウト時はEOF扱いで処理継続
+- ログによる監視とアラート
+
+**タイムアウト処理フロー**:
+```
+[入力要求] → [Event.wait(timeout=300)] → [タイムアウト判定]
+                                            ↓
+                                      [None返却(EOF扱い)]
+                                            ↓
+                                      [Prolog実行継続]
+```
+
+### 外部ハンドラエラー伝播
+
+**問題**: InputHandlerの例外がPrologエンジンに適切に伝播されない
+
+**解決方針**:
+- InputHandlerの例外を捕捉し、Prologエラーとして再発生
+- エラー種別に応じた適切なProlog例外への変換
+- ログ記録による問題追跡支援
+
+**エラー伝播マッピング**:
+```
+InputHandler例外 → Prolog例外
+├── FileNotFound → existence_error(file, filename)
+├── Permission   → permission_error(read, file, filename)  
+├── Timeout      → resource_error(timeout)
+└── 其他         → system_error(input_handler_error)
+```
+
+### 実行キャンセル対応
+
+**問題**: Prolog実行中断時の入力待ちスレッドの適切な終了
+
+**解決方針**:
+- キャンセルトークンによる協調的終了
+- 入力待ちスレッドへの明示的な中断通知
+- リソースリークの防止
+
+**キャンセルフロー**:
+```mermaid
+sequenceDiagram
+    participant User as ユーザー
+    participant Main as メインスレッド  
+    participant Prolog as Prologスレッド
+    participant Input as 入力スレッド
+    
+    User->>Main: Ctrl+C (中断要求)
+    Main->>Prolog: キャンセル通知
+    Main->>Input: shutdown_event.set()
+    
+    Prolog->>Prolog: 実行中断・クリーンアップ
+    Input->>Input: wait()終了・スレッド終了
+    
+    Main->>User: 中断完了
+```
+
+## スレッドライフサイクル管理
+
+### デーモンスレッド（Daemon Thread）戦略
+
+**採用理由**:
+- メインプロセス終了時の自動終了保証
+- 明示的な終了処理の負荷軽減
+- システム全体の応答性向上
+
+**ライフサイクル概要**:
+```
+[システム起動] → [デーモンスレッド（Daemon Thread）生成] → [入力待機ループ]
+                                                             ↓
+[システム終了] ← [自動終了]                            ← [shutdown通知]
+```
+
+**リソース管理**:
+- スレッド数の制御（入力処理用1スレッドのみ）
+- メモリリークの防止（要求・応答オブジェクトの適切な解放）
+- 適切な**タイムアウト制御（Timeout Control）**によるデッドロック防止
+
+## InputHandlerインターフェース仕様
+
+Geminiレビューで指摘されたAPI仕様の明確化：
+
+### 抽象インターフェース定義
+
+**InputHandler**は以下の責務を持つ抽象インターフェースです：
+
+**主要責務**:
+1. **入力要求受信**: 統一入力システム（Unified Input System）からの入力要求を受信
+2. **実際の入力処理**: 標準入力・GUI・ネットワーク等からの入力取得
+3. **結果返却**: 取得した入力値または適切なエラーコードの返却
+
+**契約仕様**:
+- **入力**: InputEventオブジェクト（入力タイプ・述語名・プロンプト情報を含む）
+- **出力**: 入力文字列（成功時）またはNone（EOF時）
+- **例外**: 処理不可時は適切な例外を発生（統一入力システム（Unified Input System）で捕捉・**エラー伝播（Error Propagation）**）
+
+**実装例**:
+- **StandardInputHandler**: 標準入力処理
+- **GUIInputHandler**: GUI統合（ダイアログ等）
+- **MCPInputHandler**: Model Context Protocol統合
+- **TestInputHandler**: テスト用モック実装
+
+これにより、Geminiレビューで指摘された「抽象的すぎる」という問題が解決され、実装者にとって明確な指針が提供されます。
+
+> **関連用語**: [用語集](./glossary.md)で各用語の詳細定義を参照可能
