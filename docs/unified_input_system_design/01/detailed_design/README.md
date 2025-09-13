@@ -19,6 +19,7 @@ Phase 1では、**真の継続（Continuation）実行**を実現する**統一�
 - [06_threading_system.md](./06_threading_system.md) - スレッド間通信（Inter-thread Communication）システム
 
 ### 品質保証
+- [../test_specification.md](../test_specification.md) - テスト仕様書（実装前TDD）
 - [07_testing_strategy.md](./07_testing_strategy.md) - テスト戦略と実装計画
 - [08_compatibility.md](./08_compatibility.md) - 既存コードとの互換性保証
 
