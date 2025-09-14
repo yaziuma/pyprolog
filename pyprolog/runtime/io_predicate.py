@@ -118,7 +118,10 @@ class IOPredicate(BuiltinPredicate, ABC):
             yield from self._unify_with_argument(runtime, env, target_term)
             
         except Exception as e:
-            # エラーログ出力後、述語失敗
+            # テスト用例外（PrologInputRequiredException）は再発生させる
+            if "PrologInputRequiredException" in e.__class__.__name__:
+                raise
+            # その他のエラーはログ出力後、述語失敗
             logger.error(f"{self._get_predicate_name()}/1 execution error: {e}")
             return  # 述語失敗（何もyieldしない）
     
