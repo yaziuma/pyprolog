@@ -61,6 +61,7 @@ class ThreadingController:
         self.input_event = threading.Event()
         self.response_event = threading.Event()
         self.state_lock = threading.Lock()
+        self.request_lock = threading.Lock()  # 要求排他制御
         
         # データ交換
         self.input_request: Optional[InputRequest] = None
@@ -115,33 +116,35 @@ class ThreadingController:
         if not self.enabled:
             raise RuntimeError("ThreadingController not enabled")
         
-        # 要求データ設定
-        event_id = str(uuid.uuid4())
-        with self.state_lock:
-            self.input_request = InputRequest(
-                input_type=input_type,
-                predicate_name=predicate_name,
-                prompt=prompt,
-                timestamp=time.time(),
-                event_id=event_id,
-                additional_params=kwargs
-            )
-            self.input_response = None
-        
-        # 入力処理スレッドに通知
-        self.input_event.set()
-        
-        # 応答待ち（テスト用に短いタイムアウト）
-        response_received = self.response_event.wait(timeout=5.0)
-        
-        if not response_received:
-            return None
-        
-        # 応答取得
-        with self.state_lock:
-            response = self.input_response
-            self.input_response = None
-            self.response_event.clear()
+        # 複数要求の順次処理を保証する排他制御
+        with self.request_lock:
+            # 要求データ設定
+            event_id = str(uuid.uuid4())
+            with self.state_lock:
+                self.input_request = InputRequest(
+                    input_type=input_type,
+                    predicate_name=predicate_name,
+                    prompt=prompt,
+                    timestamp=time.time(),
+                    event_id=event_id,
+                    additional_params=kwargs
+                )
+                self.input_response = None
+            
+            # 入力処理スレッドに通知
+            self.input_event.set()
+            
+            # 応答待ち（テスト用に短いタイムアウト）
+            response_received = self.response_event.wait(timeout=5.0)
+            
+            if not response_received:
+                return None
+            
+            # 応答取得
+            with self.state_lock:
+                response = self.input_response
+                self.input_response = None
+                self.response_event.clear()
         
         if response and response.success:
             return response.value
@@ -255,21 +258,20 @@ class UnifiedInputSystem:
         """統一入力要求（メインAPI）"""
         self.request_count += 1
         
-        try:
-            if self.threading_enabled:
-                # マルチスレッドモード
+        if self.threading_enabled:
+            # マルチスレッドモード
+            try:
                 return self.threading_controller.request_input(
                     input_type, predicate_name, prompt, **kwargs
                 )
-            else:
-                # シングルスレッドモード
-                return self._request_input_sync(
-                    input_type, predicate_name, prompt, **kwargs
-                )
-                
-        except Exception as e:
-            self.error_count += 1
-            return self._fallback_input(prompt)
+            except Exception as e:
+                self.error_count += 1
+                return self._fallback_input(prompt)
+        else:
+            # シングルスレッドモード - 例外をそのまま通す
+            return self._request_input_sync(
+                input_type, predicate_name, prompt, **kwargs
+            )
     
     def _request_input_sync(
         self, 
@@ -280,17 +282,22 @@ class UnifiedInputSystem:
     ) -> Optional[str]:
         """シングルスレッド同期入力処理"""
         if not self.input_handler:
+            self.error_count += 1
             return self._fallback_input(prompt)
         
-        event = InputEvent(
-            input_type=input_type,
-            predicate_name=predicate_name,
-            args={"prompt": prompt, **kwargs},
-            timestamp=time.time(),
-            event_id=str(uuid.uuid4())
-        )
-        
-        return self.input_handler.handle_input_request(event)
+        try:
+            event = InputEvent(
+                input_type=input_type,
+                predicate_name=predicate_name,
+                args={"prompt": prompt, **kwargs},
+                timestamp=time.time(),
+                event_id=str(uuid.uuid4())
+            )
+            
+            return self.input_handler.handle_input_request(event)
+        except Exception as e:
+            self.error_count += 1
+            return self._fallback_input(prompt)
     
     def _fallback_input(self, prompt: str) -> Optional[str]:
         """フォールバック入力処理"""
@@ -317,6 +324,7 @@ class UnifiedInputSystem:
         """システムシャットダウン"""
         if self.threading_enabled:
             self.threading_controller.disable()
+            self.threading_enabled = False
 
 
 # テスト用InputHandler実装

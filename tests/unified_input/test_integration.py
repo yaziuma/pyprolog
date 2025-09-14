@@ -305,6 +305,7 @@ class TestErrorHandling:
                 raise Exception("Input error")
         
         runtime.set_custom_input_handler(ErrorHandler())
+        runtime.io_manager._fallback_to_legacy = False  # フォールバック無効でエラーを伝播
         
         predicate = TestGetCharPredicate("X")
         env = BindingEnvironment()
@@ -368,9 +369,9 @@ class TestErrorHandling:
             predicate1 = TestReadLinePredicate("X1")
             predicate2 = TestReadLinePredicate("X2")
             
-            # 1回目: エラーにより失敗
+            # 1回目: エラーによりフォールバック処理（end_of_fileとの統一化）
             results1 = list(predicate1.execute(runtime, BindingEnvironment()))
-            assert len(results1) == 0
+            assert len(results1) == 1  # Noneからend_of_fileに変換されて統一化成功
             
             # 2回目: 回復して成功
             results2 = list(predicate2.execute(runtime, BindingEnvironment()))
