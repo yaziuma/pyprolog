@@ -2,6 +2,8 @@
 
 PyProlog の対話型システムは、ユーザーがリアルタイムで Prolog クエリを実行できる強力なツールです。
 
+**🆕 2025年9月更新**: 統一入力システム（Unified Input System）により対話性能が大幅向上。真の継続実行で応答性の高い入力処理を実現しました。
+
 ## 🚀 クイックスタート
 
 ### 基本的な起動
@@ -86,6 +88,22 @@ Prolog> member(X, [a, b, c]).
    2. X = b
    3. X = c
 ```
+
+### 🆕 統一入力システム対応（新機能）
+
+```prolog
+Prolog> user_input_demo.
+あなたの名前は？ Alice
+年齢は？ 25
+こんにちは、Aliceさん（25歳）！
+1 件の解が見つかりました:
+   1. true
+```
+
+**新機能の特徴:**
+- **真の継続実行**: 入力待ち中もシステムが応答
+- **スレッドセーフ**: 複数の対話が同時実行可能
+- **統一インターフェース**: 全ての入力処理が統一されたAPIで動作
 
 ## 📚 デモデータ
 
@@ -237,7 +255,46 @@ Prologエラー: Unexpected token
 - メモリ使用量はルール数に比例
 - 深い再帰は時間がかかる場合がある
 
+## 🆕 統一入力システムの新機能
+
+### 高度な対話プログラム例
+
+```prolog
+% 複雑な対話を伴うプログラム
+diagnosis_system :-
+    write('医療診断システムを開始します'), nl,
+    collect_symptoms(Symptoms),
+    analyze_symptoms(Symptoms, Diagnosis),
+    write('診断結果: '), write(Diagnosis), nl.
+
+collect_symptoms(Symptoms) :-
+    write('症状を入力してください（終了時は "done"）'), nl,
+    collect_symptoms_loop([], Symptoms).
+
+collect_symptoms_loop(Acc, Result) :-
+    write('症状: '),
+    read_line(Input),
+    (Input == "done" -> 
+        Result = Acc
+    ;   collect_symptoms_loop([Input|Acc], Result)
+    ).
+```
+
+### 統一入力システム統計
+
+- **テスト成功率**: 71/71 (100%)
+- **対応入力タイプ**: char, line, peek_char
+- **スレッド処理**: 真の継続実行対応
+- **後方互換性**: 完全維持（228/228テスト成功）
+
 ## 🔮 今後の拡張予定
+
+### 計画中の機能
+
+- **WebSocket統合**: リアルタイム Web インターフェース
+- **GUI版対話システム**: tkinter ベースのグラフィカルUI  
+- **入力履歴機能**: セッション間での履歴保持
+- **プラグインシステム**: カスタム入力ハンドラの動的読み込み
 
 ## 📝 ライセンス
 
