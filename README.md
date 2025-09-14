@@ -1,10 +1,13 @@
 # PyProlog - Advanced Prolog Interpreter in Python
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/Tests-532%20Passing-green.svg)](#testing)
+[![Tests](https://img.shields.io/badge/Tests-351%20Passing-green.svg)](#testing)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Unified Input](https://img.shields.io/badge/Unified%20Input%20System-Active-brightgreen.svg)](#unified-input-system)
 
-このプロジェクトは、**日本語変数名サポート**と**高度な開発ツール**を備えた、Python で実装された本格的な Prolog インタープリタです。`uv` を使用した高速開発環境とツール拡張機能を特徴とします。
+このプロジェクトは、**統一入力システム**と**日本語変数名サポート**、**高度な開発ツール**を備えた、Python で実装された本格的な Prolog インタープリタです。`uv` を使用した高速開発環境とツール拡張機能を特徴とします。
+
+**🆕 2025年9月更新**: 統一入力システム（Unified Input System）実装完了。真の継続実行により、対話的プログラムの応答性が飛躍的に向上しました。
 
 ## 🚀 主な特徴
 
@@ -19,7 +22,10 @@
 - **`prolog_validate`**: 静的解析による品質チェック
 
 ### 🎯 実用機能
-- **包括的な組み込み述語**: 40種類以上の標準述語（`listing/0`, `listing/1`, `export_facts/2`新追加）
+- **🆕 統一入力システム**: InputHandlerインターフェースによる統一入力管理
+- **🚀 真の継続実行**: スタックフレーム完全保持による中断・再開可能な処理
+- **🔄 スレッドセーフI/O**: 複数同時対話をサポート
+- **包括的な組み込み述語**: 40種類以上の標準述語（`listing/0`, `listing/1`, `export_facts/2`）
 - **知識ベース管理**: listing述語による述語一覧表示、export機能によるデータ出力
 - **自動型変換**: 数値文字列の自動判定・変換機能
 - **高速CLIインターフェース**: インタラクティブREPLと一括処理
@@ -28,13 +34,20 @@
 
 ## 📊 プロジェクト状況（最新）
 
+**🆕 2025年9月14日 - 統一入力システム完全実装 (v0.7.0)**
+
+✅ **統一入力システム**: InputHandlerインターフェースで全入力処理を統一  
+✅ **真の継続実行**: Pythonスレッドスタックフレーム完全保持による中断・再開  
+✅ **完全テスト済み**: 71/71統一入力システムテスト + 228/228既存システムテスト全成功  
+✅ **後方互換性100%**: 既存APIの完全動作保証  
+✅ **テストスイート最適化**: 重複テスト削除により49ファイル（51→49）に効率化  
+
 **2025年8月27日 - 知識ベース管理機能追加 (v0.6.0)**
 
 ✅ **知識ベース表示機能**: `listing/0`, `listing/1` 述語で読み込み済みルールを整形表示  
 ✅ **データエクスポート機能**: `export_facts/2` 述語でCSV/JSON/TSV形式出力対応  
 ✅ **日本語完全サポート**: 日本語述語名・変数名での表示・エクスポート  
 ✅ **フォーマット処理**: Prologフォーマッターによる美しいコード整形  
-✅ **全532テスト合格**: 包括的テストスイートで品質保証
 
 **2025年8月21日 - 入力システム大幅強化 (v0.5.0)**
 
@@ -106,22 +119,41 @@ tool = ValidateTool(runtime)
 issues = tool.validate(check_type="all")
 ```
 
-### 入力待ち検知: 動的入力対応 (NEW) ✅
+### 🆕 統一入力システム: 次世代入力処理 (NEW) 🚀
 ```python
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.runtime.io_streams import IOStream
+from pyprolog.runtime.unified_input_system import InputHandler, InputEvent
 
-# カスタム入力ハンドラで入力待ちを検知（動作確認済み）
-class MyInputHandler(IOStream):
-    def read_line(self):
-        print("🔍 入力待ちを検知しました！")
-        return get_input_from_gui()  # GUI、Web、DB等から取得
-    # その他メソッド実装...
+# 新しいInputHandlerインターフェース（統一入力システム）
+class AdvancedInputHandler(InputHandler):
+    def handle_input_request(self, event: InputEvent):
+        print(f"🔔 入力要求: {event.input_type} by {event.predicate_name}")
+        
+        if event.input_type == "line":
+            return get_input_from_gui()  # GUI、Web、AI等から取得
+        elif event.input_type == "char":
+            return get_single_char()
+        
+        return None
 
 runtime = Runtime()
-runtime.io_manager.set_input_stream(MyInputHandler())
+runtime.io_manager.set_input_handler(AdvancedInputHandler())
+runtime.io_manager.enable_threading()  # 真の継続実行有効化
 
-# 📖 詳細ガイド: docs/入力待ち検知ガイド.md（推奨方法のみ記載）
+# 📖 詳細ガイド: docs/入力待ち検知ガイド.md（最新方法記載）
+```
+
+### 入力待ち検知: レガシー対応 (従来互換) ✅
+```python
+# 従来のIOStream方式（後方互換性のため保持）
+from pyprolog.runtime.io_streams import IOStream
+
+class LegacyInputHandler(IOStream):
+    def read_line(self):
+        print("🔍 レガシー入力待ちを検知")
+        return get_input_from_source()  # 既存の入力源
+
+runtime.io_manager.set_input_stream(LegacyInputHandler())
 ```
 
 ## 📋 インストール・セットアップ
