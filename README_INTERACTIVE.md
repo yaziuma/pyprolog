@@ -9,19 +9,19 @@ PyProlog の対話型システムは、ユーザーがリアルタイムで Prol
 ### 基本的な起動
 
 ```bash
-uv run interactive_prolog.py
+uv run python -m pyprolog.cli.interactive_repl
 ```
 
-### デモモードで起動
+### 対話型REPLで起動
 
 ```bash
-uv run interactive_prolog.py --demo
+uv run python -m pyprolog.cli.repl
 ```
 
-### Prolog ファイルを読み込んで起動
+### Prolog ファイルを読み込んで実行
 
 ```bash
-uv run interactive_prolog.py -f sample_usage/family.pl
+uv run python -m pyprolog.cli.prolog sample_usage/family.pl
 ```
 
 ## 📋 主な機能
@@ -151,18 +151,21 @@ pip install colorama
 
 ```
 pyprolog/
-├── interactive_prolog.py          # メインエントリーポイント
-├── prolog/
+├── pyprolog/
 │   ├── cli/
-│   │   └── simple_interactive.py  # 対話システム実装
+│   │   ├── interactive_repl.py    # 対話システム実装
+│   │   ├── repl.py                # REPL実装
+│   │   └── prolog.py              # CLIエントリーポイント
 │   ├── runtime/
-│   │   └── interpreter.py         # Prologランタイム
+│   │   ├── interpreter.py         # Prologランタイム
+│   │   └── unified_input_system.py # 統一入力システム
 │   └── parser/
 │       ├── parser.py              # 構文解析器
 │       └── scanner.py             # 字句解析器
 ├── sample_usage/                  # サンプルファイル
 └── docs/
-    └── interactive_usage_guide.md # 詳細ガイド
+    ├── 入力待ち検知ガイド.md      # 入力システムガイド
+    └── unified_input_system_design/ # 設計ドキュメント
 ```
 
 ## 🎯 高度な使用方法
@@ -231,10 +234,11 @@ Prologエラー: Unexpected token
 
 ### Prolog 初心者向け
 
-1. デモモードで起動: `python interactive_prolog.py --demo`
-2. 基本クエリから始める: `parent(X, Y).`
-3. ルールを理解する: `grandparent(X, Y).`
-4. 条件付きクエリを試す: `happy(X).`
+1. 対話モードで起動: `uv run python -m pyprolog.cli.interactive_repl`
+2. サンプルファイル読み込み: `:load sample_usage/family.pl`
+3. 基本クエリから始める: `parent(X, Y).`
+4. ルールを理解する: `grandparent(X, Y).`
+5. 条件付きクエリを試す: `happy(X).`
 
 ### 上級ユーザー向け
 
@@ -308,8 +312,9 @@ collect_symptoms_loop(Acc, Result) :-
 
 **📞 サポート**
 
-- ドキュメント: `docs/interactive_usage_guide.md`
-- サンプル: `sample_usage/` ディレクトリ
-- 問題報告: GitHub の Issue トラッカー
+- **入力システムガイド**: `docs/入力待ち検知ガイド.md`
+- **統一入力システム設計**: `docs/unified_input_system_design/`
+- **サンプル**: `sample_usage/` ディレクトリ
+- **問題報告**: GitHub の Issue トラッカー
 
 **🎉 楽しい Prolog プログラミングを！**
