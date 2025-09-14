@@ -1474,3 +1474,62 @@ class ExportFactsPredicate(BuiltinPredicate):
             return functor_name
         else:
             return str(functor)
+
+
+# ============================================================================
+# 統一入力システム対応版入出力述語
+# ============================================================================
+
+# 新しいIOPredicate実装をインポート
+try:
+    from .io_predicates import (
+        GetCharPredicate as UnifiedGetCharPredicate,
+        ReadLinePredicate as UnifiedReadLinePredicate,
+        PeekCharPredicate as UnifiedPeekCharPredicate
+    )
+    
+    # 統一入力システム対応版が利用可能
+    UNIFIED_INPUT_AVAILABLE = True
+    
+except ImportError as e:
+    logger.warning(f"Unified input system not available: {e}")
+    UNIFIED_INPUT_AVAILABLE = False
+
+
+def create_get_char_predicate(arg: PrologType) -> BuiltinPredicate:
+    """
+    get_char/1述語のファクトリ関数
+    
+    統一入力システムが利用可能な場合は統一版を、
+    そうでなければ従来版を返す。
+    """
+    if UNIFIED_INPUT_AVAILABLE:
+        return UnifiedGetCharPredicate(arg)
+    else:
+        return GetCharPredicate(arg)
+
+
+def create_read_line_predicate(arg: PrologType) -> BuiltinPredicate:
+    """
+    read_line/1述語のファクトリ関数
+    
+    統一入力システムが利用可能な場合は統一版を、
+    そうでなければ従来版を返す。
+    """
+    if UNIFIED_INPUT_AVAILABLE:
+        return UnifiedReadLinePredicate(arg)
+    else:
+        return ReadLinePredicate(arg)
+
+
+def create_peek_char_predicate(arg: PrologType) -> BuiltinPredicate:
+    """
+    peek_char/1述語のファクトリ関数
+    
+    統一入力システムが利用可能な場合は統一版を、
+    そうでなければ従来版を返す。
+    """
+    if UNIFIED_INPUT_AVAILABLE:
+        return UnifiedPeekCharPredicate(arg)
+    else:
+        return PeekCharPredicate(arg)

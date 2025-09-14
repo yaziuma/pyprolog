@@ -30,6 +30,10 @@ from pyprolog.runtime.builtins import (
     ListingPredicate,
     ListingWithPredicatePredicate,
     ExportFactsPredicate,
+    # 統一入力システム対応版ファクトリ関数
+    create_get_char_predicate,
+    create_read_line_predicate,
+    create_peek_char_predicate,
 )
 from .io_manager import IOManager
 from .tracer import Tracer
@@ -615,7 +619,7 @@ class Runtime:
             for item in findall_pred.execute(self, env):
                 yield item
         elif functor_name == "get_char" and len(processed_goal.args) == 1:
-            get_char_pred = GetCharPredicate(processed_goal.args[0])
+            get_char_pred = create_get_char_predicate(processed_goal.args[0])
             try:
                 for item in get_char_pred.execute(self, env):
                     yield item
@@ -624,7 +628,7 @@ class Runtime:
                 logger.debug(f"Exception in {functor_name}: {e}")
                 raise
         elif functor_name == "read_line" and len(processed_goal.args) == 1:
-            read_line_pred = ReadLinePredicate(processed_goal.args[0])
+            read_line_pred = create_read_line_predicate(processed_goal.args[0])
             try:
                 for item in read_line_pred.execute(self, env):
                     yield item
@@ -633,7 +637,7 @@ class Runtime:
                 logger.debug(f"Exception in {functor_name}: {e}")
                 raise
         elif functor_name == "peek_char" and len(processed_goal.args) == 1:
-            peek_char_pred = PeekCharPredicate(processed_goal.args[0])
+            peek_char_pred = create_peek_char_predicate(processed_goal.args[0])
             for item in peek_char_pred.execute(self, env):
                 yield item
         elif functor_name == "at_end_of_stream" and len(processed_goal.args) == 0:
