@@ -163,3 +163,46 @@ def test_mixed_io_operations():
         runtime.query("mixed_input.")
 
     assert excinfo.value.input_type == "char"
+
+
+def test_mixed_io_read_line_then_get_char():
+    """混合IOテスト: read_line → get_char"""
+    prolog_code = """
+    mixed_input_reverse :- 
+        write('First read line'), nl,
+        read_line(L),
+        write('Then get char'), nl,
+        get_char(C).
+    """
+
+    runtime = Runtime()
+    runtime.io_manager = InteractiveIOManager()
+
+    assert runtime.add_rule(prolog_code), "Prologプログラムの読み込み失敗"
+
+    # read_lineで先に例外が発生するはず
+    with pytest.raises(PrologInputRequiredException) as excinfo:
+        runtime.query("mixed_input_reverse.")
+
+    assert excinfo.value.input_type == "line"
+
+
+def test_deeply_nested_read_line():
+    """深くネストされたread_line述語のテスト"""
+    prolog_code = """
+    deep_level1 :- deep_level2.
+    deep_level2 :- deep_level3.
+    deep_level3 :- deep_level4.
+    deep_level4 :- read_line(Line).
+    """
+
+    runtime = Runtime()
+    runtime.io_manager = InteractiveIOManager()
+
+    assert runtime.add_rule(prolog_code), "Prologプログラムの読み込み失敗"
+
+    # 深いネストでも例外が正常に伝播されるはず
+    with pytest.raises(PrologInputRequiredException) as excinfo:
+        runtime.query("deep_level1.")
+
+    assert excinfo.value.input_type == "line"

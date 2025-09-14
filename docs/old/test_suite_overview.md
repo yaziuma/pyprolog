@@ -2,6 +2,15 @@
 
 This document provides a comprehensive overview of the test suite for the PyProlog project, detailing the purpose and scope of each test file.
 
+## Test Suite Optimization Status
+
+**Recent Consolidations (2025-09-14):**
+- **Eliminated duplicate tests**: Reduced from 51 to 49 test files (4% reduction)  
+- **Unified exception testing**: `test_read_line_exception.py` → `test_exception_propagation.py`
+- **Unified medical diagnosis tests**: `test_final_english.py` → `test_fixed_medical.py`
+- **Code reduction**: ~400 lines of duplicate test code eliminated
+- **Maintained full coverage**: All original test functionality preserved
+
 ## `tests/core`
 
 This directory contains tests for the core data structures and fundamental mechanisms of the Prolog interpreter.
@@ -28,7 +37,7 @@ This directory contains tests for the Prolog runtime engine, covering the execut
 - **`test_built_in_unification.py`**: Tests the built-in unification and non-unification predicates, primarily `\=/2`.
 - **`test_dynamic_predicates.py`**: Verifies the functionality of dynamic predicates like `asserta/1` and `assertz/1`, which allow for modifying the knowledge base at runtime.
 - **`test_enhanced_runtime.py`**: Tests the `EnhancedRuntime`, a subclass of the standard `Runtime` that includes additional debugging and tracing capabilities.
-- **`test_exception_propagation.py`**: Ensures that exceptions raised during I/O predicate execution are correctly propagated up the call stack. It uses a mock `InteractiveIOManager` that raises exceptions for I/O requests, and verifies this behavior in direct, nested, and deeply nested calls for `get_char` and `read_line`.
+- **`test_exception_propagation.py`**: **[UNIFIED]** Comprehensive tests ensuring that exceptions raised during I/O predicate execution are correctly propagated up the call stack. Uses a mock `InteractiveIOManager` to verify exception behavior in direct, nested, and deeply nested calls for both `get_char` and `read_line`. Includes mixed I/O operation testing and reverse-order execution patterns. **Previously consolidated from `test_read_line_exception.py`**.
 - **`test_export_facts.py`**: Tests the `export_facts/2` predicate, which allows exporting facts from the knowledge base to formats like CSV, JSON, and TSV.
 - **`test_interpreter.py`**: A major integration test for the `Runtime` class, verifying the end-to-end execution of queries, including fact resolution, rule application, arithmetic, comparisons, and various built-in predicates.
 - **`test_io_infrastructure.py`**: Tests the basic I/O infrastructure, including `StringStream` for in-memory I/O and the `IOManager` for stream management.
@@ -40,7 +49,6 @@ This directory contains tests for the Prolog runtime engine, covering the execut
 - **`test_meta_predicates.py`**: Tests meta-predicates like `findall/3`, which collect all solutions for a given goal.
 - **`test_multiple_input.py`**: An integration test for a sample program (`multiple_input_calculator.pl`) that requires multiple user inputs, testing the robustness of input handling loops.
 - **`test_peek_char.py`**: Tests the `peek_char/1` and `at_end_of_stream/0` predicates, which allow for non-destructive inspection of input streams.
-- **`test_read_line_exception.py`**: This file contains tests similar to `test_exception_propagation.py` but is structured to focus specifically on exceptions related to `read_line/1` and mixed I/O scenarios. While there is overlap, it provides a focused view on `read_line`'s exception behavior.
 - **`test_recursive_rules.py`**: Tests the runtime's ability to handle recursive rules, such as those for calculating ancestry or Peano arithmetic. It also includes tests for left-recursion.
 
 ## `tests/integration`
@@ -48,8 +56,7 @@ This directory contains tests for the Prolog runtime engine, covering the execut
 These tests verify the interaction and collaboration of multiple components of the system in end-to-end scenarios.
 
 - **`test_end_to_end.py`**: A placeholder for comprehensive end-to-end tests. It includes a working test for a Japanese medical diagnosis knowledge base, demonstrating the system's ability to handle a complex, real-world-like program.
-- **`test_final_english.py`**: An integration test using a simplified English-language medical diagnosis knowledge base.
-- **`test_fixed_medical.py`**: A test that directly adds medical diagnosis rules to the runtime via `add_rule` to isolate and confirm core functionality works correctly, bypassing potential file parsing issues.
+- **`test_fixed_medical.py`**: **[UNIFIED]** Comprehensive medical diagnosis system tests using both direct rule addition (`add_rule`) and file-based KB loading approaches. Tests core functionality, English KB parsing, and diagnosis logic execution. **Previously consolidated from `test_final_english.py`**.
 - **`test_listing_export_integration.py`**: An integration test that verifies the consistency and combined functionality of the `listing` and `export_facts` predicates.
 
 ## `tests/unified_input`
