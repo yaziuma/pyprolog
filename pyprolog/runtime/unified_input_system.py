@@ -114,6 +114,48 @@ class StandardInputHandler(InputHandler):
             return None
 
 
+class StreamInputHandler(InputHandler):
+    """
+    ストリームベース入力ハンドラ
+    
+    テスト用途やファイル入力に使用
+    """
+    
+    def __init__(self, stream):
+        """
+        Args:
+            stream: IOStreamインターフェースを持つストリーム
+        """
+        self.stream = stream
+    
+    def handle_input_request(self, event: InputEvent) -> Optional[str]:
+        """
+        ストリームからの入力処理
+        
+        Args:
+            event: 入力要求イベント
+            
+        Returns:
+            Optional[str]: 入力値（None = EOF）
+        """
+        try:
+            if event.input_type == "char":
+                # 文字入力の場合
+                char = self.stream.read_char()
+                return char if char else None
+            elif event.input_type == "peek_char":
+                # 先読み文字入力の場合
+                char = self.stream.peek_char()
+                return char if char else None
+            else:
+                # 行入力の場合
+                line = self.stream.read_line()
+                return line
+        except Exception:
+            # ストリームエラー時はEOFとして扱う
+            return None
+
+
 class ThreadingController:
     """
     スレッド間通信制御

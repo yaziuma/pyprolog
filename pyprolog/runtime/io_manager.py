@@ -1,6 +1,6 @@
 # pyprolog/runtime/io_manager.py
 from .io_streams import IOStream, ConsoleStream
-from .unified_input_system import UnifiedInputSystem, InputHandler, StandardInputHandler
+from .unified_input_system import UnifiedInputSystem, InputHandler, StandardInputHandler, StreamInputHandler
 from typing import Optional, Dict, Any
 import logging
 
@@ -231,6 +231,12 @@ class IOManager:
         self._current_input_stream = stream
         # 統一入力システムのフォールバックも更新
         self.unified_input.set_fallback_stream(stream)
+        
+        # ストリームが設定された場合、統一入力システムのハンドラを
+        # StreamInputHandlerに自動的に切り替える（テスト対応）
+        if self._unified_input_enabled:
+            stream_handler = StreamInputHandler(stream)
+            self.unified_input.set_input_handler(stream_handler)
 
     def set_output_stream(self, stream: IOStream) -> None:
         """現在の出力ストリームを設定"""
