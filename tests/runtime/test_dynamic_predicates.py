@@ -2,6 +2,7 @@ import unittest
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.core.types import Variable, Number
 from pyprolog.core.errors import PrologError
+from typing import Any, Dict, List, Optional, Type
 
 
 class TestDynamicPredicates(unittest.TestCase):
@@ -15,7 +16,7 @@ class TestDynamicPredicates(unittest.TestCase):
         ):
             self.runtime.logic_interpreter.rules.clear()
 
-    def assertQueryTrue(self, query_string, expected_bindings_list=None, msg=None):
+    def assertQueryTrue(self, query_string: str, expected_bindings_list: Optional[List[Dict[Any, Any]]]=None, msg: None=None):
         solutions = self.runtime.query(query_string)
 
         if expected_bindings_list is None:
@@ -51,7 +52,7 @@ class TestDynamicPredicates(unittest.TestCase):
                         or f"Query '{query_string}', solution {i + 1}: Var '{var_name_str}' expected <{expected_value}>, got <{actual_value}>.",
                     )
 
-    def assertQueryFalse(self, query_string, msg=None):
+    def assertQueryFalse(self, query_string: str, msg: None=None):
         solutions = self.runtime.query(query_string)
         self.assertEqual(
             len(solutions),
@@ -60,7 +61,7 @@ class TestDynamicPredicates(unittest.TestCase):
             or f"Query '{query_string}' should fail but succeeded with {len(solutions)} solution(s).",
         )
 
-    def assertPrologError(self, query_string, error_type=PrologError, msg=None):
+    def assertPrologError(self, query_string: str, error_type: Type[PrologError]=PrologError, msg: None=None):
         # This helper assumes query() might raise PrologError directly,
         # or that execute() within query() does.
         # Current Runtime.query catches all exceptions and returns [].

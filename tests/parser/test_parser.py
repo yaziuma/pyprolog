@@ -8,12 +8,13 @@ Prologインタープリターのパーサー（構文解析器）の
 from pyprolog.parser.parser import Parser
 from pyprolog.parser.scanner import Scanner
 from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact
+from typing import Any, List, Union
 
 
 class TestParser:
     """パーサーのテスト"""
 
-    def _parse_source(self, source: str):
+    def _parse_source(self, source: str) -> List[Union[Any, Rule, Fact]]:
         """ソースコードを解析するヘルパーメソッド"""
         scanner = Scanner(source)
         tokens = scanner.scan_tokens()

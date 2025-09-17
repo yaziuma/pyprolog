@@ -12,6 +12,7 @@ from typing import Optional, Dict, Any, TYPE_CHECKING
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 import logging
+from pyprolog.runtime.io_streams import StringStream
 
 if TYPE_CHECKING:
     from pyprolog.runtime.io_streams import IOStream
@@ -121,7 +122,7 @@ class StreamInputHandler(InputHandler):
     テスト用途やファイル入力に使用
     """
     
-    def __init__(self, stream):
+    def __init__(self, stream: StringStream):
         """
         Args:
             stream: IOStreamインターフェースを持つストリーム

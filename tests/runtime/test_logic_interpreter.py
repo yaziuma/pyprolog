@@ -10,6 +10,7 @@ Prologインタープリターの論理的推論エンジンの
 import unittest
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact
+from typing import Iterator
 
 
 class TestLogicInterpreter:
@@ -665,7 +666,7 @@ class MockRuntime:
         self.facts = []
         self.rules = []
 
-    def execute(self, goal, env):
+    def execute(self, goal: Atom, env: BindingEnvironment) -> Iterator[BindingEnvironment]:
         """ゴール実行のモック実装"""
         from pyprolog.core.types import Atom, Term
 

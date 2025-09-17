@@ -61,6 +61,7 @@ include = ["pyprolog*"]
 
 [dependency-groups]
 dev = [
+    "monkeytype>=23.3.0",
     "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
     "pytest-timeout>=2.4.0",

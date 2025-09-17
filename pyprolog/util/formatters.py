@@ -7,6 +7,8 @@ Prolog構文フォーマッター
 from typing import List, Union, Optional
 from pyprolog.core.types import Rule, Fact, Term, Atom, Variable, Number, PrologType
 import logging
+from pyprolog.util.functor_mapper import FunctorMapper
+from pyprolog.util.variable_mapper import VariableMapper
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +16,7 @@ logger = logging.getLogger(__name__)
 class PrologFormatter:
     """Prolog構文フォーマッター"""
     
-    def __init__(self, variable_mapper=None, functor_mapper=None):
+    def __init__(self, variable_mapper: Optional[VariableMapper]=None, functor_mapper: Optional[FunctorMapper]=None):
         """
         フォーマッターを初期化
         

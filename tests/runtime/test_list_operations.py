@@ -1,6 +1,7 @@
 import pytest
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.core.types import Term, Variable, Atom
+from typing import Dict, List, Optional, Union
 
 
 class TestListOperations:
@@ -12,7 +13,7 @@ class TestListOperations:
         # if hasattr(self.runtime, 'logic_interpreter') and self.runtime.logic_interpreter:
         #     self.runtime.logic_interpreter.rules.clear()
 
-    def assertQuerySolutions(self, query_string, expected_solutions_list, msg=None):
+    def assertQuerySolutions(self, query_string: str, expected_solutions_list: List[Dict[str, Union[Atom, Term, Variable]]], msg: None=None):
         print(f"PYTHON_PRINT_ASSERT: Querying: '{query_string}'", flush=True)
         solutions = self.runtime.query(query_string)
         print(
@@ -56,7 +57,7 @@ class TestListOperations:
                 or f"Query '{query_string}': Actual solution {dict(actual_fs)} was not expected. Expected: {expected_solutions_list}."
             )
 
-    def assertQueryTrue(self, query_string, expected_bindings_list=None, msg=None):
+    def assertQueryTrue(self, query_string: str, expected_bindings_list: Optional[List[Dict[str, Union[Atom, Term]]]]=None, msg: None=None):
         print(f"PYTHON_PRINT_ASSERT: Querying: '{query_string}'", flush=True)
         solutions = self.runtime.query(query_string)
         print(
@@ -99,7 +100,7 @@ class TestListOperations:
                     or f"Query '{query_string}', first solution: Var '{var_name_str}' expected <{expected_value}>, got <{actual_value}>."
                 )
 
-    def assertQueryFalse(self, query_string, msg=None):
+    def assertQueryFalse(self, query_string: str, msg: None=None):
         print(f"PYTHON_PRINT_ASSERT: Querying: '{query_string}'", flush=True)
         solutions = self.runtime.query(query_string)
         print(
