@@ -1,6 +1,7 @@
 import unittest
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.core.types import Variable
+from typing import Any, Dict, List, Optional
 
 
 class TestBuiltInUnificationPredicates(unittest.TestCase):
@@ -13,7 +14,7 @@ class TestBuiltInUnificationPredicates(unittest.TestCase):
         ):
             self.runtime.logic_interpreter.rules.clear()
 
-    def assertQueryTrue(self, query_string, expected_bindings_list=None, msg=None):
+    def assertQueryTrue(self, query_string: str, expected_bindings_list: Optional[List[Dict[Any, Any]]]=None, msg: None=None):
         print(f"PYTHON_PRINT_ASSERT: Querying: '{query_string}'", flush=True)
         solutions = self.runtime.query(query_string)
         print(
@@ -54,7 +55,7 @@ class TestBuiltInUnificationPredicates(unittest.TestCase):
                         or f"Query '{query_string}', solution {i + 1}: Var '{var_name_str}' expected <{expected_value}>, got <{actual_value}>.",
                     )
 
-    def assertQueryFalse(self, query_string, msg=None):
+    def assertQueryFalse(self, query_string: str, msg: None=None):
         print(f"PYTHON_PRINT_ASSERT: Querying: '{query_string}'", flush=True)
         solutions = self.runtime.query(query_string)
         print(

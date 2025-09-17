@@ -7,10 +7,10 @@
 import csv
 import json
 import os
-from typing import List, Dict, Any, Union, Optional
-from pathlib import Path
+from typing import List, Dict, Any, Optional
 from pyprolog.core.types import Fact, Term, Atom, Variable, Number, PrologType
 import logging
+from pyprolog.runtime.interpreter import Runtime
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class DataExporter:
     """データエクスポーター"""
     
-    def __init__(self, runtime=None):
+    def __init__(self, runtime: Optional[Runtime]=None):
         """
         エクスポーターを初期化
         

@@ -3,7 +3,7 @@
 
 import logging
 from typing import List, Iterator, Dict, Any, Union, Optional
-from pyprolog.core.types import Term, Rule, Fact, Atom
+from pyprolog.core.types import Variable, Term, Rule, Fact, Atom
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.errors import PrologError, CutException
 from pyprolog.runtime.interpreter import Runtime
@@ -123,18 +123,18 @@ class EnhancedRuntime(Runtime):
             if self.debug_trace and self.trace_stack:
                 self.trace_stack.pop()
 
-    def trace_call(self, goal, env):
+    def trace_call(self, goal: Term, env: BindingEnvironment):
         """分析ファイルの提案に基づくCALLトレース"""
         indent = "  " * len(self.trace_stack)
         print(f"{indent}CALL: {goal} with {env.bindings}")
         self.trace_stack.append(goal)
 
-    def trace_exit(self, goal, result):
+    def trace_exit(self, goal: Term, result: BindingEnvironment):
         """分析ファイルの提案に基づくEXITトレース"""
         indent = "  " * (len(self.trace_stack) - 1)
         print(f"{indent}EXIT: {goal} -> {result.bindings}")
 
-    def trace_fail(self, goal, error):
+    def trace_fail(self, goal: Term, error: str):
         """分析ファイルの提案に基づくFAILトレース"""
         indent = "  " * (len(self.trace_stack) - 1)
         print(f"{indent}FAIL: {goal} - {error}")
@@ -219,7 +219,7 @@ class EnhancedRuntime(Runtime):
             raise
 
     def _safe_findall(
-        self, template, goal, result_list, env: BindingEnvironment
+        self, template: Variable, goal: Term, result_list: Variable, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
         """安全なfindall/3実装"""
         try:

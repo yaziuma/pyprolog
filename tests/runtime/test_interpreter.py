@@ -8,6 +8,8 @@ Runtime Interpreter テスト
 
 import unittest
 from pyprolog.core.types import Term, Variable, Atom, Number
+from typing import Dict, List, Optional, Union
+
 # pytest will be used in test_circular_reference_detection in test_logic_interpreter,
 # but not directly needed here yet. If test_type_checking needs it for some reason,
 # it would be added. For now, it's not.
@@ -41,7 +43,7 @@ class TestRuntime:
             raise unittest.SkipTest("Runtime not implemented yet")
 
     # Helper methods for querying
-    def assertQueryTrue(self, query_string, expected_bindings_list=None, msg=None):
+    def assertQueryTrue(self, query_string: str, expected_bindings_list: Optional[List[Dict[str, Union[Atom, Number, Term, Variable]]]]=None, msg: None=None):
         """
         Asserts that the query succeeds (at least one solution).
         If expected_bindings_list is provided, checks the first solution for specific bindings.
@@ -87,7 +89,7 @@ class TestRuntime:
                         or f"Query '{query_string}', solution {i + 1}: Var '{var_name_str}' expected <{expected_value}>, got <{actual_value}>."
                     )
 
-    def assertQueryFalse(self, query_string, msg=None):
+    def assertQueryFalse(self, query_string: str, msg: None=None):
         """Asserts that the query fails (no solutions)."""
         self._skip_if_not_implemented()
         solutions = self.runtime.query(query_string)

@@ -23,9 +23,6 @@ from pyprolog.runtime.builtins import (
     MemberPredicate,
     AppendPredicate,
     FindallPredicate,
-    GetCharPredicate,
-    ReadLinePredicate,
-    PeekCharPredicate,
     AtEndOfStreamPredicate,
     ListingPredicate,
     ListingWithPredicatePredicate,
@@ -100,7 +97,7 @@ class Runtime:
 
         return functors
 
-    def _extract_functors_from_term(self, term) -> set:
+    def _extract_functors_from_term(self, term: Union[Term, Variable]) -> set:
         """項から再帰的にファンクター名を抽出"""
         functors = set()
 
@@ -151,7 +148,7 @@ class Runtime:
         logger.debug(f"Built {len(evaluators)} unified operator evaluators")
         return evaluators
 
-    def _create_arithmetic_evaluator(self, op_info: OperatorInfo):
+    def _create_arithmetic_evaluator(self, op_info: OperatorInfo) -> Callable:
         def evaluator(args: List, env: BindingEnvironment) -> bool:
             if len(args) != op_info.arity:
                 raise PrologError(
@@ -170,7 +167,7 @@ class Runtime:
 
         return evaluator
 
-    def _create_comparison_evaluator(self, op_info: OperatorInfo):
+    def _create_comparison_evaluator(self, op_info: OperatorInfo) -> Callable:
         def evaluator(args: List, env: BindingEnvironment) -> bool:
             if len(args) != 2:
                 raise PrologError(
@@ -184,7 +181,7 @@ class Runtime:
 
         return evaluator
 
-    def _create_is_evaluator(self):
+    def _create_is_evaluator(self) -> Callable:
         def evaluator(
             args: List, env: BindingEnvironment
         ) -> Iterator[BindingEnvironment]:
@@ -204,7 +201,7 @@ class Runtime:
 
         return evaluator
 
-    def _create_unification_evaluator(self):
+    def _create_unification_evaluator(self) -> Callable:
         def evaluator(
             args: List, env: BindingEnvironment
         ) -> Iterator[BindingEnvironment]:
@@ -216,7 +213,7 @@ class Runtime:
 
         return evaluator
 
-    def _create_logical_evaluator(self, op_info: OperatorInfo):
+    def _create_logical_evaluator(self, op_info: OperatorInfo) -> Callable:
         def evaluator(
             args: List, env: BindingEnvironment
         ) -> Iterator[BindingEnvironment]:
@@ -334,7 +331,7 @@ class Runtime:
 
         return evaluator
 
-    def _create_control_evaluator(self, op_info: OperatorInfo):
+    def _create_control_evaluator(self, op_info: OperatorInfo) -> Callable:
         def evaluator(
             args: List, env: BindingEnvironment
         ) -> Iterator[BindingEnvironment]:
@@ -379,7 +376,7 @@ class Runtime:
 
         return evaluator
 
-    def _create_io_evaluator(self, op_info: OperatorInfo):
+    def _create_io_evaluator(self, op_info: OperatorInfo) -> Callable:
         def evaluator(
             args: List, env: BindingEnvironment
         ) -> Iterator[BindingEnvironment]:
@@ -794,7 +791,7 @@ class Runtime:
         finally:
             self.tracer.stop_trace()
 
-    def _extract_variables_names(self, term) -> List[str]:
+    def _extract_variables_names(self, term: Term) -> List[str]:
         variables = set()
         queue = [term]
         while queue:
