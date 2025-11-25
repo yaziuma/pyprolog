@@ -8,14 +8,11 @@ ThreadingControllerによる真の継続実行を提供する。
 import threading
 import time
 import uuid
-from typing import Optional, Dict, Any, TYPE_CHECKING, Callable
+from typing import Optional, Dict, Any, Callable
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 import logging
 from pyprolog.runtime.io_streams import StringStream
-
-if TYPE_CHECKING:
-    from pyprolog.runtime.io_streams import IOStream
 
 logger = logging.getLogger(__name__)
 
@@ -122,21 +119,19 @@ class InputHandler(ABC):
     """
     入力ハンドラインターフェース
     
-    利用者が実装する統一入力処理インターフェース
+    継続ハンドル前提の入力処理を実装するための基底クラス
     """
     
     @abstractmethod
     def handle_input_request(
         self, event: InputEvent, continuation: ContinuationHandle
-    ) -> Optional[str]:
+    ) -> None:
         """
         入力要求処理
         
         Args:
             event: 入力要求イベント
-            
-        Returns:
-            Optional[str]: 入力値（None = EOF）
+            continuation: 継続ハンドル（`resume` / `cancel` を必ず呼ぶこと）
         """
         pass
 
@@ -150,15 +145,13 @@ class StandardInputHandler(InputHandler):
     
     def handle_input_request(
         self, event: InputEvent, continuation: ContinuationHandle
-    ) -> Optional[str]:
+    ) -> None:
         """
         標準入力による入力処理
         
         Args:
             event: 入力要求イベント
-            
-        Returns:
-            Optional[str]: 入力値（None = EOF）  # 互換性のため残すが実際は continuation で渡す
+            continuation: 継続ハンドル
         """
         prompt = event.args.get("prompt", f"{event.predicate_name}: ")
         try:
@@ -168,10 +161,8 @@ class StandardInputHandler(InputHandler):
             else:
                 value = input(prompt)
             continuation.resume(value if value is not None else "")
-            return value
         except (EOFError, KeyboardInterrupt):
             continuation.resume(None)
-            return None
 
 
 class StreamInputHandler(InputHandler):
@@ -190,15 +181,13 @@ class StreamInputHandler(InputHandler):
     
     def handle_input_request(
         self, event: InputEvent, continuation: ContinuationHandle
-    ) -> Optional[str]:
+    ) -> None:
         """
         ストリームからの入力処理
         
         Args:
             event: 入力要求イベント
-            
-        Returns:
-            Optional[str]: 入力値（None = EOF）  # 互換性のため残す
+            continuation: 継続ハンドル
         """
         try:
             if event.input_type == "char":
@@ -210,10 +199,8 @@ class StreamInputHandler(InputHandler):
             else:
                 value = self.stream.read_line()
             continuation.resume(value)
-            return value
         except Exception:
             continuation.resume(None)
-            return None
 
 
 class ThreadingController:
@@ -250,6 +237,8 @@ class ThreadingController:
             input_handler: 入力処理ハンドラ
         """
         if self.enabled:
+            with self.state_lock:
+                self.input_handler = input_handler
             return
             
         self.input_handler = input_handler
@@ -355,8 +344,7 @@ class ThreadingController:
             response_received = self.response_event.wait(timeout=300.0)  # 5分タイムアウト
             
             if not response_received:
-                logger.error(f"Input request timeout: {predicate_name}")
-                return None
+                raise TimeoutError(f"Input request timeout: {predicate_name}")
             
             # 応答取得
             with self.state_lock:
@@ -364,11 +352,11 @@ class ThreadingController:
                 self.input_response = None
                 self.response_event.clear()
             
-            if response and response.success:
-                return response.value
-            else:
-                logger.error(f"Input request failed: {response.error_message if response else 'No response'}")
-                return None
+            if not response:
+                raise RuntimeError("No input response received")
+            if not response.success:
+                raise RuntimeError(response.error_message or "Input handler failed")
+            return response.value
     
     def _input_processing_loop(self):
         """
@@ -410,14 +398,11 @@ class ThreadingController:
             )
 
             try:
-                result = self.input_handler.handle_input_request(event, handle)
+                self.input_handler.handle_input_request(event, handle)
                 if not handle.completed:
-                    if result is not None:
-                        handle.resume(result)
-                    else:
-                        handle.cancel("InputHandler did not resume continuation")
+                    handle.cancel("InputHandler did not resume continuation")
             except Exception as e:
-                logger.error(f"InputHandler error: {e}")
+                logger.exception("InputHandler error")
                 handle.cancel(str(e))
         
         logger.info("Input processing thread stopped")
@@ -427,15 +412,13 @@ class UnifiedInputSystem:
     """
     統一入力システム
     
-    入力要求の中央制御を行い、シングルスレッドモードと
-    マルチスレッドモードを統一的に提供する。
+    入力要求の中央制御を行い、継続ハンドル単一経路でProlog実行を再開します。
     """
     
     def __init__(self):
         # コンポーネント
         self.threading_controller = ThreadingController()
         self.input_handler: Optional[InputHandler] = None
-        self.fallback_stream: Optional["IOStream"] = None
         
         # 実行モード
         self.threading_enabled = False
@@ -457,15 +440,6 @@ class UnifiedInputSystem:
         if self.threading_enabled:
             self.threading_controller.enable(handler)
     
-    def set_fallback_stream(self, stream: "IOStream"):
-        """
-        フォールバック用IOStreamを設定
-        
-        Args:
-            stream: フォールバック用IOStream
-        """
-        self.fallback_stream = stream
-    
     def enable_threading(self):
         """
         マルチスレッドモード（真の継続実行）を有効化
@@ -482,7 +456,7 @@ class UnifiedInputSystem:
     
     def disable_threading(self):
         """
-        シングルスレッドモードに切り替え
+        スレッド制御を停止
         """
         if not self.threading_enabled:
             return
@@ -502,9 +476,6 @@ class UnifiedInputSystem:
         """
         統一入力要求（メインAPI）
         
-        実行モードに応じてシングルスレッド実行または
-        マルチスレッド実行を選択する。
-        
         Args:
             input_type: 入力タイプ
             predicate_name: 述語名
@@ -515,74 +486,21 @@ class UnifiedInputSystem:
             Optional[str]: 入力値（None = EOF）
         """
         self.request_count += 1
-        logger.error(f"request_input called: threading_enabled={self.threading_enabled}, input_handler={self.input_handler}")
-        
-        if self.threading_enabled:
-            # マルチスレッドモード（真の継続実行）
-            try:
-                return self.threading_controller.request_input(
-                    input_type, predicate_name, prompt, **kwargs
-                )
-            except Exception as e:
-                self.error_count += 1
-                logger.error(f"UnifiedInputSystem threading error: {e}")
-                return self._fallback_input(prompt)
-        else:
-            # シングルスレッドモード（従来互換）
-            return self._request_input_sync(
-                input_type, predicate_name, prompt, **kwargs
-            )
-    
-    def _request_input_sync(
-        self, 
-        input_type: str, 
-        predicate_name: str,
-        prompt: str,
-        **kwargs
-    ) -> Optional[str]:
-        """
-        シングルスレッド同期入力処理
-        
-        従来互換モードでの入力処理。InputHandlerを直接呼び出す。
-        """
+        if not self.threading_enabled:
+            self.error_count += 1
+            raise RuntimeError("UnifiedInputSystem requires threading mode")
         if not self.input_handler:
             self.error_count += 1
-            logger.error(f"No input handler, error_count incremented to {self.error_count}")
-            return self._fallback_input(prompt)
-        
+            raise RuntimeError("Input handler is not configured")
+
         try:
-            event = InputEvent(
-                input_type=input_type,
-                predicate_name=predicate_name,
-                args={"prompt": prompt, **kwargs},
-                timestamp=time.time(),
-                event_id=str(uuid.uuid4()),
+            return self.threading_controller.request_input(
+                input_type, predicate_name, prompt, **kwargs
             )
-            handle = ContinuationHandle(request_id=event.event_id)
-            result = self.input_handler.handle_input_request(event, handle)
-            if not handle.completed and result is not None:
-                handle.resume(result)
-            return handle.wait()
-        except Exception as e:
+        except Exception:
             self.error_count += 1
-            logger.error(f"InputHandler error in sync mode: {e}")
+            logger.exception("UnifiedInputSystem threading error")
             raise
-    
-    def _fallback_input(self, prompt: str) -> Optional[str]:
-        """
-        フォールバック入力処理
-        
-        InputHandlerが設定されていない場合や
-        エラー時の代替入力処理。
-        """
-        if self.fallback_stream and hasattr(self.fallback_stream, 'read_line'):
-            return self.fallback_stream.read_line()
-        else:
-            # 最終手段: 標準入力
-            try:
-                return input(prompt)
-            except (EOFError, KeyboardInterrupt):
-                return None
     
     def get_statistics(self) -> Dict[str, Any]:
         """
@@ -599,7 +517,6 @@ class UnifiedInputSystem:
             "error_rate": self.error_count / max(self.request_count, 1),
             "uptime_seconds": uptime,
             "handler_configured": self.input_handler is not None,
-            "fallback_configured": self.fallback_stream is not None
         }
     
     def shutdown(self):
