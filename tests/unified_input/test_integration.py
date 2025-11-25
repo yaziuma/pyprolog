@@ -17,7 +17,7 @@ from tests.unified_input.test_io_predicate_base import (
     BindingEnvironment, PrologType, Atom, Number
 )
 from tests.unified_input.test_unified_input_system import (
-    UnifiedInputSystem, InputHandler, InputEvent
+    UnifiedInputSystem, InputHandler, InputEvent, ContinuationHandle
 )
 from tests.unified_input.test_io_manager_integration import IOManager
 
@@ -58,7 +58,9 @@ class IntegrationTestInputHandler(InputHandler):
         """入力処理に遅延を設定（スレッド動作確認用）"""
         self.delay_seconds = seconds
     
-    def handle_input_request(self, event: InputEvent) -> Optional[str]:
+    def handle_input_request(
+        self, event: InputEvent, continuation: ContinuationHandle
+    ) -> Optional[str]:
         self.call_history.append(event)
         
         # 遅延シミュレーション
@@ -69,9 +71,10 @@ class IntegrationTestInputHandler(InputHandler):
         if self.current_index < len(self.input_sequence):
             value = self.input_sequence[self.current_index]
             self.current_index += 1
-            return value
         else:
-            return None  # EOF
+            value = None
+        continuation.resume(value)
+        return value
 
 
 class TestIOPredicateIntegration:

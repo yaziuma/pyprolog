@@ -8,7 +8,7 @@ ThreadingControllerによる真の継続実行を提供する。
 import threading
 import time
 import uuid
-from typing import Optional, Dict, Any, TYPE_CHECKING
+from typing import Optional, Dict, Any, TYPE_CHECKING, Callable
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 import logging
@@ -64,6 +64,60 @@ class InputResponse:
     error_message: Optional[str] = None  # エラー時のメッセージ
 
 
+class ContinuationHandle:
+    """
+    継続ハンドル
+
+    Prolog スレッド側が待機している入力要求を再開するためのハンドルです。
+    """
+
+    def __init__(
+        self,
+        request_id: str,
+        on_resume: Optional[Callable[[str, Optional[str]], None]] = None,
+        on_cancel: Optional[Callable[[str, str], None]] = None,
+    ) -> None:
+        self.request_id = request_id
+        self._on_resume = on_resume
+        self._on_cancel = on_cancel
+        self._event = threading.Event()
+        self._lock = threading.Lock()
+        self._value: Optional[str] = None
+        self._error: Optional[str] = None
+        self._completed = False
+
+    def resume(self, value: Optional[str]) -> None:
+        with self._lock:
+            if self._completed:
+                raise RuntimeError(f"Continuation {self.request_id} already resumed")
+            self._completed = True
+            self._value = value
+        if self._on_resume:
+            self._on_resume(self.request_id, value)
+        self._event.set()
+
+    def cancel(self, error_message: str) -> None:
+        with self._lock:
+            if self._completed:
+                return
+            self._completed = True
+            self._error = error_message
+        if self._on_cancel:
+            self._on_cancel(self.request_id, error_message)
+        self._event.set()
+
+    def wait(self, timeout: float | None = None) -> Optional[str]:
+        if not self._event.wait(timeout):
+            raise TimeoutError(f"Continuation {self.request_id} wait timed out")
+        if self._error:
+            raise RuntimeError(self._error)
+        return self._value
+
+    @property
+    def completed(self) -> bool:
+        return self._completed
+
+
 class InputHandler(ABC):
     """
     入力ハンドラインターフェース
@@ -72,7 +126,9 @@ class InputHandler(ABC):
     """
     
     @abstractmethod
-    def handle_input_request(self, event: InputEvent) -> Optional[str]:
+    def handle_input_request(
+        self, event: InputEvent, continuation: ContinuationHandle
+    ) -> Optional[str]:
         """
         入力要求処理
         
@@ -92,7 +148,9 @@ class StandardInputHandler(InputHandler):
     デフォルトの標準入力処理を提供
     """
     
-    def handle_input_request(self, event: InputEvent) -> Optional[str]:
+    def handle_input_request(
+        self, event: InputEvent, continuation: ContinuationHandle
+    ) -> Optional[str]:
         """
         標準入力による入力処理
         
@@ -100,18 +158,19 @@ class StandardInputHandler(InputHandler):
             event: 入力要求イベント
             
         Returns:
-            Optional[str]: 入力値（None = EOF）
+            Optional[str]: 入力値（None = EOF）  # 互換性のため残すが実際は continuation で渡す
         """
         prompt = event.args.get("prompt", f"{event.predicate_name}: ")
         try:
             if event.input_type == "char":
-                # 文字入力の場合
                 line = input(prompt)
-                return line[0] if line else ""
+                value = line[0] if line else ""
             else:
-                # 行入力の場合
-                return input(prompt)
+                value = input(prompt)
+            continuation.resume(value if value is not None else "")
+            return value
         except (EOFError, KeyboardInterrupt):
+            continuation.resume(None)
             return None
 
 
@@ -129,7 +188,9 @@ class StreamInputHandler(InputHandler):
         """
         self.stream = stream
     
-    def handle_input_request(self, event: InputEvent) -> Optional[str]:
+    def handle_input_request(
+        self, event: InputEvent, continuation: ContinuationHandle
+    ) -> Optional[str]:
         """
         ストリームからの入力処理
         
@@ -137,23 +198,21 @@ class StreamInputHandler(InputHandler):
             event: 入力要求イベント
             
         Returns:
-            Optional[str]: 入力値（None = EOF）
+            Optional[str]: 入力値（None = EOF）  # 互換性のため残す
         """
         try:
             if event.input_type == "char":
-                # 文字入力の場合
                 char = self.stream.read_char()
-                return char if char else None
+                value = char if char else None
             elif event.input_type == "peek_char":
-                # 先読み文字入力の場合
                 char = self.stream.peek_char()
-                return char if char else None
+                value = char if char else None
             else:
-                # 行入力の場合
-                line = self.stream.read_line()
-                return line
+                value = self.stream.read_line()
+            continuation.resume(value)
+            return value
         except Exception:
-            # ストリームエラー時はEOFとして扱う
+            continuation.resume(None)
             return None
 
 
@@ -220,6 +279,32 @@ class ThreadingController:
         self.enabled = False
         self.shutdown_flag.clear()  # 次回有効化のためリセット
         logger.info("ThreadingController disabled")
+
+    def _set_response(self, response: InputResponse) -> None:
+        with self.state_lock:
+            self.input_response = response
+        self.response_event.set()
+
+    def _handle_continuation_resume(self, request_id: str, value: Optional[str]) -> None:
+        self._set_response(
+            InputResponse(
+                value=value,
+                timestamp=time.time(),
+                event_id=request_id,
+                success=True,
+            )
+        )
+
+    def _handle_continuation_failure(self, request_id: str, error_message: str) -> None:
+        self._set_response(
+            InputResponse(
+                value=None,
+                timestamp=time.time(),
+                event_id=request_id,
+                success=False,
+                error_message=error_message,
+            )
+        )
     
     def request_input(
         self, 
@@ -310,43 +395,30 @@ class ThreadingController:
                 if request is None:
                     continue
             
-            # InputHandlerに処理委譲
+            # InputHandler に処理委譲（継続ハンドルベース）
+            event = InputEvent(
+                input_type=request.input_type,
+                predicate_name=request.predicate_name,
+                args={"prompt": request.prompt, **request.additional_params},
+                timestamp=request.timestamp,
+                event_id=request.event_id,
+            )
+            handle = ContinuationHandle(
+                request_id=request.event_id,
+                on_resume=self._handle_continuation_resume,
+                on_cancel=self._handle_continuation_failure,
+            )
+
             try:
-                event = InputEvent(
-                    input_type=request.input_type,
-                    predicate_name=request.predicate_name,
-                    args={"prompt": request.prompt, **request.additional_params},
-                    timestamp=request.timestamp,
-                    event_id=request.event_id
-                )
-                
-                input_value = self.input_handler.handle_input_request(event)
-                
-                # 成功応答
-                response = InputResponse(
-                    value=input_value,
-                    timestamp=time.time(),
-                    event_id=request.event_id,
-                    success=True
-                )
-                
+                result = self.input_handler.handle_input_request(event, handle)
+                if not handle.completed:
+                    if result is not None:
+                        handle.resume(result)
+                    else:
+                        handle.cancel("InputHandler did not resume continuation")
             except Exception as e:
                 logger.error(f"InputHandler error: {e}")
-                
-                # エラー応答  
-                response = InputResponse(
-                    value=None,
-                    timestamp=time.time(),
-                    event_id=request.event_id,
-                    success=False,
-                    error_message=str(e)
-                )
-            
-            # Prologスレッドに応答
-            with self.state_lock:
-                self.input_response = response
-            
-            self.response_event.set()
+                handle.cancel(str(e))
         
         logger.info("Input processing thread stopped")
 
@@ -484,10 +556,13 @@ class UnifiedInputSystem:
                 predicate_name=predicate_name,
                 args={"prompt": prompt, **kwargs},
                 timestamp=time.time(),
-                event_id=str(uuid.uuid4())
+                event_id=str(uuid.uuid4()),
             )
-            
-            return self.input_handler.handle_input_request(event)
+            handle = ContinuationHandle(request_id=event.event_id)
+            result = self.input_handler.handle_input_request(event, handle)
+            if not handle.completed and result is not None:
+                handle.resume(result)
+            return handle.wait()
         except Exception as e:
             self.error_count += 1
             logger.error(f"InputHandler error in sync mode: {e}")
