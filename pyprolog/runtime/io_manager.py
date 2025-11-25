@@ -33,6 +33,7 @@ class IOManager:
         # 初期設定
         self._setup_default_unified_input()
         self._setup_unified_input_fallback()
+        self.enable_threading()
 
     def _setup_default_unified_input(self):
         """デフォルト統一入力ハンドラの設定"""
