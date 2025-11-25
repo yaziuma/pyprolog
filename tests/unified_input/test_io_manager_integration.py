@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any
 
 # テスト用のインポート（実装前のモック）
 from tests.unified_input.test_unified_input_system import (
-    UnifiedInputSystem, InputHandler, InputEvent
+    UnifiedInputSystem, InputHandler, InputEvent, ContinuationHandle
 )
 
 
@@ -282,9 +282,13 @@ class TestInputHandler(InputHandler):
         }
         self.call_history = []
     
-    def handle_input_request(self, event: InputEvent) -> Optional[str]:
+    def handle_input_request(
+        self, event: InputEvent, continuation: ContinuationHandle
+    ) -> Optional[str]:
         self.call_history.append(event)
-        return self.responses.get(event.input_type, "default")
+        value = self.responses.get(event.input_type, "default")
+        continuation.resume(value)
+        return value
 
 
 class TestIOManagerBasicAPI:
@@ -563,7 +567,9 @@ class TestIOManagerErrorHandling:
         
         # エラーハンドラ設定
         class ErrorHandler(InputHandler):
-            def handle_input_request(self, event: InputEvent) -> Optional[str]:
+            def handle_input_request(
+                self, event: InputEvent, continuation: ContinuationHandle
+            ) -> Optional[str]:
                 raise Exception("Handler error")
         
         error_handler = ErrorHandler()
@@ -585,7 +591,9 @@ class TestIOManagerErrorHandling:
         
         # エラーハンドラ設定
         class ErrorHandler(InputHandler):
-            def handle_input_request(self, event: InputEvent) -> Optional[str]:
+            def handle_input_request(
+                self, event: InputEvent, continuation: ContinuationHandle
+            ) -> Optional[str]:
                 raise Exception("Handler error")
         
         error_handler = ErrorHandler()
