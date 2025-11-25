@@ -171,6 +171,7 @@ class InteractiveProlog:
                 self.explain_tool = ExplainTool(self.runtime)
                 self.search_tool = SearchTool(self.runtime)
                 self.validate_tool = ValidateTool(self.runtime)
+                self.runtime.io_manager.enable_threading()
 
                 self.current_rules_file = rules_file
                 # If consult is used, it would print its own messages.
@@ -199,6 +200,7 @@ class InteractiveProlog:
                 self.explain_tool = ExplainTool(self.runtime)
                 self.search_tool = SearchTool(self.runtime)
                 self.validate_tool = ValidateTool(self.runtime)
+                self.runtime.io_manager.enable_threading()
                 print(self._format_info("空のランタイムを初期化しました"))
                 return True
 
@@ -251,6 +253,7 @@ class InteractiveProlog:
             )  # Pass variable_mapper
             self.explain_tool = ExplainTool(self.runtime)
             self.search_tool = SearchTool(self.runtime)
+            self.runtime.io_manager.enable_threading()
             self.variable_mapper.clear_mapping()  # Clear mapper state
             self.current_rules_file = None
             print(self._format_success("ルールと変数マッピングをクリアしました"))

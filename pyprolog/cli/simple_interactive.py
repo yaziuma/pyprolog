@@ -118,6 +118,7 @@ class SimplePrologInteractive:
                 self.runtime = Runtime(
                     rules_list, variable_mapper=self.variable_mapper
                 )  # Pass variable_mapper
+                self.runtime.io_manager.enable_threading()
 
                 self.current_rules_file = rules_file
                 if not rules_list:
@@ -138,6 +139,7 @@ class SimplePrologInteractive:
                 self.runtime = Runtime(
                     [], variable_mapper=self.variable_mapper
                 )  # Pass variable_mapper
+                self.runtime.io_manager.enable_threading()
                 print(self._format_info("空のランタイムを初期化しました"))
                 return True
 
@@ -188,6 +190,7 @@ class SimplePrologInteractive:
             self.runtime = Runtime(
                 [], variable_mapper=self.variable_mapper
             )  # Pass variable_mapper
+            self.runtime.io_manager.enable_threading()
             self.variable_mapper.clear_mapping()  # Clear mapper state
             self.current_rules_file = None
             print(self._format_success("ルールと変数マッピングをクリアしました"))
