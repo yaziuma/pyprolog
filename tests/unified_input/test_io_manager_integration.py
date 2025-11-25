@@ -10,8 +10,11 @@ from unittest.mock import Mock, MagicMock, patch
 from typing import Optional, Dict, Any
 
 # テスト用のインポート（実装前のモック）
-from tests.unified_input.test_unified_input_system import (
-    UnifiedInputSystem, InputHandler, InputEvent, ContinuationHandle
+from pyprolog.runtime.unified_input_system import (
+    UnifiedInputSystem,
+    InputHandler,
+    InputEvent,
+    ContinuationHandle,
 )
 
 

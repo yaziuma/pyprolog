@@ -16,8 +16,11 @@ from tests.unified_input.test_io_predicate_base import (
     IOPredicate, TestGetCharPredicate, TestReadLinePredicate,
     BindingEnvironment, PrologType, Atom, Number
 )
-from tests.unified_input.test_unified_input_system import (
-    UnifiedInputSystem, InputHandler, InputEvent, ContinuationHandle
+from pyprolog.runtime.unified_input_system import (
+    UnifiedInputSystem,
+    InputHandler,
+    InputEvent,
+    ContinuationHandle,
 )
 from tests.unified_input.test_io_manager_integration import IOManager
 

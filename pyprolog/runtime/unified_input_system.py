@@ -566,7 +566,7 @@ class UnifiedInputSystem:
         except Exception as e:
             self.error_count += 1
             logger.error(f"InputHandler error in sync mode: {e}")
-            return self._fallback_input(prompt)
+            raise
     
     def _fallback_input(self, prompt: str) -> Optional[str]:
         """
