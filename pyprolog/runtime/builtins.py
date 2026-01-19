@@ -413,17 +413,15 @@ class DynamicAssertAPredicate(BuiltinPredicate):
                     )
                     return  # Fail the assertion
 
-                new_rule = Rule(
-                    head, processed_body
-                )  # Now head and processed_body are Term
+                new_rule = Rule(head, processed_body)  # Now head and processed_body are Term
                 logger.debug(f"ASSERTA: Created Rule: {new_rule}")
-                runtime.rules.insert(0, new_rule)
+                runtime.logic_interpreter.add_rule(new_rule, position="first")
                 logger.info(f"ASSERTA: Successfully asserted rule: {new_rule}")
             else:
                 logger.debug(f"ASSERTA: Identified as fact: {clause_val_as_term}")
                 new_fact = Fact(clause_val_as_term)
                 logger.debug(f"ASSERTA: Created Fact: {new_fact}")
-                runtime.rules.insert(0, new_fact)
+                runtime.logic_interpreter.add_rule(new_fact, position="first")
                 logger.info(f"ASSERTA: Successfully asserted fact: {new_fact}")
 
             # This line is intentionally left as is, as per instructions.
@@ -503,17 +501,15 @@ class DynamicAssertZPredicate(BuiltinPredicate):
                     )
                     return  # Fail the assertion
 
-                new_rule = Rule(
-                    head, processed_body
-                )  # Now head and processed_body are Term
+                new_rule = Rule(head, processed_body)  # Now head and processed_body are Term
                 logger.debug(f"ASSERTZ: Created Rule: {new_rule}")
-                runtime.rules.append(new_rule)
+                runtime.logic_interpreter.add_rule(new_rule, position="last")
                 logger.info(f"ASSERTZ: Successfully asserted rule: {new_rule}")
             else:
                 logger.debug(f"ASSERTZ: Identified as fact: {clause_val_as_term}")
                 new_fact = Fact(clause_val_as_term)
                 logger.debug(f"ASSERTZ: Created Fact: {new_fact}")
-                runtime.rules.append(new_fact)
+                runtime.logic_interpreter.add_rule(new_fact, position="last")
                 logger.info(f"ASSERTZ: Successfully asserted fact: {new_fact}")
 
             # This line is intentionally left as is, as per instructions.
@@ -895,10 +891,7 @@ class DynamicRetractPredicate(BuiltinPredicate):
                         logger.info(
                             f"RETRACT: Matched and removed rule: {runtime.rules[i]}"
                         )
-                        del runtime.rules[i]
-                        runtime.logic_interpreter.rules = (
-                            runtime.rules
-                        )  # Update logic interpreter's reference
+                        runtime.logic_interpreter.remove_rule(db_clause)
                         yield final_env  # Yield the environment from successful unification
                         return  # Retract first match only for now
                 else:  # Retracting a fact form (simple term)
@@ -908,8 +901,7 @@ class DynamicRetractPredicate(BuiltinPredicate):
                     logger.info(
                         f"RETRACT: Matched and removed clause: {runtime.rules[i]} (using head match for fact-form retract)"
                     )
-                    del runtime.rules[i]
-                    runtime.logic_interpreter.rules = runtime.rules
+                    runtime.logic_interpreter.remove_rule(db_clause)
                     yield head_env  # Yield the environment from head unification
                     return  # Retract first match
 
