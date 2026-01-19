@@ -388,6 +388,19 @@ class LogicInterpreter:
             f"LOGIC_INTERP: Attempting to solve actual_goal: {actual_goal} with env: {env.bindings}"
         )
 
+        self._refresh_index_if_needed()
+
+        # 未定義述語は existence_error を返す（builtin/演算子は execute 側で処理済み）
+        if (
+            isinstance(actual_goal.functor, Atom)
+            and actual_goal.functor.name not in ("true", "fail")
+        ):
+            key = (actual_goal.functor.name, len(actual_goal.args))
+            if key not in self.rules_index:
+                raise PrologError(
+                    f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
+                )
+
         # トレース: ゴール呼び出し記録
         if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
             self.runtime.tracer.record_call(actual_goal, env)
@@ -411,8 +424,6 @@ class LogicInterpreter:
         #     logger.debug(f"Goal {actual_goal} is CUT (handled by Runtime), yielding current env.")
         #     yield env
         #     return
-
-        self._refresh_index_if_needed()
 
         candidate_entries: List[Union[Rule, Fact]]
         if isinstance(actual_goal.functor, Atom):
