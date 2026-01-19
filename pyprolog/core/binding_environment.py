@@ -1,4 +1,8 @@
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
+
+import rpds
+
+_MISSING = object()
 
 # from prolog.core.types import Variable, Term, Atom, Number, String, PrologType
 # 上記のフルインポートは循環参照のリスクがあるため、型ヒントでは文字列リテラルを使用
@@ -9,8 +13,14 @@ if TYPE_CHECKING:
 
 
 class BindingEnvironment:
-    def __init__(self, parent: Optional["BindingEnvironment"] = None):
-        self.bindings: Dict[str, "PrologType"] = {}
+    def __init__(
+        self,
+        parent: Optional["BindingEnvironment"] = None,
+        bindings: Optional[rpds.HashTrieMap] = None,
+    ):
+        self.bindings: rpds.HashTrieMap = (
+            bindings if bindings is not None else rpds.HashTrieMap()
+        )
         self.parent: Optional["BindingEnvironment"] = parent
 
     def bind(self, var_name: str, value: "PrologType"):
@@ -24,12 +34,13 @@ class BindingEnvironment:
         # unify(X,Y) -> env1 (X -> Y)
         # unify(X,a) in env1 -> deref(X)=Y, deref(a)=a. unify(Y,a) -> env2 (X->Y, Y->a)
         # この bind は、dereference 後の変数に対する束縛に使われる。
-        self.bindings[var_name] = value
+        self.bindings = self.bindings.insert(var_name, value)
 
     def get_value(self, var_name: str) -> Optional["PrologType"]:
         """変数の値を取得する。見つからなければNoneを返す"""
-        if var_name in self.bindings:
-            return self.bindings[var_name]
+        value = self.bindings.get(var_name, _MISSING)
+        if value is not _MISSING:
+            return value
         if self.parent:
             return self.parent.get_value(var_name)
         return None
@@ -41,9 +52,7 @@ class BindingEnvironment:
     def copy(self) -> "BindingEnvironment":
         """環境のシャローコピーを作成する"""
         # 親環境は共有し、現在のレベルの束縛のみをコピーする
-        new_env = BindingEnvironment(self.parent)
-        new_env.bindings = self.bindings.copy()  # 現在の束縛をコピー
-        return new_env
+        return BindingEnvironment(self.parent, bindings=self.bindings)
 
     def __repr__(self) -> str:
         items = []

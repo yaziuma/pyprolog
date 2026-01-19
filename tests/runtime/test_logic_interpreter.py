@@ -464,8 +464,8 @@ class TestLogicInterpreter:
         env_circ = BindingEnvironment()
         # Manually create circular binding: X maps to Variable("Y"), Y maps to Variable("X")
         # Note: BindingEnvironment stores values, so Variable("Y") is the value for key "X"
-        env_circ.bindings[VX.name] = VY
-        env_circ.bindings[VY.name] = VX
+        env_circ.bind(VX.name, VY)
+        env_circ.bind(VY.name, VX)
 
         with pytest.raises(RecursionError):
             self.logic_interpreter.dereference(VX, env_circ)
