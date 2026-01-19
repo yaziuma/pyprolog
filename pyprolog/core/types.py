@@ -1,5 +1,6 @@
-from dataclasses import dataclass, field
 from typing import List, Union
+
+import msgspec
 
 # 先に PrologType の前方参照を定義
 PrologType = Union[
@@ -7,12 +8,10 @@ PrologType = Union[
 ]  # ListTerm を追加
 
 
-@dataclass
-class BaseTerm:  # Termの基底クラス
+class BaseTerm(msgspec.Struct, frozen=False):  # Termの基底クラス
     pass
 
 
-@dataclass
 class Atom(BaseTerm):
     name: str
 
@@ -26,7 +25,6 @@ class Atom(BaseTerm):
         return hash(self.name)
 
 
-@dataclass
 class Variable(BaseTerm):
     name: str
 
@@ -40,7 +38,6 @@ class Variable(BaseTerm):
         return hash(self.name)
 
 
-@dataclass
 class Number(BaseTerm):
     value: Union[int, float]
 
@@ -54,7 +51,6 @@ class Number(BaseTerm):
         return hash(self.value)
 
 
-@dataclass
 class String(BaseTerm):
     value: str
 
@@ -68,10 +64,9 @@ class String(BaseTerm):
         return hash(self.value)
 
 
-@dataclass
 class Term(BaseTerm):
     functor: Atom  # 述語名 (アトム)
-    args: List[PrologType] = field(default_factory=list)
+    args: List[PrologType] = msgspec.field(default_factory=list)
 
     def __repr__(self):
         if not self.args:
@@ -98,11 +93,10 @@ class Term(BaseTerm):
             return id(self)  # オブジェクトIDに基づくフォールバック (非推奨だが一時的)
 
 
-@dataclass
 class ListTerm(
     BaseTerm
 ):  # パーサーが直接 '.'/2 を生成する場合、このクラスは高レベル表現
-    elements: List[PrologType] = field(default_factory=list)
+    elements: List[PrologType] = msgspec.field(default_factory=list)
     # Prologのリストの末尾は通常 '[]' (アトム) または別のリスト (部分リストの場合は変数)
     tail: Union[Variable, Atom, "ListTerm", None] = None
 
@@ -151,8 +145,7 @@ class ListTerm(
             return id(self)
 
 
-@dataclass
-class Rule:
+class Rule(msgspec.Struct, frozen=False):
     head: Term
     body: Term
 
@@ -170,8 +163,7 @@ class Rule:
         return hash((self.head, self.body))
 
 
-@dataclass
-class Fact:
+class Fact(msgspec.Struct, frozen=False):
     head: Term
 
     def __repr__(self):
