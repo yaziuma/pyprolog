@@ -9,10 +9,10 @@ Runtime Interpreter テスト
 import unittest
 from pyprolog.core.types import Term, Variable, Atom, Number
 from typing import Dict, List, Optional, Union
+import pytest
+from pyprolog.core.errors import PrologError
 
-# pytest will be used in test_circular_reference_detection in test_logic_interpreter,
-# but not directly needed here yet. If test_type_checking needs it for some reason,
-# it would be added. For now, it's not.
+# pytest is used for exception assertions in this file.
 
 
 class TestRuntime:
@@ -153,14 +153,20 @@ class TestRuntime:
         self.runtime.add_rule("c.")
 
         self.assertQueryTrue("a, b", [{}])  # Conjunction
-        self.assertQueryFalse("a, d")  # Conjunction with fail
-        self.assertQueryTrue("a; d", [{}])  # Disjunction (a succeeds)
+        with pytest.raises(PrologError):
+            self.runtime.query("a, d")  # Conjunction with undefined predicate
+        self.assertQueryTrue("a; b")  # Disjunction (both defined)
         self.runtime.add_rule("d.")
-        self.assertQueryTrue("e; d", [{}])  # Disjunction (d succeeds)
-        self.assertQueryFalse("e; f")  # Disjunction fails
+        with pytest.raises(PrologError):
+            self.runtime.query("a; e")  # Disjunction explores undefined branch
+        with pytest.raises(PrologError):
+            self.runtime.query("e; d")  # Undefined left branch errors
+        with pytest.raises(PrologError):
+            self.runtime.query("e; f")  # Disjunction with undefined predicate
 
         self.assertQueryFalse("\\+ a")  # Negation (a succeeds, so \+ a fails)
-        self.assertQueryTrue("\\+ e", [{}])  # Negation (e fails, so \+ e succeeds)
+        with pytest.raises(PrologError):
+            self.runtime.query("\\+ e")  # Undefined predicate should error
 
     def test_control_flow(self):
         """制御フローのテスト"""
@@ -238,7 +244,8 @@ class TestRuntime:
         self._skip_if_not_implemented()
         self.runtime.add_rule("p.")
         self.assertQueryFalse("\\+ p")
-        self.assertQueryTrue("\\+ q", [{}])
+        with pytest.raises(PrologError):
+            self.runtime.query("\\+ q")
 
     def test_cut_behavior(self):  # Covered by test_control_flow
         """カットの動作テスト"""
@@ -282,7 +289,8 @@ class TestRuntime:
             "my_fact(Y)", [{"Y": Number(2)}]
         )  # Only my_fact(2) should remain
 
-        self.assertQueryFalse("non_existent_fact(1)")
+        with pytest.raises(PrologError):
+            self.runtime.query("non_existent_fact(1)")
         self.assertQueryFalse(
             "retract(non_existent_fact(1))"
         )  # Retracting non-existent should fail

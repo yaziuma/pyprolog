@@ -100,16 +100,15 @@ class TestExplainTool:
 
         # 存在しない述語は解が見つからないので success は False になる
         assert result["success"] is False
+        assert "error" in result
         assert len(result["solutions"]) == 0
 
     def test_explain_invalid_query(self):
         """無効なクエリの説明テスト"""
         result = self.explain_tool.explain_query("invalid syntax here", "text")
 
-        # パーサーが例外を投げないバグがあるため、explain_toolはエラーを検知できない。
-        # そのため、解が0件として扱われ、success: Falseが返る。
         assert result["success"] is False
-        assert "error" not in result  # バグのある現状の挙動を確認
+        assert "error" in result
 
     def test_explain_with_invalid_format(self):
         """無効な形式指定の説明テスト"""

@@ -173,11 +173,14 @@ class Runtime:
                 raise PrologError(
                     f"Comparison operator {op_info.symbol} requires 2 arguments"
                 )
-            left_val = self.math_interpreter.evaluate(args[0], env)
-            right_val = self.math_interpreter.evaluate(args[1], env)
-            return self.math_interpreter.evaluate_comparison_op(
-                op_info.symbol, left_val, right_val
-            )
+            try:
+                left_val = self.math_interpreter.evaluate(args[0], env)
+                right_val = self.math_interpreter.evaluate(args[1], env)
+                return self.math_interpreter.evaluate_comparison_op(
+                    op_info.symbol, left_val, right_val
+                )
+            except PrologError:
+                return False
 
         return evaluator
 
@@ -513,6 +516,8 @@ class Runtime:
                 # IOManager例外などの重要な例外は伝播
                 if "Input required" in str(e) or hasattr(e, "input_type"):
                     logger.debug(f"Critical exception in operator {functor_name}: {e}")
+                    raise
+                if isinstance(e, PrologError):
                     raise
                 logger.error(
                     f"Error evaluating operator {functor_name}: {e}", exc_info=True

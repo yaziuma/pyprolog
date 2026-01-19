@@ -63,7 +63,15 @@ class ExplainTool:
 
         except Exception as e:
             logger.error(f"Error explaining query '{query_str}': {e}")
-            return {"query": query_str, "error": str(e), "success": False}
+            return {
+                "query": query_str,
+                "error": str(e),
+                "success": False,
+                "solutions": [],
+                "trace": "",
+                "format": format_type,
+                "event_count": 0,
+            }
 
     def parse_explain_command(self, explain_command: str) -> tuple:
         """
