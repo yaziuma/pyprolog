@@ -178,8 +178,11 @@ class TestExportFactsPredicate:
 
     def test_export_facts_invalid_file_path(self):
         """無効なファイルパスでのテスト"""
-        # 存在しないディレクトリへのパス
-        invalid_path = "/proc/definitely/invalid/path/output.csv"
+        # 存在しないドライブ/ディレクトリへのパス
+        if os.name == "nt":
+            invalid_path = "Z:\\invalid<>path\\output.csv"
+        else:
+            invalid_path = "/proc/definitely/invalid/path/output.csv"
 
         # エラーが発生して失敗することを確認
         solutions = list(
