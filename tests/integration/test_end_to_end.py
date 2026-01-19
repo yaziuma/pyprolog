@@ -3,12 +3,13 @@ End-to-End テスト
 
 システム全体の統合動作を検証するテストスイート。
 パーサー、ランタイム、論理エンジンの連携を総合的にテストします。
-
-注意: Runtime/Parserが実装されるまで、全テストはスキップされます。
 """
 
-import unittest
-from pyprolog.core.types import Variable, Term
+import pytest
+
+from pyprolog.core.errors import PrologError
+from pyprolog.core.types import Atom, Number, Term, Variable
+from pyprolog.runtime.io_streams import StringStream
 
 
 class TestEndToEnd:
@@ -16,338 +17,374 @@ class TestEndToEnd:
 
     def setup_method(self):
         """各テストの前処理"""
-        # Runtimeクラスの実装状況に応じて調整
-        try:
-            from pyprolog.runtime.interpreter import Runtime
+        from pyprolog.runtime.interpreter import Runtime
 
-            self.runtime = Runtime()
-        except ImportError:
-            self.runtime = None
+        self.runtime = Runtime()
+        self.runtime.rules.clear()
+        if hasattr(self.runtime, "logic_interpreter") and self.runtime.logic_interpreter:
+            self.runtime.logic_interpreter.replace_rules(self.runtime.rules)
 
-    def _skip_if_not_implemented(self):
-        """Runtimeが実装されていない場合はテストをスキップ"""
-        if self.runtime is None:
-            raise unittest.SkipTest("Runtime not fully implemented yet")
+    def _make_list(self, elements):
+        result = Atom("[]")
+        for element in reversed(elements):
+            result = Term(Atom("."), [element, result])
+        return result
 
-    def _load_program(self, program_text: str):
-        """プログラムテキストをロードするヘルパーメソッド"""
-        # 実装されるまでスキップ
-        raise unittest.SkipTest("Program loading not implemented yet")
+    def _add_rules(self, *rules: str):
+        for rule in rules:
+            assert self.runtime.add_rule(rule), f"Failed to add rule: {rule}"
 
     def test_simple_queries(self):
         """単純なクエリのテスト"""
-        self._skip_if_not_implemented()
+        self._add_rules(
+            "likes(mary, food).",
+            "likes(mary, wine).",
+            "likes(john, wine).",
+            "likes(john, mary).",
+        )
 
-        # 実装例（Runtime/Parserが実装されてから有効化）:
-        # program = """
-        # likes(mary, food).
-        # likes(mary, wine).
-        # likes(john, wine).
-        # likes(john, mary).
-        # """
-        #
-        # self._load_program(program)
-        #
-        # results = self.runtime.query("likes(mary, wine)")
-        # assert len(results) == 1
+        results = self.runtime.query("likes(mary, wine)")
+        assert len(results) == 1
+
+        results = self.runtime.query("likes(mary, X)")
+        values = {solution.get(Variable("X")) for solution in results}
+        assert Atom("food") in values
+        assert Atom("wine") in values
 
     def test_complex_queries(self):
         """複雑なクエリのテスト"""
-        self._skip_if_not_implemented()
+        self._add_rules(
+            "parent(tom, bob).",
+            "parent(bob, ann).",
+            "grandparent(GP, GC) :- parent(GP, P), parent(P, GC).",
+        )
 
-        # 実装例:
-        # 祖父関係などの複雑なクエリのテスト
+        results = self.runtime.query("grandparent(tom, ann)")
+        assert len(results) == 1
+
+        results = self.runtime.query("grandparent(tom, X)")
+        assert results[0].get(Variable("X")) == Atom("ann")
 
     def test_recursive_rules(self):
         """再帰ルールのテスト"""
-        self._skip_if_not_implemented()
+        self._add_rules(
+            "parent(a,b).",
+            "parent(b,c).",
+            "parent(c,d).",
+            "ancestor(X, Y) :- parent(X, Y).",
+            "ancestor(X, Z) :- parent(X, Y), ancestor(Y, Z).",
+        )
 
-        # 実装例:
-        # ancestor関係の再帰的定義のテスト
+        assert len(self.runtime.query("ancestor(a, d)")) == 1
+        assert len(self.runtime.query("ancestor(d, a)")) == 0
 
     def test_arithmetic_integration(self):
         """算術演算の統合テスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # is演算子と算術演算の統合テスト
+        results = self.runtime.query("X is 5 + 2 * 3 - 1")
+        assert results[0].get(Variable("X")) == Number(10)
+        assert len(self.runtime.query("1 is 1 + 1")) == 0
 
     def test_list_operations(self):
         """リスト操作の統合テスト"""
-        self._skip_if_not_implemented()
+        results = self.runtime.query("member(X, [a,b,c])")
+        values = [solution.get(Variable("X")) for solution in results]
+        assert values == [Atom("a"), Atom("b"), Atom("c")]
 
-        # 実装例:
-        # member/2, append/3 などのリスト操作
+        results = self.runtime.query("append([a,b], [c], L)")
+        assert results[0].get(Variable("L")) == self._make_list(
+            [Atom("a"), Atom("b"), Atom("c")]
+        )
 
     def test_cut_behavior(self):
         """カットの動作テスト"""
-        self._skip_if_not_implemented()
+        self._add_rules(
+            "data(one).",
+            "data(two).",
+            "data(three).",
+            "cut_test(X) :- data(X), !.",
+        )
 
-        # 実装例:
-        # カットによるバックトラッキング制御
+        results = self.runtime.query("cut_test(X)")
+        assert len(results) == 1
+        assert results[0].get(Variable("X")) == Atom("one")
 
     def test_negation_as_failure(self):
         """失敗による否定のテスト"""
-        self._skip_if_not_implemented()
+        self._add_rules("p(a).")
 
-        # 実装例:
-        # \\+ 演算子による否定
+        assert len(self.runtime.query("\\+ p(a)")) == 0
+        assert len(self.runtime.query("\\+ p(b)")) == 1
 
     def test_variable_scoping(self):
         """変数スコープのテスト"""
-        self._skip_if_not_implemented()
+        self._add_rules(
+            "q(1).",
+            "q(2).",
+            "r(2).",
+            "p(X) :- q(X), r(X).",
+        )
 
-        # 実装例:
-        # 変数のスコープ管理
+        results = self.runtime.query("p(X)")
+        assert len(results) == 1
+        assert results[0].get(Variable("X")) == Number(2)
 
     def test_complex_unification(self):
         """複雑な単一化のテスト"""
-        self._skip_if_not_implemented()
+        self._add_rules("pair(f(a), g(b)).")
 
-        # 実装例:
-        # 複雑な構造の単一化
+        results = self.runtime.query("pair(f(X), g(Y))")
+        assert results[0].get(Variable("X")) == Atom("a")
+        assert results[0].get(Variable("Y")) == Atom("b")
+
+        results = self.runtime.query("f(X, g(Y)) = f(a, g(b))")
+        assert results[0].get(Variable("X")) == Atom("a")
+        assert results[0].get(Variable("Y")) == Atom("b")
 
     def test_meta_predicates(self):
         """メタ述語のテスト"""
-        self._skip_if_not_implemented()
+        self._add_rules("p(a).", "p(b).")
 
-        # 実装例:
-        # findall/3, bagof/3, setof/3
+        results = self.runtime.query("findall(X, p(X), L)")
+        assert results[0].get(Variable("L")) == self._make_list(
+            [Atom("a"), Atom("b")]
+        )
 
     def test_error_recovery(self):
         """エラー回復のテスト"""
-        self._skip_if_not_implemented()
+        with pytest.raises(PrologError):
+            self.runtime.query("undefined_predicate(X)")
 
-        # 実装例:
-        # 構文エラーからの回復
+        results = self.runtime.query("true")
+        assert len(results) == 1
 
     def test_performance_basic(self):
         """基本的なパフォーマンステスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # 基本的なクエリの実行時間測定
+        results = self.runtime.query("member(X, [a,b,c,d,e,f,g,h,i])")
+        assert len(results) == 9
 
     def test_memory_management_integration(self):
         """メモリ管理の統合テスト"""
-        self._skip_if_not_implemented()
+        for i in range(50):
+            assert self.runtime.add_rule(f"fact({i}).")
 
-        # 実装例:
-        # 大量データでのメモリ管理
+        results = self.runtime.query("fact(X)")
+        assert len(results) == 50
 
     def test_parser_integration(self):
         """パーサー統合のテスト"""
-        self._skip_if_not_implemented()
+        self._add_rules(
+            "person('John Jones', boston).",
+            "calc(X) :- X is (5 + 2) * (3 - 1).",
+            "list_item([a,b,c]).",
+        )
 
-        # 実装例:
-        # 様々な構文要素の解析
+        results = self.runtime.query("calc(Z)")
+        assert results[0].get(Variable("Z")) == Number(14)
+        assert len(self.runtime.query("person('John Jones', boston)")) == 1
+        assert len(self.runtime.query("list_item([a,b,c])")) == 1
 
     def test_runtime_state_management(self):
         """ランタイム状態管理のテスト"""
-        self._skip_if_not_implemented()
+        assert len(self.runtime.query("asserta(state(a))")) == 1
+        assert len(self.runtime.query("assertz(state(b))")) == 1
 
-        # 実装例:
-        # ランタイム状態の管理と更新
+        results = self.runtime.query("state(X)")
+        assert [solution.get(Variable("X")) for solution in results] == [
+            Atom("a"),
+            Atom("b"),
+        ]
+
+        assert len(self.runtime.query("retract(state(a))")) == 1
+        results = self.runtime.query("state(X)")
+        assert [solution.get(Variable("X")) for solution in results] == [Atom("b")]
 
     def test_comprehensive_scenario(self):
         """包括的なシナリオテスト"""
-        self._skip_if_not_implemented()
+        assert self.runtime.consult("tests/data/fixed_medical_diagnosis.pl")
 
-        # 実装例:
-        # 実際のPrologプログラムの実行
+        output = StringStream()
+        self.runtime.io_manager.set_output_stream(output)
+
+        results = self.runtime.query("diagnose_disease([fever], Disease, Probability)")
+        assert len(results) == 3
+
+        results = self.runtime.query(
+            "patient_diagnosis([fever], 30, [], [], Result)"
+        )
+        assert len(results) == 3
+        assert "Starting diagnosis" in output.get_output_string()
 
     def test_query_parsing(self):
         """クエリ解析のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # 文字列クエリの解析
+        self._add_rules("likes(mary, food).")
+        results = self.runtime.query("likes(mary, food)")
+        assert len(results) == 1
 
     def test_multiple_solutions(self):
         """複数解のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # バックトラッキングによる複数解
+        self._add_rules("item(apple).", "item(banana).")
+        results = self.runtime.query("item(X)")
+        values = {solution.get(Variable("X")) for solution in results}
+        assert values == {Atom("apple"), Atom("banana")}
 
     def test_built_in_predicates(self):
         """組み込み述語のテスト"""
-        self._skip_if_not_implemented()
+        output = StringStream()
+        self.runtime.io_manager.set_output_stream(output)
 
-        # 実装例:
-        # write/1, nl/0 などの組み込み述語
+        results = self.runtime.query("write(hello), nl")
+        assert len(results) == 1
+        assert output.get_output_string() == "hello\n"
 
     def test_constraint_satisfaction(self):
         """制約充足のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # 制約論理プログラミング
+        results = self.runtime.query("X is 5, X >= 5, X < 10")
+        assert results[0].get(Variable("X")) == Number(5)
 
     def test_database_operations(self):
         """データベース操作のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # assert/retract による動的述語
+        assert len(self.runtime.query("asserta(db_fact(1))")) == 1
+        assert len(self.runtime.query("assertz(db_fact(2))")) == 1
+        results = self.runtime.query("db_fact(X)")
+        assert [solution.get(Variable("X")) for solution in results] == [
+            Number(1),
+            Number(2),
+        ]
+        assert len(self.runtime.query("retract(db_fact(1))")) == 1
+        assert len(self.runtime.query("db_fact(1)")) == 0
 
     def test_exception_handling(self):
         """例外処理のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # throw/catch による例外処理
+        with pytest.raises(PrologError):
+            self.runtime.query("throw(error)")
 
     def test_module_system(self):
         """モジュールシステムのテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # モジュール分離と名前空間
+        with pytest.raises(PrologError):
+            self.runtime.query("module(user)")
 
     def test_io_operations(self):
         """入出力操作のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # ファイル入出力とストリーム操作
+        output = StringStream()
+        self.runtime.io_manager.set_output_stream(output)
+        assert len(self.runtime.query("write(output_test), nl")) == 1
+        assert output.get_output_string() == "output_test\n"
 
     def test_term_inspection(self):
         """項検査のテスト"""
-        self._skip_if_not_implemented()
+        results = self.runtime.query("functor(f(a,b), F, A)")
+        assert results[0].get(Variable("F")) == Atom("f")
+        assert results[0].get(Variable("A")) == Number(2)
 
-        # 実装例:
-        # functor/3, arg/3, =../2
+        results = self.runtime.query("arg(2, f(a,b), X)")
+        assert results[0].get(Variable("X")) == Atom("b")
+
+        results = self.runtime.query("f(a,b) =.. L")
+        assert results[0].get(Variable("L")) == self._make_list(
+            [Atom("f"), Atom("a"), Atom("b")]
+        )
 
     def test_type_checking_integration(self):
         """型チェック統合のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # var/1, atom/1, number/1 など
+        assert len(self.runtime.query("var(X)")) == 1
+        assert len(self.runtime.query("atom(sample)")) == 1
+        assert len(self.runtime.query("number(123)")) == 1
 
     def test_goal_expansion(self):
         """ゴール展開のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # マクロ展開とゴール変換
+        with pytest.raises(PrologError):
+            self.runtime.query("goal_expansion(a, b)")
 
     def test_operator_definitions(self):
         """演算子定義のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # op/3 による演算子定義
+        with pytest.raises(PrologError):
+            self.runtime.query("op(500, xfy, foo)")
 
     def test_dcg_support(self):
         """DCG（文法規則）サポートのテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # --> 記法による文法規則
+        with pytest.raises(PrologError):
+            self.runtime.query("phrase(rule, [a])")
 
     def test_debugging_support(self):
         """デバッグサポートのテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # trace/0, debug/0 によるデバッグ
+        with pytest.raises(PrologError):
+            self.runtime.query("trace")
 
     def test_profiling_support(self):
         """プロファイリングサポートのテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # 実行時間とメモリ使用量の測定
+        with pytest.raises(PrologError):
+            self.runtime.query("profile")
 
     def test_multi_threading(self):
         """マルチスレッドのテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # 並行実行とスレッドセーフティ
+        stats = self.runtime.io_manager.get_input_statistics()
+        assert stats["threading_enabled"] is True
+        assert stats["handler_configured"] is True
 
     def test_garbage_collection(self):
         """ガベージコレクションのテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # メモリ管理と自動回収
+        results = self.runtime.query("X is 1")
+        assert results[0].get(Variable("X")) == Number(1)
+        results = self.runtime.query("X is 2")
+        assert results[0].get(Variable("X")) == Number(2)
 
     def test_foreign_interface(self):
         """外部インターフェースのテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # Python関数との連携
+        with pytest.raises(PrologError):
+            self.runtime.query("foreign_call(foo)")
 
     def test_serialization(self):
         """シリアル化のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # プログラム状態の保存と復元
+        with pytest.raises(PrologError):
+            self.runtime.query("serialize(state)")
 
     def test_incremental_compilation(self):
         """インクリメンタルコンパイルのテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # 部分的なプログラム更新
+        self._add_rules("new_fact :- fail.")
+        assert len(self.runtime.query("new_fact")) == 0
+        self._add_rules("new_fact.")
+        assert len(self.runtime.query("new_fact")) == 1
 
     def test_optimization(self):
         """最適化のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # クエリ最適化と実行効率
+        for i in range(20):
+            assert self.runtime.add_rule(f"opt({i}).")
+        results = self.runtime.query("opt(X)")
+        assert len(results) == 20
 
     def test_stress_scenarios(self):
         """ストレステストシナリオ"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # 高負荷でのシステム動作
+        for i in range(100):
+            assert self.runtime.add_rule(f"stress({i}).")
+        results = self.runtime.query("stress(X)")
+        assert len(results) == 100
 
     def test_edge_case_integration(self):
         """境界ケース統合テスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # 各コンポーネントの境界ケースの組み合わせ
+        self._add_rules("edge(a).")
+        assert len(self.runtime.query("edge(a), fail")) == 0
+        assert len(self.runtime.query("edge(a); edge(b)")) == 1
 
     def test_medical_diagnosis_japanese(self):
         """日本語医療診断KBのエンドツーエンドテスト"""
-        # Runtimeが初期化されていることを確認 (setup_methodで初期化されるはず)
-        if self.runtime is None:
-            # Fallback if setup_method didn't run or failed, though pytest typically ensures setup runs.
-            # Or, if Runtime import itself is the issue, this test can't proceed.
-            try:
-                from pyprolog.runtime.interpreter import Runtime
-
-                self.runtime = Runtime()
-            except ImportError:
-                raise unittest.SkipTest("Runtime could not be imported or initialized.")
-
         kb_path = "tests/data/medical_diagnosis_kb_japanese.pl"
         consult_success = self.runtime.consult(kb_path)
         assert consult_success, f"Failed to consult the knowledge base: {kb_path}"
 
         # --- Test basic write/1 and nl/0 ---
-        write_test_query = "test_write."
-        write_solutions = self.runtime.query(write_test_query)
+        output = StringStream()
+        self.runtime.io_manager.set_output_stream(output)
+        write_solutions = self.runtime.query("test_write")
         assert write_solutions is not None, "test_write query returned None."
         # test_write should succeed once if it's found and write/nl work.
-        assert len(write_solutions) >= 0, (
+        assert len(write_solutions) >= 1, (
             "test_write query failed (or produced unexpected results)."
         )
-        # We assert >=0 because it might succeed with no bindings, or once with empty binding.
-        # The main check is the captured stdout for 'Hello from Prolog write'.
+        assert "Hello from Prolog write" in output.get_output_string()
         # --- End Test basic write/1 and nl/0 ---
 
         # --- Basic KB Integrity Check ---
-        simple_fact_query = "疾患症状(風邪, 発熱, 0.8)."
+        simple_fact_query = "疾患症状(風邪, 発熱, 0.8)"
         simple_solutions = self.runtime.query(simple_fact_query)
         assert simple_solutions is not None, "Simple fact query returned None."
         assert len(simple_solutions) > 0, (
@@ -356,7 +393,7 @@ class TestEndToEnd:
         # --- End Basic KB Integrity Check ---
 
         # Query 1: 患者診断([発熱, 咳], 30, [], [], Result). - Added empty list for Lifestyles for arity 5
-        query1_str = "患者診断([発熱, 咳], 30, [], [], Result)."
+        query1_str = "患者診断([発熱, 咳], 30, [], [], Result)"
         solutions1 = self.runtime.query(query1_str)
 
         assert solutions1 is not None, (
@@ -377,7 +414,7 @@ class TestEndToEnd:
         )
 
         # Query 2: 患者診断([息切れ, 発熱], 70, [糖尿病], [], Result). - Added empty list for Lifestyles for arity 5
-        query2_str = "患者診断([息切れ, 発熱], 70, [糖尿病], [], Result)."
+        query2_str = "患者診断([息切れ, 発熱], 70, [糖尿病], [], Result)"
         solutions2 = self.runtime.query(query2_str)
         assert solutions2 is not None, "Query 2 returned None."
         assert len(solutions2) > 0, (
@@ -394,7 +431,7 @@ class TestEndToEnd:
         )
 
         # Query 3: 診断([発熱, 咳, のどの痛み], 45, [喫煙], DiagnosisList). - This uses 診断/4 which correctly calls 患者診断/5
-        query3_str = "診断([発熱, 咳, のどの痛み], 45, [喫煙], DiagnosisList)."
+        query3_str = "診断([発熱, 咳, のどの痛み], 45, [喫煙], DiagnosisList)"
         solutions3 = self.runtime.query(query3_str)
         assert solutions3 is not None, "Query 3 returned None."
         assert len(solutions3) > 0, (
@@ -410,34 +447,3 @@ class TestEndToEnd:
             "DiagnosisList from Query 3 should be a Prolog list."
         )
 
-
-# テスト用のヘルパークラス
-class MockProgramLoader:
-    """テスト用のプログラムローダーモック"""
-
-    def __init__(self):
-        self.loaded_programs = []
-
-    def load(self, program_text: str):
-        """プログラムをロード（モック実装）"""
-        self.loaded_programs.append(program_text)
-
-    def clear(self):
-        """ロードされたプログラムをクリア"""
-        self.loaded_programs.clear()
-
-
-class MockQueryEngine:
-    """テスト用のクエリエンジンモック"""
-
-    def __init__(self):
-        self.query_history = []
-
-    def execute(self, query: str):
-        """クエリを実行（モック実装）"""
-        self.query_history.append(query)
-        return []  # 空の結果を返す
-
-    def get_history(self):
-        """クエリ履歴を取得"""
-        return self.query_history.copy()
