@@ -824,12 +824,11 @@ class Runtime:
             if parsed_items:
                 for item in parsed_items:
                     if isinstance(item, (Rule, Fact)):
-                        self.rules.append(item)
+                        self.logic_interpreter.add_rule(item, position="last")
                         added_count += 1
                     else:
                         logger.warning(f"Skipping non-rule/fact from add_rule: {item}")
                 if added_count > 0:
-                    self.logic_interpreter.rules = self.rules
                     logger.info(f"Added {added_count} rule(s)/fact(s) from string.")
                 else:
                     logger.warning("No rules/facts parsed from add_rule string.")
@@ -857,12 +856,11 @@ class Runtime:
             added_count = 0
             for item in new_rules_or_terms:
                 if isinstance(item, (Rule, Fact)):
-                    self.rules.append(item)
+                    self.logic_interpreter.add_rule(item, position="last")
                     added_count += 1
                 else:
                     logger.warning(f"Skipping non-rule/fact during consult: {item}")
             if added_count > 0:
-                self.logic_interpreter.rules = self.rules
                 logger.info(f"Consulted {added_count} rules/facts from {filename}")
             else:
                 logger.info(f"No rules or facts consulted from {filename}")

@@ -11,7 +11,7 @@ from pyprolog.core.types import (
 )
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.errors import PrologError, CutException
-from typing import TYPE_CHECKING, Tuple, Iterator, List, Union, Dict
+from typing import TYPE_CHECKING, Tuple, Iterator, List, Union, Dict, Optional
 import logging
 
 if TYPE_CHECKING:
@@ -25,6 +25,93 @@ class LogicInterpreter:
         self.rules: List[Union[Rule, Fact]] = rules
         self.runtime: "Runtime" = runtime
         self._unique_var_counter = 0
+        self.rules_index: Dict[Tuple[str, int], List[Union[Rule, Fact]]] = {}
+        self._rules_len = 0
+        self._build_index()
+
+    def _build_index(self) -> None:
+        self.rules_index = {}
+        for rule in self.rules:
+            self._add_to_index(rule)
+        self._rules_len = len(self.rules)
+
+    def _refresh_index_if_needed(self) -> None:
+        if len(self.rules) != self._rules_len:
+            self._build_index()
+
+    def _effective_head_for_index(
+        self, entry: Union[Rule, Fact]
+    ) -> Optional[Term]:
+        head = entry.head
+
+        if (
+            isinstance(entry, Fact)
+            and isinstance(head, Term)
+            and isinstance(head.functor, Atom)
+            and head.functor.name == ":-"
+            and len(head.args) == 2
+        ):
+            effective_head = head.args[0]
+        else:
+            effective_head = head
+
+        if isinstance(effective_head, Atom):
+            return Term(effective_head, [])
+        if isinstance(effective_head, Term):
+            return effective_head
+        return None
+
+    def _index_key_from_head(self, head: Optional[Term]) -> Optional[Tuple[str, int]]:
+        if head is None:
+            return None
+        if not isinstance(head.functor, Atom):
+            return None
+        return (head.functor.name, len(head.args))
+
+    def _add_to_index(self, entry: Union[Rule, Fact], position: str = "last") -> None:
+        key = self._index_key_from_head(self._effective_head_for_index(entry))
+        if key is None:
+            return
+        bucket = self.rules_index.setdefault(key, [])
+        if position == "first":
+            bucket.insert(0, entry)
+        else:
+            bucket.append(entry)
+
+    def _remove_from_index(self, entry: Union[Rule, Fact]) -> None:
+        key = self._index_key_from_head(self._effective_head_for_index(entry))
+        if key is None:
+            return
+        bucket = self.rules_index.get(key)
+        if not bucket:
+            return
+        for i, item in enumerate(bucket):
+            if item is entry:
+                del bucket[i]
+                break
+        if not bucket:
+            self.rules_index.pop(key, None)
+
+    def add_rule(self, entry: Union[Rule, Fact], position: str = "last") -> None:
+        if position == "first":
+            self.rules.insert(0, entry)
+        else:
+            self.rules.append(entry)
+        self._add_to_index(entry, position=position)
+        self._rules_len = len(self.rules)
+
+    def remove_rule(self, entry: Union[Rule, Fact]) -> bool:
+        for i, item in enumerate(self.rules):
+            if item is entry:
+                del self.rules[i]
+                self._remove_from_index(entry)
+                self._rules_len = len(self.rules)
+                return True
+        return False
+
+    def replace_rules(self, rules: List[Union[Rule, Fact]]) -> None:
+        self.rules = rules
+        self._build_index()
 
     def _rename_variables(
         self, term_or_rule: Union[PrologType, Rule, Fact]
@@ -277,7 +364,16 @@ class LogicInterpreter:
         #     yield env
         #     return
 
-        for db_entry_idx, db_entry in enumerate(self.rules):
+        self._refresh_index_if_needed()
+
+        candidate_entries: List[Union[Rule, Fact]]
+        if isinstance(actual_goal.functor, Atom):
+            key = (actual_goal.functor.name, len(actual_goal.args))
+            candidate_entries = list(self.rules_index.get(key, []))
+        else:
+            candidate_entries = list(self.rules)
+
+        for db_entry_idx, db_entry in enumerate(candidate_entries):
             logger.debug(f"LOGIC_INTERP: Trying rule/fact #{db_entry_idx}: {db_entry}")
             renamed_entry = self._rename_variables(db_entry)
             logger.debug(f"LOGIC_INTERP: Renamed entry: {renamed_entry}")
