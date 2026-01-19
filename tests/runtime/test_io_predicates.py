@@ -19,7 +19,10 @@ class TestIOPredicates:
 
     # Helper methods adapted from other test files
     def assertQueryTrue(
-        self, query_string: str, expected_bindings_list: Optional[List[Dict[str, Atom]]]=None, msg: str = None
+        self,
+        query_string: str,
+        expected_bindings_list: Optional[List[Dict[str, Atom]]] = None,
+        msg: str = None,
     ):
         """
         Asserts that a query succeeds (yields at least one solution) and optionally

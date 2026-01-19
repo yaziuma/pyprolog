@@ -219,7 +219,11 @@ class EnhancedRuntime(Runtime):
             raise
 
     def _safe_findall(
-        self, template: Variable, goal: Term, result_list: Variable, env: BindingEnvironment
+        self,
+        template: Variable,
+        goal: Term,
+        result_list: Variable,
+        env: BindingEnvironment,
     ) -> Iterator[BindingEnvironment]:
         """安全なfindall/3実装"""
         try:

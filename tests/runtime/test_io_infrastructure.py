@@ -1,5 +1,6 @@
 # tests/runtime/test_io_infrastructure.py
 from pyprolog.runtime.io_streams import StringStream, ConsoleStream
+from pyprolog.runtime.unified_input_system import StreamInputHandler
 from pyprolog.runtime.io_manager import IOManager
 from pyprolog.runtime.interpreter import Runtime  # Assuming Runtime is in interpreter
 
@@ -57,36 +58,20 @@ def test_string_stream_clear_output():
 
 # Test IOManager Stream Management
 def test_io_manager_default_streams():
-    """Test that IOManager defaults to ConsoleStream."""
+    """Test that IOManager defaults to ConsoleStream for output."""
     manager = IOManager()
-    assert isinstance(manager.get_input_stream(), ConsoleStream)
     assert isinstance(manager.get_output_stream(), ConsoleStream)
 
 
-def test_io_manager_set_get_streams():
-    """Test setting and getting streams in IOManager."""
+def test_io_manager_set_input_handler_and_request_input():
+    """Test request_input with StreamInputHandler."""
     manager = IOManager()
-    input_s = StringStream("test")
-    output_s = StringStream()
+    handler = StreamInputHandler(StringStream("hello\nworld\n"))
+    manager.set_input_handler(handler)
 
-    manager.set_input_stream(input_s)
-    manager.set_output_stream(output_s)
-
-    assert manager.get_input_stream() is input_s
-    assert manager.get_output_stream() is output_s
-
-
-# Test IOManager Character I/O
-def test_io_manager_read_char():
-    """Test read_char_from_current in IOManager."""
-    manager = IOManager()
-    manager.set_input_stream(StringStream("hello"))
-    assert manager.read_char_from_current() == "h"
-    assert manager.read_char_from_current() == "e"
-    assert manager.read_char_from_current() == "l"
-    assert manager.read_char_from_current() == "l"
-    assert manager.read_char_from_current() == "o"
-    assert manager.read_char_from_current() == ""  # EOF
+    assert manager.request_input("char", "get_char") == "h"
+    assert manager.request_input("line", "read_line") == "ello"
+    assert manager.request_input("line", "read_line") == "world"
 
 
 def test_io_manager_write_char():
@@ -111,8 +96,7 @@ def test_runtime_has_io_manager():
     """Test that a Runtime instance has an IOManager."""
     runtime_instance = Runtime()  # Assuming default constructor is fine
     assert isinstance(runtime_instance.io_manager, IOManager)
-    # Also check if default streams are ConsoleStream via runtime's IOManager
-    assert isinstance(runtime_instance.io_manager.get_input_stream(), ConsoleStream)
+    # Also check if default output stream is ConsoleStream via runtime's IOManager
     assert isinstance(runtime_instance.io_manager.get_output_stream(), ConsoleStream)
 
 

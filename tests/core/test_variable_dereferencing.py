@@ -218,7 +218,9 @@ class TestVariableDereferencing:
         assert result2 == Atom("updated")
 
     # ヘルパーメソッド
-    def _dereference_fully(self, var: Variable, visited: Optional[Set[str]]=None) -> Union[Term, Variable, Number, Atom, String]:
+    def _dereference_fully(
+        self, var: Variable, visited: Optional[Set[str]] = None
+    ) -> Union[Term, Variable, Number, Atom, String]:
         """完全な間接参照の実装例"""
         if visited is None:
             visited = set()
@@ -241,7 +243,9 @@ class TestVariableDereferencing:
 
         return value
 
-    def _dereference_term(self, term: Union[Variable, Term]) -> Union[Variable, Term, Number, Atom, String]:
+    def _dereference_term(
+        self, term: Union[Variable, Term]
+    ) -> Union[Variable, Term, Number, Atom, String]:
         """項内の変数を間接参照する実装例"""
         if isinstance(term, Variable):
             return self._dereference_fully(term)

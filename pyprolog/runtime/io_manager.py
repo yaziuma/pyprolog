@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class IOManager:
     """
     入出力管理クラス（継続駆動統一入力システム）
-    
+
     全ての入力要求は継続ハンドル前提の UnifiedInputSystem を経由し、
     旧同期フォールバックは撤去された構成です。
     """
@@ -21,7 +21,7 @@ class IOManager:
         """
         self._current_output_stream: IOStream = ConsoleStream()
         self.unified_input = UnifiedInputSystem()
-        
+
         self._setup_default_unified_input()
         self.enable_threading()
 
@@ -35,24 +35,20 @@ class IOManager:
     # ========================================================================
 
     def request_input(
-        self, 
-        input_type: str, 
-        predicate_name: str, 
-        prompt: str = "",
-        **kwargs
+        self, input_type: str, predicate_name: str, prompt: str = "", **kwargs
     ) -> Optional[str]:
         """
         統一入力要求API
-        
+
         継続ハンドルベースの UnifiedInputSystem を直接呼び出します。
         例外はそのままプロセス実行側へ伝播します。
-        
+
         Args:
             input_type: 入力タイプ ("char", "line", "peek_char" etc.)
             predicate_name: 呼び出し元述語名
             prompt: プロンプト文字列
             **kwargs: 追加パラメータ
-            
+
         Returns:
             Optional[str]: 入力値（None = EOF）
         """
@@ -67,7 +63,7 @@ class IOManager:
     def set_input_handler(self, handler: InputHandler):
         """
         統一入力ハンドラを設定
-        
+
         Args:
             handler: InputHandlerの実装
         """
@@ -76,7 +72,7 @@ class IOManager:
     def enable_threading(self):
         """
         マルチスレッドモード（真の継続実行）を有効化
-        
+
         この呼び出し後、全ての入力要求で真の継続実行が使用される。
         """
         self.unified_input.enable_threading()
@@ -88,42 +84,6 @@ class IOManager:
         logger.info("IOManager: Threading mode disabled")
 
     # ========================================================================
-    # 従来API（後方互換性）
-    # ========================================================================
-
-    def read_char_from_current(self) -> str:
-        """
-        現在の入力ストリームから文字を読み取り（従来互換API）
-        
-        【重要】このメソッドは既存のGetCharPredicateとの互換性のため保持。
-        しかし、新しいIOPredicate統合後は使用されない。
-        
-        Returns:
-            str: 読み取った文字（EOF時は空文字列）
-        """
-        result = self.request_input("char", "get_char_legacy")
-        return result if result is not None else ""
-
-    def read_line_from_current(self) -> Optional[str]:
-        """
-        現在の入力ストリームから行を読み取り（従来互換API）
-        
-        Returns:
-            Optional[str]: 読み取った行（EOF時はNone）
-        """
-        return self.request_input("line", "read_line_legacy")
-
-    def peek_char_from_current(self) -> str:
-        """
-        現在の入力ストリームから非破壊的文字読み取り（従来互換API）
-        
-        Returns:
-            str: 覗き見した文字（EOF時は空文字列）
-        """
-        result = self.request_input("peek_char", "peek_char_legacy", non_destructive=True)
-        return result if result is not None else ""
-
-    # ========================================================================
     # 出力系API（変更なし）
     # ========================================================================
 
@@ -133,7 +93,7 @@ class IOManager:
 
     def write_string_to_current(self, string: str):
         """現在の出力ストリームに文字列を書き込み"""
-        if hasattr(self._current_output_stream, 'write'):
+        if hasattr(self._current_output_stream, "write"):
             self._current_output_stream.write(string)
         else:
             # 文字列を文字ごとに書き込み
