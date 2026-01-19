@@ -66,22 +66,6 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
     return logging.getLogger(name)
 
 
-def setup_logger(name: str = "prolog") -> logging.Logger:
-    """レガシー互換性のためのロガー設定関数。
-
-    Args:
-        name: ロガー名。
-
-    Returns:
-        設定済みのロガーインスタンス。
-
-    Note:
-        この関数は後方互換性のために残されています。
-        新しいコードでは get_logger() を使用してください。
-    """
-    return get_logger(name)
-
-
 # 自動初期化とデフォルトロガーの作成
 setup_logging()
 logger = get_logger()
