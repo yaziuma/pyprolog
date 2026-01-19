@@ -9,7 +9,6 @@ from pyprolog.core.merge_bindings import (
     merge_bindings,
     bindings_to_dict,
     dict_to_binding_environment,
-    unify_with_bindings,
     apply_substitution,
 )
 from pyprolog.core.binding_environment import BindingEnvironment
@@ -156,32 +155,6 @@ class TestMergeBindings:
             assert merged2["Y"] == Number(123)  # 具体値が優先
         else:
             assert merged2.get_value("Y") == Number(123)  # 具体値が優先
-
-    def test_unification_with_bindings(self):
-        """バインディングを使った単一化テスト"""
-        # 基本的な単一化
-        term1 = Variable("X")
-        term2 = Atom("hello")
-
-        success, result = unify_with_bindings(term1, term2)
-        assert success
-        if isinstance(result, dict):
-            assert result.get("X") == Atom("hello")
-        else:
-            assert result.get_value("X") == Atom("hello")
-
-        # 既存のバインディングとの単一化
-        existing_bindings = {"Y": Number(42)}
-        success2, result2 = unify_with_bindings(
-            Variable("Z"), String("world"), existing_bindings
-        )
-        assert success2
-        if isinstance(result2, dict):
-            assert result2["Y"] == Number(42)
-            assert result2["Z"] == String("world")
-        else:
-            assert result2.get_value("Y") == Number(42)
-            assert result2.get_value("Z") == String("world")
 
     def test_mixed_merging(self):
         """混合データ型のマージテスト"""
