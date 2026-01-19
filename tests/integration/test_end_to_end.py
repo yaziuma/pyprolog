@@ -303,13 +303,6 @@ class TestEndToEnd:
         # 実装例:
         # クエリ最適化と実行効率
 
-    def test_compatibility(self):
-        """互換性のテスト"""
-        self._skip_if_not_implemented()
-
-        # 実装例:
-        # 標準Prologとの互換性
-
     def test_stress_scenarios(self):
         """ストレステストシナリオ"""
         self._skip_if_not_implemented()

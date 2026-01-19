@@ -177,21 +177,6 @@ class TestFunctorMapper:
         assert len(non_ascii_map) == 0
         assert len(english_map) == 0
 
-    def test_backward_compatibility_methods(self):
-        """後方互換性メソッドテスト"""
-        mapper = FunctorMapper()
-
-        # 日本語判定（後方互換性）
-        assert mapper.is_japanese_functor("親")
-        assert mapper.is_japanese_functor("男性")
-        assert not mapper.is_japanese_functor("parent")
-        assert not mapper.is_japanese_functor("test123")
-
-        # 日本語マッピング（後方互換性）
-        mapped = mapper.map_japanese_to_english("親")
-        assert mapped.startswith("MAPPED_F")
-        assert mapper.map_english_to_japanese(mapped) == "親"
-
     def test_large_scale_mapping_performance(self):
         """大規模マッピングの性能テスト"""
         mapper = FunctorMapper()

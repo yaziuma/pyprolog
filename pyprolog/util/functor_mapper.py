@@ -133,19 +133,3 @@ class FunctorMapper:
         """登録済み既存ファンクター名を取得"""
         return self._existing_functors.copy()
 
-    # 後方互換性のためのメソッド（既存のインターフェースを維持）
-    def map_japanese_to_english(self, japanese_functor: str) -> str:
-        """日本語ファンクター名を英語に変換（後方互換性用）"""
-        return self.map_non_ascii_to_english(japanese_functor)
-
-    def map_english_to_japanese(self, english_functor: str) -> str:
-        """英語ファンクター名を日本語に復元（後方互換性用）"""
-        return self.map_english_to_non_ascii(english_functor)
-
-    def is_japanese_functor(self, name: str) -> bool:
-        """日本語ファンクター名かどうかを判定（後方互換性用）"""
-        if not name:
-            return False
-        # 日本語文字が含まれているかチェック
-        japanese_chars = re.search(r"[ぁ-ゟ゠-ヿ一-鿿]", name)
-        return japanese_chars is not None
