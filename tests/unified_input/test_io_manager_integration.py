@@ -11,7 +11,6 @@ from pyprolog.runtime.unified_input_system import StreamInputHandler
 
 def test_request_input_char_line_peek():
     manager = IOManager()
-    manager.disable_threading()
     manager.set_input_handler(StreamInputHandler(StringStream("ab\ncd\n")))
 
     assert manager.request_input("char", "get_char") == "a"

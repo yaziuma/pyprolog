@@ -267,7 +267,10 @@ class TestListingExportIntegration:
         assert len(solutions) == 1
 
         # 無効なexport（失敗するはず）
-        invalid_path = "/proc/definitely/invalid/path/file.csv"
+        if os.name == "nt":
+            invalid_path = "Z:\\invalid<>path\\file.csv"
+        else:
+            invalid_path = "/proc/definitely/invalid/path/file.csv"
         solutions = list(
             self.runtime.query(f"export_facts(person/3, '{invalid_path}').")
         )

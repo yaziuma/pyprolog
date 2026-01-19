@@ -4,6 +4,7 @@ from pyprolog.core.errors import (
     PrologError,
     CutException,
 )  # Assuming CutException might be relevant for some builtins
+from pyprolog.runtime.unified_input_system import StreamInputHandler
 from typing import TYPE_CHECKING, Iterator, List, Union, Optional
 import logging
 import ast
@@ -956,7 +957,12 @@ class AtEndOfStreamPredicate(BuiltinPredicate):
     def _get_target_stream(self, runtime: "Runtime", env: BindingEnvironment):
         """対象ストリームの特定"""
         if len(self.args) == 0:
-            return runtime.io_manager.get_input_stream()
+            unified_input = getattr(runtime.io_manager, "unified_input", None)
+            if unified_input and isinstance(
+                unified_input.input_handler, StreamInputHandler
+            ):
+                return unified_input.input_handler.stream
+            raise PrologError("at_end_of_stream requires StreamInputHandler")
         else:
             # at_end_of_stream(+Stream) 形式（将来実装）
             raise NotImplementedError("Stream argument not yet supported")

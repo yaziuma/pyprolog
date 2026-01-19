@@ -1,6 +1,7 @@
 # tests/runtime/test_peek_char.py
 import pytest
 from pyprolog.runtime.io_streams import StringStream
+from pyprolog.runtime.unified_input_system import StreamInputHandler
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.core.types import Variable, Atom
 
@@ -87,7 +88,7 @@ class TestPeekCharPredicate:
     def test_peek_char_unification_success(self):
         """peek_char/1の成功ケース"""
         runtime = Runtime()
-        runtime.io_manager.set_input_stream(StringStream("abc"))
+        runtime.io_manager.set_input_handler(StreamInputHandler(StringStream("abc")))
 
         solutions = runtime.query("peek_char(X)")
 
@@ -101,7 +102,7 @@ class TestPeekCharPredicate:
     def test_peek_char_unification_failure(self):
         """peek_char/1の失敗ケース"""
         runtime = Runtime()
-        runtime.io_manager.set_input_stream(StringStream("abc"))
+        runtime.io_manager.set_input_handler(StreamInputHandler(StringStream("abc")))
 
         solutions = runtime.query("peek_char(z)")  # 'a'と'z'は一致しない
 
@@ -110,7 +111,7 @@ class TestPeekCharPredicate:
     def test_peek_char_eof(self):
         """EOF時のpeek_char/1"""
         runtime = Runtime()
-        runtime.io_manager.set_input_stream(StringStream(""))
+        runtime.io_manager.set_input_handler(StreamInputHandler(StringStream("")))
 
         solutions = runtime.query("peek_char(X)")
 
@@ -121,7 +122,7 @@ class TestPeekCharPredicate:
         """peek_charとget_charの混在操作"""
         runtime = Runtime()
         stream = StringStream("abcde")
-        runtime.io_manager.set_input_stream(stream)
+        runtime.io_manager.set_input_handler(StreamInputHandler(stream))
 
         # peek -> get -> peek -> get のパターン
         peek1 = runtime.query("peek_char(X1)")  # 'a'
@@ -141,7 +142,7 @@ class TestAtEndOfStreamPredicate:
     def test_at_end_of_stream_false(self):
         """データがある場合の動作"""
         runtime = Runtime()
-        runtime.io_manager.set_input_stream(StringStream("data"))
+        runtime.io_manager.set_input_handler(StreamInputHandler(StringStream("data")))
 
         solutions = runtime.query("at_end_of_stream")
 
@@ -150,7 +151,7 @@ class TestAtEndOfStreamPredicate:
     def test_at_end_of_stream_true(self):
         """EOFの場合の動作"""
         runtime = Runtime()
-        runtime.io_manager.set_input_stream(StringStream(""))
+        runtime.io_manager.set_input_handler(StreamInputHandler(StringStream("")))
 
         solutions = runtime.query("at_end_of_stream")
 
@@ -160,7 +161,7 @@ class TestAtEndOfStreamPredicate:
         """読み取り進行中のEOF状態変化"""
         runtime = Runtime()
         stream = StringStream("a")
-        runtime.io_manager.set_input_stream(stream)
+        runtime.io_manager.set_input_handler(StreamInputHandler(stream))
 
         # データがあるときは失敗
         solutions1 = runtime.query("at_end_of_stream")
@@ -191,7 +192,7 @@ class TestConditionalReading:
         """)
 
         # テストケース1: 数字がある場合
-        runtime.io_manager.set_input_stream(StringStream("5abc"))
+        runtime.io_manager.set_input_handler(StreamInputHandler(StringStream("5abc")))
         solutions = runtime.query("read_if_digit(X)")
         assert len(solutions) == 1
         # Check if get_char returns a character - could be Atom or Number depending on implementation
@@ -199,7 +200,7 @@ class TestConditionalReading:
         assert result == Atom("5") or result == 5 or str(result) == "5"
 
         # テストケース2: 数字がない場合
-        runtime.io_manager.set_input_stream(StringStream("abc"))
+        runtime.io_manager.set_input_handler(StreamInputHandler(StringStream("abc")))
         solutions = runtime.query("read_if_digit(Y)")
         assert len(solutions) == 0
 
@@ -209,7 +210,7 @@ def test_basic_functionality():
     """基本機能の動作確認"""
     runtime = Runtime()
     stream = StringStream("hello")
-    runtime.io_manager.set_input_stream(stream)
+    runtime.io_manager.set_input_handler(StreamInputHandler(stream))
 
     # peek_char使用
     peek_result = runtime.query("peek_char(X)")
@@ -218,3 +219,4 @@ def test_basic_functionality():
     # EOF確認
     eof_result = runtime.query("at_end_of_stream")
     assert len(eof_result) == 0  # False（まだデータあり）
+

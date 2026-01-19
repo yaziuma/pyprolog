@@ -22,7 +22,7 @@ from pyprolog.runtime.unified_input_system import (
     InputEvent,
     ContinuationHandle,
 )
-from tests.unified_input.test_io_manager_integration import IOManager
+from pyprolog.runtime.io_manager import IOManager
 
 
 class MockRuntime:
@@ -183,8 +183,8 @@ class TestThreadedExecution:
     """スレッド化実行テスト"""
 
     def test_single_thread_vs_multi_thread_consistency(self):
-        """シングル/マルチスレッドモードの一貫性"""
-        # シングルスレッドモード
+        """デフォルト/明示有効化の一貫性"""
+        # デフォルト設定
         runtime1 = MockRuntime()
         handler1 = IntegrationTestInputHandler(["single"])
         runtime1.set_custom_input_handler(handler1)
@@ -192,7 +192,7 @@ class TestThreadedExecution:
         predicate1 = TestReadLinePredicate("X")
         single_results = list(predicate1.execute(runtime1, BindingEnvironment()))
 
-        # マルチスレッドモード
+        # 明示的にスレッド有効化（冪等）
         runtime2 = MockRuntime()
         handler2 = IntegrationTestInputHandler(["multi"])
         runtime2.set_custom_input_handler(handler2)
@@ -299,13 +299,12 @@ class TestErrorHandling:
 
         # エラーハンドラ
         class ErrorHandler(InputHandler):
-            def handle_input_request(self, event: InputEvent) -> Optional[str]:
+            def handle_input_request(
+                self, event: InputEvent, continuation: ContinuationHandle
+            ) -> Optional[str]:
                 raise Exception("Input error")
 
         runtime.set_custom_input_handler(ErrorHandler())
-        runtime.io_manager._fallback_to_legacy = (
-            False  # フォールバック無効でエラーを伝播
-        )
 
         predicate = TestGetCharPredicate("X")
         env = BindingEnvironment()
@@ -352,11 +351,14 @@ class TestErrorHandling:
             def __init__(self):
                 self.call_count = 0
 
-            def handle_input_request(self, event: InputEvent) -> Optional[str]:
+            def handle_input_request(
+                self, event: InputEvent, continuation: ContinuationHandle
+            ) -> Optional[str]:
                 self.call_count += 1
                 if self.call_count == 1:
                     raise Exception("First call error")
                 else:
+                    continuation.resume("recovered")
                     return "recovered"
 
         handler = RecoveryHandler()
@@ -367,9 +369,9 @@ class TestErrorHandling:
             predicate1 = TestReadLinePredicate("X1")
             predicate2 = TestReadLinePredicate("X2")
 
-            # 1回目: エラーによりフォールバック処理（end_of_fileとの統一化）
+            # 1回目: エラーにより述語失敗
             results1 = list(predicate1.execute(runtime, BindingEnvironment()))
-            assert len(results1) == 1  # Noneからend_of_fileに変換されて統一化成功
+            assert len(results1) == 0
 
             # 2回目: 回復して成功
             results2 = list(predicate2.execute(runtime, BindingEnvironment()))
@@ -386,11 +388,8 @@ class TestRuntimeIntegration:
         """Runtimeのデフォルト設定"""
         runtime = MockRuntime()
 
-        # デフォルトではシングルスレッドモード
-        assert not runtime.io_manager.unified_input.threading_enabled
-
-        # 統一入力システムは有効
-        assert runtime.io_manager._unified_input_enabled
+        # デフォルトでスレッドモードが有効
+        assert runtime.io_manager.unified_input.threading_enabled
 
     def test_runtime_threaded_mode_enable(self):
         """Runtime真の継続実行モード有効化"""
@@ -500,18 +499,18 @@ class TestComplexScenarios:
             runtime.io_manager.shutdown()
 
     def test_mode_switching_during_execution(self):
-        """実行中のモード切り替え"""
+        """実行中のスレッド有効化が冪等であることを確認"""
         runtime = MockRuntime()
         handler = IntegrationTestInputHandler(["mode1", "mode2", "mode3"])
         runtime.set_custom_input_handler(handler)
 
-        # シングルスレッドで1回実行
+        # デフォルトで1回実行
         predicate1 = TestReadLinePredicate("X1")
         results1 = list(predicate1.execute(runtime, BindingEnvironment()))
         assert len(results1) == 1
-        assert not runtime.io_manager.unified_input.threading_enabled
+        assert runtime.io_manager.unified_input.threading_enabled
 
-        # マルチスレッドモードに切り替え
+        # スレッドモードを再度有効化（冪等）
         runtime.enable_threaded_input()
 
         try:
@@ -519,14 +518,11 @@ class TestComplexScenarios:
             results2 = list(predicate2.execute(runtime, BindingEnvironment()))
             assert len(results2) == 1
             assert runtime.io_manager.unified_input.threading_enabled
-
-            # シングルスレッドモードに戻す
-            runtime.io_manager.disable_threading()
-
+            
             predicate3 = TestReadLinePredicate("X3")
             results3 = list(predicate3.execute(runtime, BindingEnvironment()))
             assert len(results3) == 1
-            assert not runtime.io_manager.unified_input.threading_enabled
+            assert runtime.io_manager.unified_input.threading_enabled
 
         finally:
             runtime.io_manager.shutdown()
