@@ -116,37 +116,6 @@ def dict_to_binding_environment(bindings_dict):
     return env
 
 
-def unify_with_bindings(term1, term2, bindings=None):
-    """2つの項を既存のバインディングに基づいて単一化する
-
-    Args:
-        term1: 単一化する項1
-        term2: 単一化する項2
-        bindings: 既存のバインディング（辞書またはBindingEnvironment、オプション）
-
-    Returns:
-        tuple: (成功したかどうか, 更新されたバインディング)
-    """
-    from pyprolog.core.binding_environment import BindingEnvironment
-
-    # バインディング環境の準備
-    if isinstance(bindings, BindingEnvironment):
-        env = bindings.copy()
-    elif isinstance(bindings, dict):
-        env = dict_to_binding_environment(bindings)
-    else:
-        env = BindingEnvironment()
-
-    # 簡単な単一化を試行
-    success = env.unify(term1, term2)
-
-    # 結果を返す（元のバインディングの形式に合わせる）
-    if isinstance(bindings, dict):
-        return success, env.to_dict()
-    else:
-        return success, env
-
-
 def apply_substitution(term, bindings):
     """項にバインディングを適用して置換する
 

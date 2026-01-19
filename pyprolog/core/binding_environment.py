@@ -73,45 +73,6 @@ class BindingEnvironment:
             level += 1
         return "Env(" + "; ".join(items) + ")"
 
-    def unify(self, term1, term2):
-        """
-        簡単な単一化メソッド（merge_bindings.py との互換性のため）
-        """
-        # Variable オブジェクトの場合
-        if isinstance(term1, Variable):
-            try:
-                self.bind(term1.name, term2)
-                return True
-            except Exception:
-                return False
-        elif isinstance(term2, Variable):
-            try:
-                self.bind(term2.name, term1)
-                return True
-            except Exception:
-                return False
-
-        # 文字列キー（変数名）の場合
-        elif isinstance(term1, str):
-            try:
-                self.bind(term1, term2)
-                return True
-            except Exception:
-                return False
-        elif isinstance(term2, str):
-            try:
-                self.bind(term2, term1)
-                return True
-            except Exception:
-                return False
-
-        # PrologType同士の場合は等価性チェック
-        elif term1 == term2:
-            return True
-
-        else:
-            return False
-
     def merge_with(self, other):
         """
         他の環境またはバインディング辞書とマージ

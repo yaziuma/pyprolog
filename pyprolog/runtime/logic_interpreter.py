@@ -167,67 +167,102 @@ class LogicInterpreter:
         self, term1: PrologType, term2: PrologType, env: BindingEnvironment
     ) -> Tuple[bool, BindingEnvironment]:
         logger.debug(
-            f"LOGIC_INTERP_UNIFY: Unifying term1: {term1} (type {type(term1)}) with term2: {term2} (type {type(term2)}) in env: {env.bindings}"
+            "LOGIC_INTERP_UNIFY: Unifying term1: %s (type %s) with term2: %s (type %s) in env: %s",
+            term1,
+            type(term1),
+            term2,
+            type(term2),
+            env.bindings,
         )
         current_env = env.copy()
         t1 = self.dereference(term1, current_env)
         t2 = self.dereference(term2, current_env)
         logger.debug(
-            f"LOGIC_INTERP_UNIFY: Dereferenced t1: {t1} (type {type(t1)}), t2: {t2} (type {type(t2)})"
+            "LOGIC_INTERP_UNIFY: Dereferenced t1: %s (type %s), t2: %s (type %s)",
+            t1,
+            type(t1),
+            t2,
+            type(t2),
         )
 
         if t1 == t2:
             logger.debug(
-                f"LOGIC_INTERP_UNIFY: t1 == t2 ({t1}), returning True, env: {current_env.bindings}"
+                "LOGIC_INTERP_UNIFY: t1 == t2 (%s), returning True, env: %s",
+                t1,
+                current_env.bindings,
             )
             return True, current_env
 
         if isinstance(t1, Variable):
             if self._occurs_check(t1, t2, current_env):
                 logger.debug(
-                    f"LOGIC_INTERP_UNIFY: Occurs check failed for var {t1} in term {t2}, returning False"
+                    "LOGIC_INTERP_UNIFY: Occurs check failed for var %s in term %s, returning False",
+                    t1,
+                    t2,
                 )
                 return False, env
             current_env.bind(t1.name, t2)
             logger.debug(
-                f"LOGIC_INTERP_UNIFY: Bound var {t1.name} to {t2}, returning True, env: {current_env.bindings}"
+                "LOGIC_INTERP_UNIFY: Bound var %s to %s, returning True, env: %s",
+                t1.name,
+                t2,
+                current_env.bindings,
             )
             return True, current_env
         if isinstance(t2, Variable):
             if self._occurs_check(t2, t1, current_env):
                 logger.debug(
-                    f"LOGIC_INTERP_UNIFY: Occurs check failed for var {t2} in term {t1}, returning False"
+                    "LOGIC_INTERP_UNIFY: Occurs check failed for var %s in term %s, returning False",
+                    t2,
+                    t1,
                 )
                 return False, env
             current_env.bind(t2.name, t1)
             logger.debug(
-                f"LOGIC_INTERP_UNIFY: Bound var {t2.name} to {t1}, returning True, env: {current_env.bindings}"
+                "LOGIC_INTERP_UNIFY: Bound var %s to %s, returning True, env: %s",
+                t2.name,
+                t1,
+                current_env.bindings,
             )
             return True, current_env
 
         if isinstance(t1, Atom) and isinstance(t2, Atom):
             success = t1.name == t2.name
             logger.debug(
-                f"LOGIC_INTERP_UNIFY: Atom vs Atom ({t1.name} vs {t2.name}), success: {success}, returning env: {current_env.bindings}"
+                "LOGIC_INTERP_UNIFY: Atom vs Atom (%s vs %s), success: %s, returning env: %s",
+                t1.name,
+                t2.name,
+                success,
+                current_env.bindings,
             )
             return success, current_env
         if isinstance(t1, Number) and isinstance(t2, Number):
             success = t1.value == t2.value
             logger.debug(
-                f"LOGIC_INTERP_UNIFY: Number vs Number ({t1.value} vs {t2.value}), success: {success}, returning env: {current_env.bindings}"
+                "LOGIC_INTERP_UNIFY: Number vs Number (%s vs %s), success: %s, returning env: %s",
+                t1.value,
+                t2.value,
+                success,
+                current_env.bindings,
             )
             return success, current_env
         if isinstance(t1, String) and isinstance(t2, String):
             success = t1.value == t2.value
             logger.debug(
-                f"LOGIC_INTERP_UNIFY: String vs String ('{t1.value}' vs '{t2.value}'), success: {success}, returning env: {current_env.bindings}"
+                "LOGIC_INTERP_UNIFY: String vs String ('%s' vs '%s'), success: %s, returning env: %s",
+                t1.value,
+                t2.value,
+                success,
+                current_env.bindings,
             )
             return success, current_env
 
         if isinstance(t1, Term) and isinstance(t2, Term):
             if t1.functor == t2.functor and len(t1.args) == len(t2.args):
                 logger.debug(
-                    f"LOGIC_INTERP_UNIFY: Term vs Term ({t1.functor}/{len(t1.args)}), unifying args."
+                    "LOGIC_INTERP_UNIFY: Term vs Term (%s/%s), unifying args.",
+                    t1.functor,
+                    len(t1.args),
                 )
                 temp_env = current_env.copy()
                 all_args_unified = True
@@ -238,29 +273,42 @@ class LogicInterpreter:
                     if not unified:
                         all_args_unified = False
                         logger.debug(
-                            f"LOGIC_INTERP_UNIFY: Arg #{i + 1} unification failed."
+                            "LOGIC_INTERP_UNIFY: Arg #%s unification failed.",
+                            i + 1,
                         )
                         break
                     temp_env = temp_env_after_arg_unify
 
                 if all_args_unified:
                     logger.debug(
-                        f"LOGIC_INTERP_UNIFY: All args unified for {t1.functor}/{len(t1.args)}, returning True, env: {temp_env.bindings}"
+                        "LOGIC_INTERP_UNIFY: All args unified for %s/%s, returning True, env: %s",
+                        t1.functor,
+                        len(t1.args),
+                        temp_env.bindings,
                     )
                     return True, temp_env
                 else:
                     logger.debug(
-                        f"LOGIC_INTERP_UNIFY: Arg unification failed for {t1.functor}/{len(t1.args)}, returning False, original env: {env.bindings}"
+                        "LOGIC_INTERP_UNIFY: Arg unification failed for %s/%s, returning False, original env: %s",
+                        t1.functor,
+                        len(t1.args),
+                        env.bindings,
                     )
                     return False, env
             else:
                 logger.debug(
-                    f"LOGIC_INTERP_UNIFY: Term functor/arity mismatch ({t1.functor}/{len(t1.args)} vs {t2.functor}/{len(t2.args)}), returning False"
+                    "LOGIC_INTERP_UNIFY: Term functor/arity mismatch (%s/%s vs %s/%s), returning False",
+                    t1.functor,
+                    len(t1.args),
+                    t2.functor,
+                    len(t2.args),
                 )
                 return False, env
 
         logger.debug(
-            f"LOGIC_INTERP_UNIFY: Unification failed by falling through (t1 type: {type(t1)}, t2 type: {type(t2)}), returning False"
+            "LOGIC_INTERP_UNIFY: Unification failed by falling through (t1 type: %s, t2 type: %s), returning False",
+            type(t1),
+            type(t2),
         )
         return False, env
 
