@@ -525,51 +525,6 @@ class LogicInterpreter:
         # Standard Prolog would raise an existence_error if there are NO clauses for the predicate.
         # This check is simplified: if this solve_goal attempt yields nothing, and it's not 'true' or 'fail',
         # it implies the predicate is undefined or fails.
-        # For the purpose of test_findall_goal_throws_exception, we need an error to be raised.
-        # A more sophisticated check would involve seeing if ANY rules for actual_goal.functor/arity exist.
-        # For now, if this specific invocation path yields no solutions, and it wasn't true/fail,
-        # let's consider it an "effective" failure that should become an error for an undefined pred.
-        # This is a placeholder for proper undefined predicate error handling.
-
-        # This simplified check isn't perfect. A predicate might be defined but simply fail for a given goal.
-        # However, for 'this_predicate_is_undefined_for_sure_xyz', it will have no clauses.
-
-        # Let's refine: check if any rules exist for this functor/arity at all.
-        # This is a bit more involved here. A simpler proxy for the test:
-        # The test is specifically for 'this_predicate_is_undefined_for_sure_xyz'.
-        # We can assume if solve_goal for THIS predicate name yields nothing, it's an error.
-        # This is still a bit of a hack for the test.
-        # Proper way: Runtime could have a list of defined predicates.
-
-        # TODO: Implement general undefined predicate error handling.
-        # The current mechanism for raising an error for 'this_predicate_is_undefined_for_sure_xyz'
-        # is a test-specific HACK for test_findall_goal_throws_exception.
-        # A general solution should check if any clauses (rules/facts) or built-ins
-        # exist for 'actual_goal.functor.name / arity' after the loop concludes without yielding solutions.
-        # If no definitions exist at all, then an existence_error(procedure, Name/Arity) should be raised.
-        # This needs to be done carefully to distinguish from normal failure of a defined predicate.
-        if actual_goal.functor.name == "this_predicate_is_undefined_for_sure_xyz":
-            # This check should ideally be: if not self.runtime.is_predicate_defined(actual_goal.functor, len(actual_goal.args))
-            # AND no solutions were yielded by the loop above for this goal.
-            # For now, this hack assumes if we are trying to solve this specific predicate and the loop finishes,
-            # it must be because it's undefined (as it has no clauses by design in the test).
-            _solution_found_for_xyz_test_pred = False
-            for _ in self.solve_goal_without_existence_error_for_test(
-                actual_goal, env
-            ):  # Avoid recursion into this hack
-                _solution_found_for_xyz_test_pred = True
-                # This is still not quite right, as solve_goal is a generator.
-                # The check needs to happen *after* the main loop in solve_goal has been exhausted for this pred.
-                # The current structure makes this tricky.
-            # This hack is problematic because solve_goal is a generator.
-            # A simple way for the test predicate to ensure an error:
-            logger.error(
-                f"LOGIC_INTERP (HACK): Predicate {actual_goal.functor.name}/{len(actual_goal.args)} is 'undefined' by test design. Raising existence_error."
-            )
-            raise PrologError(
-                f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
-            )
-
         # トレース: 最終的に失敗した場合の記録
         if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
             self.runtime.tracer.record_fail(actual_goal)
@@ -577,16 +532,6 @@ class LogicInterpreter:
         logger.debug(
             f"LOGIC_INTERP: Finished iterating DB for goal {actual_goal}. No more (or no) solutions found from this path."
         )
-
-    # This is a placeholder to conceptualize how one might avoid recursive error for the hack above.
-    # Not fully implemented or used.
-    def solve_goal_without_existence_error_for_test(
-        self, goal: PrologType, env: BindingEnvironment
-    ) -> Iterator[BindingEnvironment]:
-        # Actual implementation would be like solve_goal but without the specific hack block.
-        # This is just to illustrate the difficulty of the current hack.
-        if goal:  # Make linters happy
-            yield from ()
 
     def instantiate_term(self, term: PrologType, env: BindingEnvironment) -> PrologType:
         """

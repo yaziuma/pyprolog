@@ -54,8 +54,6 @@ class TestExplainTool:
         """ルールクエリの説明テスト"""
         result = self.explain_tool.explain_query("grandparent(tom, john)", "text")
 
-        # TODO: This test fails because the rule query incorrectly yields no solutions.
-        # This points to a deeper bug in the logic interpreter.
         assert result["success"] is True
         assert "grandparent(tom, john)" in result["query"]
         assert "trace" in result
@@ -91,7 +89,6 @@ class TestExplainTool:
         """深度制限付きの説明テスト"""
         result = self.explain_tool.explain_query("grandparent(tom, john)", "text", 2)
 
-        # TODO: This test fails along with test_explain_rule_query.
         assert result["success"] is True
         assert "trace" in result
         # 深度制限により、イベント数が制限されているかは実装依存
