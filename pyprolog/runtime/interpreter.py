@@ -393,7 +393,7 @@ class Runtime:
                 if len(args) != 0:
                     raise PrologError("nl/0 requires no arguments")
                 # Use IOManager's write method instead of print
-                self.io_manager.write_char_to_current('\n')
+                self.io_manager.write_char_to_current("\n")
                 yield env
             elif op_info.symbol == "tab":
                 if len(args) > 1:
@@ -654,7 +654,9 @@ class Runtime:
             for item in listing_pred.execute(self, env):
                 yield item
         elif functor_name == "export_facts" and len(processed_goal.args) == 2:
-            export_pred = ExportFactsPredicate(processed_goal.args[0], processed_goal.args[1])
+            export_pred = ExportFactsPredicate(
+                processed_goal.args[0], processed_goal.args[1]
+            )
             for item in export_pred.execute(self, env):
                 yield item
         else:

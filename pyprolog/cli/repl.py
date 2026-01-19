@@ -160,15 +160,16 @@ def run_repl(runtime):
 
 class REPL:
     """Simple Prolog REPL wrapper class"""
-    
+
     def __init__(self, runtime=None):
         self.runtime = runtime
-    
+
     def run(self):
         """Run the REPL with the provided runtime"""
         if self.runtime:
             run_repl(self.runtime)
         else:
             from pyprolog.runtime.interpreter import Runtime
+
             runtime = Runtime()
             run_repl(runtime)

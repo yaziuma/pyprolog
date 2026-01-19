@@ -18,10 +18,10 @@ def try_convert_atom_to_number(atom_value: str) -> Optional[Union[int, float]]:
     """
     標準的なPython方式でatom文字列を数値に変換する。
     ast.literal_eval()を使用して安全に数値変換を行う。
-    
+
     Args:
         atom_value: 変換対象の文字列
-        
+
     Returns:
         変換成功時は数値(int/float)、失敗時はNone
     """
@@ -86,11 +86,13 @@ class AtomNumberPredicate(BuiltinPredicate):
     Built-in predicate atom_number/2.
     Converts between atoms and numbers: atom_number(+Atom, ?Number) or atom_number(?Atom, +Number).
     """
-    
+
     def __init__(self, atom_arg: PrologType, number_arg: PrologType):
         super().__init__(atom_arg, number_arg)
         if len(self.args) != 2:
-            raise PrologError(f"atom_number/2 expects 2 arguments, got {len(self.args)}")
+            raise PrologError(
+                f"atom_number/2 expects 2 arguments, got {len(self.args)}"
+            )
 
     def execute(
         self, runtime: "Runtime", env: BindingEnvironment
@@ -773,118 +775,6 @@ class FindallPredicate(BuiltinPredicate):
         return
 
 
-class GetCharPredicate(BuiltinPredicate):
-    """
-    Built-in predicate get_char/1.
-    Reads the next character from the current input stream and unifies it with Arg.
-    """
-
-    def __init__(self, arg: "PrologType"):
-        super().__init__(arg)
-        if len(self.args) != 1:
-            # This check is mostly for consistency, as Runtime.execute usually checks arity.
-            raise PrologError(f"get_char/1 expects 1 argument, got {len(self.args)}")
-
-    def execute(
-        self, runtime: "Runtime", env: BindingEnvironment
-    ) -> Iterator[BindingEnvironment]:
-        # 1. Get a character string from the IOManager
-        # Assuming read_char_from_current() returns a single character string,
-        # or an empty string for EOF.
-        char_str = runtime.io_manager.read_char_from_current()
-
-        # 2. Determine the target Prolog term based on the character string
-        target_term: PrologType
-        if char_str == "":  # EOF
-            target_term = Atom("end_of_file")
-        elif len(char_str) == 1:  # Standard case: single character
-            # Try to convert digit characters to numbers, keep others as atoms
-            if char_str.isdigit():
-                target_term = Number(int(char_str))
-            else:
-                target_term = Atom(char_str)
-        else:
-            # This case should ideally not happen if read_char_from_current adheres to
-            # returning a single char or empty string. If it can return more,
-            # the behavior of get_char/1 might need further specification for such cases.
-            # For now, let's treat unexpected multi-character strings as an error or take the first.
-            # Standard get_char/1 expects to read one char.
-            # If read_char_from_current might return more (e.g. from a buffered non-interactive stream),
-            # this predicate would need to handle that (e.g. by only taking the first char and perhaps
-            # leaving the rest in an internal buffer for subsequent reads - complex).
-            # Simplest for now: if it's not EOF and not a single char, it's an issue or undefined.
-            # Let's assume for now read_char_from_current() guarantees single char or empty.
-            # If for some reason it doesn't, this is a point of potential failure/unexpected behavior.
-            # For robustness, if it could return None or other non-string types:
-            if char_str is None:  # Defensive, if read_char could return None
-                target_term = Atom("end_of_file")  # Treat None like EOF
-            else:  # Should be multi-character string if not "" or len 1
-                # This path indicates an unexpected return from read_char_from_current
-                # For now, we'll be strict and expect single chars or EOF marker.
-                # Standard get_char would typically not be in this state from a conforming stream.
-                # If the underlying stream gives more than one char, get_char usually takes one.
-                # To be safe and simple for now, if it's not empty, take the first char.
-                # This part might need refinement based on stream behavior.
-                char_to_use = char_str[0]
-                if char_to_use.isdigit():
-                    target_term = Number(int(char_to_use))
-                else:
-                    target_term = Atom(char_to_use)
-
-        # 3. Get the argument to get_char/1 (the Prolog variable or term)
-        prolog_arg = self.args[0]
-
-        # 4. Attempt to unify the argument with the target_term
-        # unify returns a tuple: (bool_success, resulting_environment)
-        unified, next_env = runtime.logic_interpreter.unify(
-            prolog_arg, target_term, env
-        )
-
-        # 5. Yield successful unifications
-        if unified:
-            yield next_env
-        # If unification fails, the predicate simply fails (yields nothing).
-
-
-class ReadLinePredicate(BuiltinPredicate):
-    """
-    Built-in predicate read_line/1.
-    Reads a line from the current input stream and unifies it with Arg.
-    """
-
-    def __init__(self, arg: "PrologType"):
-        super().__init__(arg)
-        if len(self.args) != 1:
-            raise PrologError(f"read_line/1 expects 1 argument, got {len(self.args)}")
-
-    def execute(
-        self, runtime: "Runtime", env: BindingEnvironment
-    ) -> Iterator[BindingEnvironment]:
-        # 1. Read a line from the IOManager
-        line_str = runtime.io_manager.read_line_from_current()
-
-        # 2. Determine the target Prolog term based on the line string
-        target_term: PrologType
-        if line_str is None:  # EOF
-            target_term = Atom("end_of_file")
-        else:
-            # Try to convert to number first, fall back to atom
-            number_value = try_convert_atom_to_number(line_str)
-            if number_value is not None:
-                target_term = Number(number_value)
-            else:
-                target_term = Atom(line_str)
-
-        # 3. Unify the target term with the argument
-        unified, final_env = runtime.logic_interpreter.unify(
-            self.args[0], target_term, env
-        )
-        if unified:
-            yield final_env
-        # If unification fails, read_line/1 fails (no solutions yielded).
-        return
-
-
 class DynamicRetractPredicate(BuiltinPredicate):
     def __init__(self, clause_arg: PrologType):
         super().__init__(clause_arg)
@@ -1026,85 +916,6 @@ class DynamicRetractPredicate(BuiltinPredicate):
         return  # Failed to find a match
 
 
-class PeekCharPredicate(BuiltinPredicate):
-    """
-    peek_char/1述語実装
-    次の文字を非破壊的に読み取る（ストリームの位置は変更しない）
-    """
-
-    def __init__(self, *args):
-        super().__init__(*args)
-        self._validate_arguments()
-
-    def _validate_arguments(self):
-        """引数検証"""
-        arg_count = len(self.args)
-        if arg_count == 0:
-            raise PrologError("peek_char requires at least 1 argument")
-        elif arg_count > 2:
-            raise PrologError(f"peek_char takes 1-2 arguments, got {arg_count}")
-
-    def execute(
-        self, runtime: "Runtime", env: BindingEnvironment
-    ) -> Iterator[BindingEnvironment]:
-        """メイン実行ロジック"""
-        try:
-            # ストリーム取得
-            stream = self._get_target_stream(runtime, env)
-
-            # 能力チェック
-            if not stream.supports_peek_operations():
-                from ..core.stream_errors import StreamOperationError
-
-                raise StreamOperationError(
-                    f"Stream {type(stream).__name__} does not support peek_char/1"
-                )
-
-            # peek操作実行
-            char_str = stream.peek_char()
-            target_atom = self._convert_to_atom(char_str)
-
-            # unification
-            char_arg = self.args[-1]  # 最後の引数が文字変数
-            unified, next_env = runtime.logic_interpreter.unify(
-                char_arg, target_atom, env
-            )
-
-            if unified:
-                yield next_env
-
-        except Exception as e:
-            # ストリーム操作エラーは予期される例外
-            if "not support" in str(e).lower():
-                logger.warning(f"peek_char/1 stream operation failed: {e}")
-                return  # 失敗として処理
-            else:
-                # 予期しない例外は再発生
-                logger.error(f"Unexpected error in peek_char/1: {e}", exc_info=True)
-                raise PrologError(f"peek_char/1 execution failed: {e}") from e
-
-    def _get_target_stream(self, runtime: "Runtime", env: BindingEnvironment):
-        """対象ストリームの特定"""
-        if len(self.args) == 1:
-            # peek_char(-Char) 形式
-            return runtime.io_manager.get_input_stream()
-        else:
-            # peek_char(+Stream, -Char) 形式（将来実装）
-            stream_arg = self.args[0]
-            # ストリーム引数の解決ロジック（将来実装）
-            raise NotImplementedError("Stream argument not yet supported")
-
-    def _convert_to_atom(self, char_str: str) -> Atom:
-        """文字列からAtomへの変換"""
-        if char_str == "":
-            return Atom("end_of_file")
-        elif len(char_str) == 1:
-            return Atom(char_str)
-        else:
-            # マルチバイト文字などの処理
-            return Atom(char_str[0])  # 最初の文字のみ
-
-
 class AtEndOfStreamPredicate(BuiltinPredicate):
     """
     at_end_of_stream/0述語実装
@@ -1166,23 +977,23 @@ class ListingPredicate(BuiltinPredicate):
         """メイン実行ロジック"""
         try:
             from ..util.formatters import PrologFormatter
-            
+
             # フォーマッターを初期化
             formatter = PrologFormatter(
-                variable_mapper=getattr(runtime, 'variable_mapper', None),
-                functor_mapper=getattr(runtime, 'functor_mapper', None)
+                variable_mapper=getattr(runtime, "variable_mapper", None),
+                functor_mapper=getattr(runtime, "functor_mapper", None),
             )
-            
+
             # 全ルール・事実を整形
             formatted_output = formatter.format_rules_list(runtime.rules)
-            
+
             # IOManagerを通じて出力
             for char in formatted_output:
                 runtime.io_manager.write_char_to_current(char)
-            
+
             # 成功
             yield env
-            
+
         except Exception as e:
             logger.error(f"Error in listing/0: {e}", exc_info=True)
             return  # 失敗時は何もyieldしない
@@ -1203,81 +1014,98 @@ class ListingWithPredicatePredicate(BuiltinPredicate):
         """メイン実行ロジック"""
         try:
             from ..util.formatters import PrologFormatter
-            
+
             # 述語指定を解析
-            predicate_name, arity = self._parse_predicate_spec(self.args[0], env, runtime)
+            predicate_name, arity = self._parse_predicate_spec(
+                self.args[0], env, runtime
+            )
             if predicate_name is None:
                 return  # 解析失敗
-            
+
             # フォーマッターを初期化
             formatter = PrologFormatter(
-                variable_mapper=getattr(runtime, 'variable_mapper', None),
-                functor_mapper=getattr(runtime, 'functor_mapper', None)
+                variable_mapper=getattr(runtime, "variable_mapper", None),
+                functor_mapper=getattr(runtime, "functor_mapper", None),
             )
-            
+
             # 指定述語のルール・事実を整形
-            formatted_output = formatter.format_predicate_rules(runtime.rules, predicate_name, arity)
-            
+            formatted_output = formatter.format_predicate_rules(
+                runtime.rules, predicate_name, arity
+            )
+
             # IOManagerを通じて出力
             for char in formatted_output:
                 runtime.io_manager.write_char_to_current(char)
-            
+
             # 成功
             yield env
-            
+
         except Exception as e:
             logger.error(f"Error in listing/1: {e}", exc_info=True)
             return  # 失敗時は何もyieldしない
 
-    def _parse_predicate_spec(self, spec: PrologType, env: BindingEnvironment, runtime: "Runtime") -> tuple:
+    def _parse_predicate_spec(
+        self, spec: PrologType, env: BindingEnvironment, runtime: "Runtime"
+    ) -> tuple:
         """
         述語指定を解析してname/arityを取得
-        
+
         Args:
             spec: 述語指定（例: person/2）
             env: 環境
             runtime: Runtime
-            
+
         Returns:
             (predicate_name, arity) または (None, None)
         """
         try:
             # 変数の場合は参照解決
             dereferenced_spec = runtime.logic_interpreter.dereference(spec, env)
-            
+
             # functor/arity 形式のチェック
             if isinstance(dereferenced_spec, Term):
-                if (isinstance(dereferenced_spec.functor, Atom) 
-                    and dereferenced_spec.functor.name == "/" 
-                    and len(dereferenced_spec.args) == 2):
-                    
-                    functor_arg = runtime.logic_interpreter.dereference(dereferenced_spec.args[0], env)
-                    arity_arg = runtime.logic_interpreter.dereference(dereferenced_spec.args[1], env)
-                    
+                if (
+                    isinstance(dereferenced_spec.functor, Atom)
+                    and dereferenced_spec.functor.name == "/"
+                    and len(dereferenced_spec.args) == 2
+                ):
+                    functor_arg = runtime.logic_interpreter.dereference(
+                        dereferenced_spec.args[0], env
+                    )
+                    arity_arg = runtime.logic_interpreter.dereference(
+                        dereferenced_spec.args[1], env
+                    )
+
                     # ファンクター名の取得
                     if isinstance(functor_arg, Atom):
                         predicate_name = functor_arg.name
                     else:
-                        logger.warning(f"Invalid functor in predicate spec: {functor_arg}")
+                        logger.warning(
+                            f"Invalid functor in predicate spec: {functor_arg}"
+                        )
                         return (None, None)
-                    
+
                     # アリティの取得（整数または整数値の浮動小数点を許可）
                     if isinstance(arity_arg, Number) and arity_arg.value >= 0:
                         # 浮動小数点でも整数値なら許可
                         if float(arity_arg.value).is_integer():
                             arity = int(arity_arg.value)
                         else:
-                            logger.warning(f"Invalid arity in predicate spec: {arity_arg}")
+                            logger.warning(
+                                f"Invalid arity in predicate spec: {arity_arg}"
+                            )
                             return (None, None)
                     else:
                         logger.warning(f"Invalid arity in predicate spec: {arity_arg}")
                         return (None, None)
-                    
+
                     return (predicate_name, arity)
-            
-            logger.warning(f"Invalid predicate specification format: {dereferenced_spec}")
+
+            logger.warning(
+                f"Invalid predicate specification format: {dereferenced_spec}"
+            )
             return (None, None)
-            
+
         except Exception as e:
             logger.warning(f"Failed to parse predicate spec {spec}: {e}")
             return (None, None)
@@ -1298,127 +1126,152 @@ class ExportFactsPredicate(BuiltinPredicate):
         """メイン実行ロジック"""
         try:
             from ..util.data_exporter import DataExporter
-            
+
             # 述語指定を解析
-            predicate_name, arity = self._parse_predicate_spec(self.args[0], env, runtime)
+            predicate_name, arity = self._parse_predicate_spec(
+                self.args[0], env, runtime
+            )
             if predicate_name is None:
                 return  # 解析失敗
-            
+
             # ファイル指定を取得
             file_spec = runtime.logic_interpreter.dereference(self.args[1], env)
-            
+
             # 指定述語の事実を抽出
-            target_facts = self._extract_facts(runtime.rules, predicate_name, arity, runtime)
-            
+            target_facts = self._extract_facts(
+                runtime.rules, predicate_name, arity, runtime
+            )
+
             # エクスポーターでファイル出力
             exporter = DataExporter(runtime)
             success = exporter.export_facts(target_facts, file_spec)
-            
+
             if success:
                 yield env  # 成功
             else:
                 return  # 失敗
-                
+
         except Exception as e:
             logger.error(f"Error in export_facts/2: {e}", exc_info=True)
             return  # 失敗時は何もyieldしない
 
-    def _parse_predicate_spec(self, spec: PrologType, env: BindingEnvironment, runtime: "Runtime") -> tuple:
+    def _parse_predicate_spec(
+        self, spec: PrologType, env: BindingEnvironment, runtime: "Runtime"
+    ) -> tuple:
         """
         述語指定を解析してname/arityを取得（listing/1と同じ）
-        
+
         Args:
             spec: 述語指定（例: person/2）
             env: 環境
             runtime: Runtime
-            
+
         Returns:
             (predicate_name, arity) または (None, None)
         """
         try:
             # 変数の場合は参照解決
             dereferenced_spec = runtime.logic_interpreter.dereference(spec, env)
-            
+
             # functor/arity 形式のチェック
             if isinstance(dereferenced_spec, Term):
-                if (isinstance(dereferenced_spec.functor, Atom) 
-                    and dereferenced_spec.functor.name == "/" 
-                    and len(dereferenced_spec.args) == 2):
-                    
-                    functor_arg = runtime.logic_interpreter.dereference(dereferenced_spec.args[0], env)
-                    arity_arg = runtime.logic_interpreter.dereference(dereferenced_spec.args[1], env)
-                    
+                if (
+                    isinstance(dereferenced_spec.functor, Atom)
+                    and dereferenced_spec.functor.name == "/"
+                    and len(dereferenced_spec.args) == 2
+                ):
+                    functor_arg = runtime.logic_interpreter.dereference(
+                        dereferenced_spec.args[0], env
+                    )
+                    arity_arg = runtime.logic_interpreter.dereference(
+                        dereferenced_spec.args[1], env
+                    )
+
                     # ファンクター名の取得
                     if isinstance(functor_arg, Atom):
                         predicate_name = functor_arg.name
                     else:
-                        logger.warning(f"Invalid functor in predicate spec: {functor_arg}")
+                        logger.warning(
+                            f"Invalid functor in predicate spec: {functor_arg}"
+                        )
                         return (None, None)
-                    
+
                     # アリティの取得（整数または整数値の浮動小数点を許可）
                     if isinstance(arity_arg, Number) and arity_arg.value >= 0:
                         # 浮動小数点でも整数値なら許可
                         if float(arity_arg.value).is_integer():
                             arity = int(arity_arg.value)
                         else:
-                            logger.warning(f"Invalid arity in predicate spec: {arity_arg}")
+                            logger.warning(
+                                f"Invalid arity in predicate spec: {arity_arg}"
+                            )
                             return (None, None)
                     else:
                         logger.warning(f"Invalid arity in predicate spec: {arity_arg}")
                         return (None, None)
-                    
+
                     return (predicate_name, arity)
-            
-            logger.warning(f"Invalid predicate specification format: {dereferenced_spec}")
+
+            logger.warning(
+                f"Invalid predicate specification format: {dereferenced_spec}"
+            )
             return (None, None)
-            
+
         except Exception as e:
             logger.warning(f"Failed to parse predicate spec {spec}: {e}")
             return (None, None)
 
-    def _extract_facts(self, rules: List[Union[Rule, Fact]], predicate_name: str, arity: int, runtime: "Runtime") -> List[Fact]:
+    def _extract_facts(
+        self,
+        rules: List[Union[Rule, Fact]],
+        predicate_name: str,
+        arity: int,
+        runtime: "Runtime",
+    ) -> List[Fact]:
         """
         指定述語の事実のみを抽出
-        
+
         Args:
             rules: 全ルール・事実リスト
             predicate_name: 対象述語名
             arity: 対象アリティ
             runtime: Runtime
-            
+
         Returns:
             マッチする事実のリスト
         """
         facts = []
-        
+
         for rule in rules:
             try:
                 # 事実のみを対象とする
                 if not isinstance(rule, Fact):
                     continue
-                
+
                 head = rule.head
-                
+
                 # 述語名・アリティをチェック
                 if self._matches_predicate(head, predicate_name, arity, runtime):
                     facts.append(rule)
-                    
+
             except Exception as e:
                 logger.warning(f"Error checking rule {rule}: {e}")
                 continue
-        
+
         return facts
 
-    def _matches_predicate(self, term: Term, predicate_name: str, arity: int, runtime: "Runtime") -> bool:
+    def _matches_predicate(
+        self, term: Term, predicate_name: str, arity: int, runtime: "Runtime"
+    ) -> bool:
         """
         項が指定述語にマッチするかチェック
-        
+
         Args:
             term: チェック対象の項
             predicate_name: 対象述語名
             arity: 対象アリティ
             runtime: Runtime
-            
+
         Returns:
             マッチする場合True
         """
@@ -1431,23 +1284,31 @@ class ExportFactsPredicate(BuiltinPredicate):
                 term_arity = 0
             else:
                 return False
-            
+
             # 名前の完全一致またはマッピング一致をチェック
-            name_match = (term_functor_name == predicate_name)
-            
+            name_match = term_functor_name == predicate_name
+
             # ファンクターマッピングがある場合は双方向チェック
-            if not name_match and hasattr(runtime, 'functor_mapper') and runtime.functor_mapper:
+            if (
+                not name_match
+                and hasattr(runtime, "functor_mapper")
+                and runtime.functor_mapper
+            ):
                 # 日本語→英語マッピング
-                mapped_predicate = runtime.functor_mapper.map_non_ascii_to_english(predicate_name)
-                name_match = (term_functor_name == mapped_predicate)
-                
+                mapped_predicate = runtime.functor_mapper.map_non_ascii_to_english(
+                    predicate_name
+                )
+                name_match = term_functor_name == mapped_predicate
+
                 # 英語→日本語マッピング
                 if not name_match:
-                    mapped_term = runtime.functor_mapper.map_english_to_non_ascii(term_functor_name)
-                    name_match = (mapped_term == predicate_name)
-            
+                    mapped_term = runtime.functor_mapper.map_english_to_non_ascii(
+                        term_functor_name
+                    )
+                    name_match = mapped_term == predicate_name
+
             return name_match and term_arity == arity
-            
+
         except Exception as e:
             logger.warning(f"Error matching predicate for term {term}: {e}")
             return False
@@ -1455,22 +1316,24 @@ class ExportFactsPredicate(BuiltinPredicate):
     def _get_functor_name(self, functor: PrologType, runtime: "Runtime") -> str:
         """
         ファンクターから名前を取得
-        
+
         Args:
             functor: ファンクター
             runtime: Runtime
-            
+
         Returns:
             ファンクター名
         """
         if isinstance(functor, Atom):
             functor_name = functor.name
-            
+
             # ファンクターマッピングで日本語復元を試行
-            if hasattr(runtime, 'functor_mapper') and runtime.functor_mapper:
-                original_name = runtime.functor_mapper.map_english_to_non_ascii(functor_name)
+            if hasattr(runtime, "functor_mapper") and runtime.functor_mapper:
+                original_name = runtime.functor_mapper.map_english_to_non_ascii(
+                    functor_name
+                )
                 return original_name
-            
+
             return functor_name
         else:
             return str(functor)
@@ -1480,56 +1343,35 @@ class ExportFactsPredicate(BuiltinPredicate):
 # 統一入力システム対応版入出力述語
 # ============================================================================
 
-# 新しいIOPredicate実装をインポート
-try:
-    from .io_predicates import (
-        GetCharPredicate as UnifiedGetCharPredicate,
-        ReadLinePredicate as UnifiedReadLinePredicate,
-        PeekCharPredicate as UnifiedPeekCharPredicate
-    )
-    
-    # 統一入力システム対応版が利用可能
-    UNIFIED_INPUT_AVAILABLE = True
-    
-except ImportError as e:
-    logger.warning(f"Unified input system not available: {e}")
-    UNIFIED_INPUT_AVAILABLE = False
+from .io_predicates import (
+    GetCharPredicate as UnifiedGetCharPredicate,
+    ReadLinePredicate as UnifiedReadLinePredicate,
+    PeekCharPredicate as UnifiedPeekCharPredicate,
+)
 
 
 def create_get_char_predicate(arg: PrologType) -> BuiltinPredicate:
     """
     get_char/1述語のファクトリ関数
-    
-    統一入力システムが利用可能な場合は統一版を、
-    そうでなければ従来版を返す。
+
+    統一入力システム対応版を返す。
     """
-    if UNIFIED_INPUT_AVAILABLE:
-        return UnifiedGetCharPredicate(arg)
-    else:
-        return GetCharPredicate(arg)
+    return UnifiedGetCharPredicate(arg)
 
 
 def create_read_line_predicate(arg: PrologType) -> BuiltinPredicate:
     """
     read_line/1述語のファクトリ関数
-    
-    統一入力システムが利用可能な場合は統一版を、
-    そうでなければ従来版を返す。
+
+    統一入力システム対応版を返す。
     """
-    if UNIFIED_INPUT_AVAILABLE:
-        return UnifiedReadLinePredicate(arg)
-    else:
-        return ReadLinePredicate(arg)
+    return UnifiedReadLinePredicate(arg)
 
 
 def create_peek_char_predicate(arg: PrologType) -> BuiltinPredicate:
     """
     peek_char/1述語のファクトリ関数
-    
-    統一入力システムが利用可能な場合は統一版を、
-    そうでなければ従来版を返す。
+
+    統一入力システム対応版を返す。
     """
-    if UNIFIED_INPUT_AVAILABLE:
-        return UnifiedPeekCharPredicate(arg)
-    else:
-        return PeekCharPredicate(arg)
+    return UnifiedPeekCharPredicate(arg)

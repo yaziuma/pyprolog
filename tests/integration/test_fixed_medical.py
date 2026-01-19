@@ -97,7 +97,7 @@ class TestFixedMedical(unittest.TestCase):
 
             else:
                 print("⚠️ English KB file not found, skipping file-based test")
-                
+
         except Exception as e:
             print(f"⚠️ English KB test skipped due to: {e}")
             print("This is normal if the test data file doesn't exist")

@@ -151,7 +151,7 @@ class TermFunction(Term):
 
 class Dot(Term):
     """リスト構築子 '.' を表すTerm"""
-    
+
     def __init__(self, head, tail):
         super().__init__(".", head, tail)
         self.head = head
@@ -160,7 +160,7 @@ class Dot(Term):
 
 class Bar(Term):
     """リストの区切り文字 '|' を表すTerm"""
-    
+
     def __init__(self, elements, tail):
         super().__init__("|", *elements, tail)
         self.elements = elements

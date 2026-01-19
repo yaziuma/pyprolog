@@ -666,7 +666,9 @@ class MockRuntime:
         self.facts = []
         self.rules = []
 
-    def execute(self, goal: Atom, env: BindingEnvironment) -> Iterator[BindingEnvironment]:
+    def execute(
+        self, goal: Atom, env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
         """ゴール実行のモック実装"""
         from pyprolog.core.types import Atom, Term
 

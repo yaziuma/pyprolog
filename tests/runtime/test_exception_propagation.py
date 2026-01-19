@@ -29,15 +29,9 @@ class InteractiveIOManager(IOManager):
     def __init__(self):
         super().__init__()
 
-    def read_char_from_current(self) -> str:
-        """文字入力時に例外を発生"""
-        raise PrologInputRequiredException(input_type="char", variable="X")
-
-    def read_line_from_current(self) -> str:
-        """行入力時に例外を発生"""
-        raise PrologInputRequiredException(input_type="line", variable="X")
-
-    def request_input(self, input_type: str, predicate_name: str, prompt: str = "", **kwargs):
+    def request_input(
+        self, input_type: str, predicate_name: str, prompt: str = "", **kwargs
+    ):
         """統一入力システム対応：入力要求時に例外を発生"""
         if input_type == "char" or input_type == "peek_char":
             raise PrologInputRequiredException(input_type="char", variable="X")

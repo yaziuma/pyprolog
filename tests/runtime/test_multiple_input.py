@@ -3,9 +3,6 @@
 multiple_input_calculator.plの機能をテスト
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
-from io import StringIO
 
 from pyprolog import Runtime
 from pyprolog.runtime.io_streams import StringStream
@@ -25,17 +22,17 @@ class TestMultipleInputCalculator:
         # 入力ストリームを設定（5と3を入力）
         input_data = "5\n3\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         # 出力をキャプチャするためのストリーム
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         # calculate_sumを実行
         results = self.runtime.query("calculate_sum")
-        
+
         # 成功することを確認
         assert len(results) == 1
-        
+
         # 出力を確認（合計8が出力される）
         output = output_stream.get_output_string()
         assert "合計: 8" in output
@@ -45,15 +42,15 @@ class TestMultipleInputCalculator:
         # 1つ目に無効値"abc"、再入力で"7"、2つ目に"4"
         input_data = "abc\n7\n4\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         results = self.runtime.query("calculate_sum")
-        
+
         # 成功することを確認
         assert len(results) == 1
-        
+
         # エラーメッセージと正しい合計が出力される
         output = output_stream.get_output_string()
         assert "エラー: 数値ではありません" in output
@@ -64,15 +61,15 @@ class TestMultipleInputCalculator:
         # 1つ目に"6"、2つ目に無効値"xyz"、再入力で"2"
         input_data = "6\nxyz\n2\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         results = self.runtime.query("calculate_sum")
-        
+
         # 成功することを確認
         assert len(results) == 1
-        
+
         # エラーメッセージと正しい合計が出力される
         output = output_stream.get_output_string()
         assert "エラー: 数値ではありません" in output
@@ -83,15 +80,15 @@ class TestMultipleInputCalculator:
         # 1つ目に"hello"→再入力"10"、2つ目に"world"→再入力"5"
         input_data = "hello\n10\nworld\n5\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         results = self.runtime.query("calculate_sum")
-        
+
         # 成功することを確認
         assert len(results) == 1
-        
+
         # 2回のエラーメッセージと正しい合計が出力される
         output = output_stream.get_output_string()
         error_count = output.count("エラー: 数値ではありません")
@@ -102,14 +99,14 @@ class TestMultipleInputCalculator:
         """負の数値の入力テスト"""
         input_data = "-5\n3\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         results = self.runtime.query("calculate_sum")
-        
+
         assert len(results) == 1
-        
+
         output = output_stream.get_output_string()
         assert "合計: -2" in output
 
@@ -117,14 +114,14 @@ class TestMultipleInputCalculator:
         """小数点数の入力テスト"""
         input_data = "2.5\n1.5\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         results = self.runtime.query("calculate_sum")
-        
+
         assert len(results) == 1
-        
+
         output = output_stream.get_output_string()
         assert "合計: 4.0" in output or "合計: 4" in output
 
@@ -132,14 +129,14 @@ class TestMultipleInputCalculator:
         """ゼロ値の入力テスト"""
         input_data = "0\n0\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         results = self.runtime.query("calculate_sum")
-        
+
         assert len(results) == 1
-        
+
         output = output_stream.get_output_string()
         assert "合計: 0" in output
 
@@ -147,14 +144,14 @@ class TestMultipleInputCalculator:
         """大きな数値の入力テスト"""
         input_data = "1000000\n2000000\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         results = self.runtime.query("calculate_sum")
-        
+
         assert len(results) == 1
-        
+
         output = output_stream.get_output_string()
         assert "合計: 3000000" in output
 
@@ -163,14 +160,14 @@ class TestMultipleInputCalculator:
         # 1つ目に複数回の無効入力後に"8"、2つ目に"2"
         input_data = "abc\ndef\n8\n2\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         results = self.runtime.query("calculate_sum")
-        
+
         assert len(results) == 1
-        
+
         output = output_stream.get_output_string()
         # 2回のエラーメッセージが出力される
         error_count = output.count("エラー: 数値ではありません")
@@ -181,12 +178,12 @@ class TestMultipleInputCalculator:
         """入力プロンプトが正しく表示されることのテスト"""
         input_data = "5\n3\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         results = self.runtime.query("calculate_sum")
-        
+
         output = output_stream.get_output_string()
         assert "数値を2つ入力して合計を計算します" in output
         assert "1つ目の値を入力してください:" in output
@@ -197,10 +194,10 @@ class TestMultipleInputCalculator:
         # get_first_numberのテスト
         input_data = "42\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         results = self.runtime.query("get_first_number(X)")
         assert len(results) == 1
         # Get the actual variable name from the result
@@ -208,7 +205,7 @@ class TestMultipleInputCalculator:
         # Use approximate equality to handle int/float differences
         prolog_value = results[0][variable_name]
         # Extract numeric value from Number object if needed
-        if hasattr(prolog_value, 'value'):
+        if hasattr(prolog_value, "value"):
             value = prolog_value.value
         else:
             value = prolog_value
@@ -224,19 +221,19 @@ class TestMultipleInputCalculator:
         # Use approximate equality to handle int/float differences
         prolog_value = results[0][variable_name]
         # Extract numeric value from Number object if needed
-        if hasattr(prolog_value, 'value'):
+        if hasattr(prolog_value, "value"):
             value = prolog_value.value
         else:
             value = prolog_value
         assert abs(value - 42) < 0.001
-        
+
         # 非数値の検証テスト（再帰呼び出しが発生するため入力ストリームが必要）
         input_data = "100\n"
         self.runtime.io_manager.set_input_stream(StringStream(input_data))
-        
+
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
-        
+
         results = self.runtime.query("validate_number(abc, X, first)")
         assert len(results) == 1
         # Get the actual variable name from the result
@@ -244,7 +241,7 @@ class TestMultipleInputCalculator:
         # Use approximate equality to handle int/float differences
         prolog_value = results[0][variable_name]
         # Extract numeric value from Number object if needed
-        if hasattr(prolog_value, 'value'):
+        if hasattr(prolog_value, "value"):
             value = prolog_value.value
         else:
             value = prolog_value
