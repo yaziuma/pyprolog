@@ -23,7 +23,7 @@ sieve([P|Rest], [P|SievedRest]) :-
 % 倍数を取り除く
 filter([], _, []).
 filter([H|T], P, Result) :-
-    0 is H mod P, !,    % 割り切れる場合はスキップ
+    H mod P =:= 0, !,    % 割り切れる場合はスキップ
     filter(T, P, Result).
 filter([H|T], P, [H|Result]) :-
     filter(T, P, Result).

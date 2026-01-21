@@ -8,7 +8,9 @@
 benchmark(N) :-
     write('Solving '), write(N), write('-Queens problem...'), nl,
     solve_queens(N, Solution),
-    write('Solution found: '), write(Solution), nl.
+    write('Solution found: '), write(Solution), nl,
+    fail. % 全ての解を見つけたい場合はバックトラッキングさせる
+benchmark(_).
 
 % Nクイーンの解決
 solve_queens(N, Solution) :-
@@ -19,36 +21,26 @@ solve_queens(N, Solution) :-
 queens([], Solution, Solution).
 queens(UnplacedRows, SafeQueens, Solution) :-
     select(Row, UnplacedRows, RemainingRows),
-    Length is 1 + 0, % 現在の列位置を計算する簡易的な方法（実際の列番号はSafeQueensの長さでわかる）
-    list_length(SafeQueens, Col0),
-    Col is Col0 + 1,
-    is_safe(Row, Col, SafeQueens),
-    queens(RemainingRows, [q(Row, Col)|SafeQueens], Solution).
+    safe(Row, 1, SafeQueens),
+    queens(RemainingRows, [Row|SafeQueens], Solution).
 
-% 配置が可能かチェック
-is_safe(_, _, []).
-is_safe(Row, Col, [q(R, C)|Rest]) :-
-    Row =\= R,          % 同じ行ではない（selectで保証されるが一応）
-    diff(Row, R, D1),
-    diff(Col, C, D2),
-    D1 =\= D2,          % 斜めではない (|Row-R| != |Col-C|)
-    is_safe(Row, Col, Rest).
+% 安全性の確認
+safe(_, _, []).
+safe(Row, Distance, [Q|Rest]) :-
+    Row != Q,
+    Row != Q + Distance,
+    Row != Q - Distance,
+    NextDistance is Distance + 1,
+    safe(Row, NextDistance, Rest).
 
-% 補助述語
+% 補助述語 (select)
+select(X, [X|T], T).
+select(X, [H|T], [H|Rest]) :-
+    select(X, T, Rest).
+
+% 補助述語 (range)
 range(N, N, [N]) :- !.
 range(I, N, [I|Rest]) :-
     I < N,
     I1 is I + 1,
     range(I1, N, Rest).
-
-select(X, [X|Rest], Rest).
-select(X, [H|Rest], [H|RestWithoutX]) :-
-    select(X, Rest, RestWithoutX).
-
-list_length([], 0).
-list_length([_|T], N) :-
-    list_length(T, N0),
-    N is N0 + 1.
-
-diff(A, B, D) :- A >= B, !, D is A - B.
-diff(A, B, D) :- D is B - A.
