@@ -55,6 +55,7 @@ class Runtime:
         rules: Optional[List[Union[Rule, Fact]]] = None,
         variable_mapper: Optional[VariableMapper] = None,
         functor_mapper: Optional[FunctorMapper] = None,
+        occurs_check_enabled: bool = True,
     ):
         self.rules: List[Union[Rule, Fact]] = rules if rules is not None else []
         self.variable_mapper = (
@@ -76,6 +77,7 @@ class Runtime:
         self.math_interpreter = MathInterpreter()
         self.io_manager = IOManager()  # Initialize IOManager
         self.tracer = Tracer()  # Initialize Tracer
+        self.occurs_check_enabled = occurs_check_enabled
         self.logic_interpreter = LogicInterpreter(
             self.rules, self
         )  # Pass self (Runtime) to LogicInterpreter
@@ -434,6 +436,11 @@ class Runtime:
             env.bindings,
         )
 
+        def _record_builtin_call(name: str) -> None:
+            env.stats["builtin_calls_by_name"][name] = (
+                env.stats["builtin_calls_by_name"].get(name, 0) + 1
+            )
+
         processed_goal: Term
         if (
             isinstance(goal, Atom)
@@ -453,6 +460,7 @@ class Runtime:
                 # AtomをTermに変換してIOオペレータとして処理
                 processed_goal = Term(goal, [])
                 evaluator = self._operator_evaluators[goal.name]
+                _record_builtin_call(goal.name)
                 try:
                     for item in evaluator(processed_goal.args, env):
                         logger.debug(
@@ -502,6 +510,7 @@ class Runtime:
 
         if op_info and functor_name in self._operator_evaluators:
             evaluator = self._operator_evaluators[functor_name]
+            _record_builtin_call(functor_name)
             try:
                 if (
                     op_info.operator_type == OperatorType.ARITHMETIC
@@ -550,6 +559,7 @@ class Runtime:
                 )
                 return
         elif functor_name == "var" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
             dereferenced_arg = self.logic_interpreter.dereference(
                 processed_goal.args[0], env
             )
@@ -557,6 +567,7 @@ class Runtime:
             for item in var_pred.execute(self, env):
                 yield item
         elif functor_name == "atom" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
             dereferenced_arg = self.logic_interpreter.dereference(
                 processed_goal.args[0], env
             )
@@ -564,6 +575,7 @@ class Runtime:
             for item in atom_pred.execute(self, env):
                 yield item
         elif functor_name == "number" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
             dereferenced_arg = self.logic_interpreter.dereference(
                 processed_goal.args[0], env
             )
@@ -571,12 +583,14 @@ class Runtime:
             for item in num_pred.execute(self, env):
                 yield item
         elif functor_name == "atom_number" and len(processed_goal.args) == 2:
+            _record_builtin_call(functor_name)
             atom_number_pred = AtomNumberPredicate(
                 processed_goal.args[0], processed_goal.args[1]
             )
             for item in atom_number_pred.execute(self, env):
                 yield item
         elif functor_name == "functor" and len(processed_goal.args) == 3:
+            _record_builtin_call(functor_name)
             functor_pred = FunctorPredicate(
                 processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
             )
@@ -587,6 +601,7 @@ class Runtime:
                 logger.debug("CutException from functor/3. Re-raising.")
                 raise
         elif functor_name == "arg" and len(processed_goal.args) == 3:
+            _record_builtin_call(functor_name)
             arg_pred = ArgPredicate(
                 processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
             )
@@ -597,6 +612,7 @@ class Runtime:
                 logger.debug("CutException from arg/3. Re-raising.")
                 raise
         elif functor_name == "=.." and len(processed_goal.args) == 2:
+            _record_builtin_call(functor_name)
             univ_pred = UnivPredicate(processed_goal.args[0], processed_goal.args[1])
             try:
                 for item in univ_pred.execute(self, env):
@@ -605,15 +621,18 @@ class Runtime:
                 logger.debug("CutException from =../2. Re-raising.")
                 raise
         elif functor_name == "asserta" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
             asserta_pred = DynamicAssertAPredicate(processed_goal.args[0])
             for item in asserta_pred.execute(self, env):
                 yield item
         elif functor_name == "assertz" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
             assertz_pred = DynamicAssertZPredicate(processed_goal.args[0])
             for item in assertz_pred.execute(self, env):
                 yield item
         elif functor_name == "member" and len(processed_goal.args) == 2:
             # Note: MemberPredicate's execute method handles dereferencing its arguments as needed.
+            _record_builtin_call(functor_name)
             member_pred = MemberPredicate(
                 processed_goal.args[0], processed_goal.args[1]
             )
@@ -625,6 +644,7 @@ class Runtime:
                 raise
         elif functor_name == "append" and len(processed_goal.args) == 3:
             # AppendPredicate handles dereferencing its arguments internally as needed.
+            _record_builtin_call(functor_name)
             append_pred = AppendPredicate(
                 processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
             )
@@ -639,6 +659,7 @@ class Runtime:
                 )  # Though unlikely
                 raise
         elif functor_name == "findall" and len(processed_goal.args) == 3:
+            _record_builtin_call(functor_name)
             findall_pred = FindallPredicate(
                 processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
             )
@@ -647,6 +668,7 @@ class Runtime:
             for item in findall_pred.execute(self, env):
                 yield item
         elif functor_name == "get_char" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
             get_char_pred = create_get_char_predicate(processed_goal.args[0])
             try:
                 for item in get_char_pred.execute(self, env):
@@ -656,6 +678,7 @@ class Runtime:
                 logger.debug("Exception in %s: %s", functor_name, e)
                 raise
         elif functor_name == "read_line" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
             read_line_pred = create_read_line_predicate(processed_goal.args[0])
             try:
                 for item in read_line_pred.execute(self, env):
@@ -665,26 +688,32 @@ class Runtime:
                 logger.debug("Exception in %s: %s", functor_name, e)
                 raise
         elif functor_name == "peek_char" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
             peek_char_pred = create_peek_char_predicate(processed_goal.args[0])
             for item in peek_char_pred.execute(self, env):
                 yield item
         elif functor_name == "at_end_of_stream" and len(processed_goal.args) == 0:
+            _record_builtin_call(functor_name)
             at_end_pred = AtEndOfStreamPredicate()
             for item in at_end_pred.execute(self, env):
                 yield item
         elif functor_name == "retract" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
             retract_pred = DynamicRetractPredicate(processed_goal.args[0])
             for item in retract_pred.execute(self, env):  # self is runtime
                 yield item
         elif functor_name == "listing" and len(processed_goal.args) == 0:
+            _record_builtin_call(functor_name)
             listing_pred = ListingPredicate()
             for item in listing_pred.execute(self, env):
                 yield item
         elif functor_name == "listing" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
             listing_pred = ListingWithPredicatePredicate(processed_goal.args[0])
             for item in listing_pred.execute(self, env):
                 yield item
         elif functor_name == "export_facts" and len(processed_goal.args) == 2:
+            _record_builtin_call(functor_name)
             export_pred = ExportFactsPredicate(
                 processed_goal.args[0], processed_goal.args[1]
             )
