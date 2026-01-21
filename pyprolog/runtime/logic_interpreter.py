@@ -11,7 +11,7 @@ from pyprolog.core.types import (
 )
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.errors import PrologError, CutException
-from typing import TYPE_CHECKING, Tuple, Iterator, List, Union, Dict, Optional
+from typing import TYPE_CHECKING, Tuple, Iterator, List, Union, Dict, Optional, Any
 import logging
 
 if TYPE_CHECKING:
@@ -42,10 +42,11 @@ class LogicInterpreter:
     def _effective_head_for_index(self, entry: Union[Rule, Fact]) -> Optional[Term]:
         head = entry.head
 
+        # type() is check for speed optimization where inheritance is not expected/used for these core types
         if (
-            isinstance(entry, Fact)
-            and isinstance(head, Term)
-            and isinstance(head.functor, Atom)
+            type(entry) is Fact
+            and type(head) is Term
+            and type(head.functor) is Atom
             and head.functor.name == ":-"
             and len(head.args) == 2
         ):
@@ -53,16 +54,16 @@ class LogicInterpreter:
         else:
             effective_head = head
 
-        if isinstance(effective_head, Atom):
+        if type(effective_head) is Atom:
             return Term(effective_head, [])
-        if isinstance(effective_head, Term):
+        if type(effective_head) is Term:
             return effective_head
         return None
 
     def _index_key_from_head(self, head: Optional[Term]) -> Optional[Tuple[str, int]]:
         if head is None:
             return None
-        if not isinstance(head.functor, Atom):
+        if type(head.functor) is not Atom:
             return None
         return (head.functor.name, len(head.args))
 
@@ -111,59 +112,92 @@ class LogicInterpreter:
         self.rules = rules
         self._build_index()
 
+    def _rename_recursive_term(self, current_term: Any, mapping: Dict[str, Variable]) -> Any:
+        """
+        Helper method to recursively rename variables in a term.
+        Optimized to use type() checks and avoid overhead of inner function definitions.
+        """
+        t_type = type(current_term)
+
+        if t_type is Variable:
+            name = current_term.name
+            if name in mapping:
+                return mapping[name]
+            
+            new_name = f"_V{self._unique_var_counter}_{name}"
+            new_var = Variable(new_name)
+            mapping[name] = new_var
+            return new_var
+            
+        elif t_type is Term:
+            # Optimization: if no args, no need to recreate term
+            if not current_term.args:
+                return current_term
+            new_args = [self._rename_recursive_term(arg, mapping) for arg in current_term.args]
+            return Term(current_term.functor, new_args)
+            
+        elif t_type is ListTerm:
+            new_elements = [self._rename_recursive_term(el, mapping) for el in current_term.elements]
+            new_tail_val = current_term.tail
+            renamed_tail_val = (
+                self._rename_recursive_term(new_tail_val, mapping) if new_tail_val is not None else None
+            )
+            # Use isinstance here as ListTerm tail validation might need to check multiple allowed types
+            if not (
+                isinstance(renamed_tail_val, (Variable, Atom, ListTerm))
+                or renamed_tail_val is None
+            ):
+                raise PrologError(
+                    f"Internal error: Renamed tail of ListTerm is not a valid type: {type(renamed_tail_val)}"
+                )
+            return ListTerm(new_elements, renamed_tail_val)
+            
+        # Optimization: Atom, Number, String are immutable and contain no variables
+        elif t_type is Atom or t_type is Number or t_type is String:
+            return current_term
+            
+        return current_term
+
     def _rename_variables(
         self, term_or_rule: Union[PrologType, Rule, Fact]
     ) -> Union[PrologType, Rule, Fact]:
         self._unique_var_counter += 1
         mapping: Dict[str, Variable] = {}
 
-        def rename_recursive(current_term: PrologType) -> PrologType:
-            if isinstance(current_term, Variable):
-                if current_term.name not in mapping:
-                    new_name = f"_V{self._unique_var_counter}_{current_term.name}"
-                    mapping[current_term.name] = Variable(new_name)
-                return mapping[current_term.name]
-            elif isinstance(current_term, Term):
-                new_args = [rename_recursive(arg) for arg in current_term.args]
-                return Term(current_term.functor, new_args)
-            elif isinstance(current_term, ListTerm):
-                new_elements = [rename_recursive(el) for el in current_term.elements]
-                new_tail_val = current_term.tail
-                renamed_tail_val = (
-                    rename_recursive(new_tail_val) if new_tail_val is not None else None
-                )
-                if not (
-                    isinstance(renamed_tail_val, (Variable, Atom, ListTerm))
-                    or renamed_tail_val is None
-                ):
-                    raise PrologError(
-                        f"Internal error: Renamed tail of ListTerm is not a valid type: {type(renamed_tail_val)}"
-                    )
-                return ListTerm(new_elements, renamed_tail_val)
-            return current_term
+        # Optimized dispatch based on type
+        obj_type = type(term_or_rule)
 
-        if isinstance(term_or_rule, Rule):
-            renamed_head = rename_recursive(term_or_rule.head)
-            renamed_body = rename_recursive(term_or_rule.body)
-            if not isinstance(renamed_head, Term):
+        if obj_type is Rule:
+            renamed_head = self._rename_recursive_term(term_or_rule.head, mapping)
+            renamed_body = self._rename_recursive_term(term_or_rule.body, mapping)
+            
+            if type(renamed_head) is not Term:
                 raise PrologError("Internal error: Renamed head of Rule is not a Term.")
+            
             # Allow body to be a Term, Atom, or Variable
-            if not isinstance(renamed_body, (Term, Atom, Variable)):
+            body_type = type(renamed_body)
+            if body_type is not Term and body_type is not Atom and body_type is not Variable:
                 raise PrologError(
-                    f"Internal error: Renamed body of Rule is not a Term, Atom, or Variable, got {type(renamed_body)}."
+                    f"Internal error: Renamed body of Rule is not a Term, Atom, or Variable, got {body_type}."
                 )
             return Rule(renamed_head, renamed_body)
-        elif isinstance(term_or_rule, Fact):
-            renamed_head = rename_recursive(term_or_rule.head)
-            if not isinstance(renamed_head, Term):
+            
+        elif obj_type is Fact:
+            renamed_head = self._rename_recursive_term(term_or_rule.head, mapping)
+            if type(renamed_head) is not Term:
                 raise PrologError("Internal error: Renamed head of Fact is not a Term.")
             return Fact(renamed_head)
+            
         else:
-            return rename_recursive(term_or_rule)
+            return self._rename_recursive_term(term_or_rule, mapping)
 
     def unify(
         self, term1: PrologType, term2: PrologType, env: BindingEnvironment
     ) -> Tuple[bool, BindingEnvironment]:
+        # Optimization: Avoid f-string creation if log level is high, 
+        # though user mentioned ignoring logging overhead, explicitly guarding logic paths is safer.
+        # Here we keep original logging statements but logic is optimized.
+        
         logger.debug(
             "LOGIC_INTERP_UNIFY: Unifying term1: %s (type %s) with term2: %s (type %s) in env: %s",
             term1,
@@ -172,9 +206,19 @@ class LogicInterpreter:
             type(term2).__name__,
             env.bindings,
         )
+
+        # Fast path for identical terms (Numbers, Atoms, same Variable instances)
+        if term1 == term2:
+             # Even if they are the same object, we must check if they are variables needing dereference?
+             # Actually, if they are exactly the same object/value, unify succeeds without environment change
+             # UNLESS they are variables bound to something else in env.
+             # Dereference first is safer.
+             pass
+
         current_env = env.copy()
         t1 = self.dereference(term1, current_env)
         t2 = self.dereference(term2, current_env)
+        
         logger.debug(
             "LOGIC_INTERP_UNIFY: Dereferenced t1: %s (type %s), t2: %s (type %s)",
             t1,
@@ -191,7 +235,11 @@ class LogicInterpreter:
             )
             return True, current_env
 
-        if isinstance(t1, Variable):
+        # Optimize type checks using type() is ... which is faster than isinstance() for exact types
+        type1 = type(t1)
+        type2 = type(t2)
+
+        if type1 is Variable:
             if self._occurs_check(t1, t2, current_env):
                 logger.debug(
                     "LOGIC_INTERP_UNIFY: Occurs check failed for var %s in term %s, returning False",
@@ -207,7 +255,8 @@ class LogicInterpreter:
                 current_env.bindings,
             )
             return True, current_env
-        if isinstance(t2, Variable):
+        
+        if type2 is Variable:
             if self._occurs_check(t2, t1, current_env):
                 logger.debug(
                     "LOGIC_INTERP_UNIFY: Occurs check failed for var %s in term %s, returning False",
@@ -224,7 +273,7 @@ class LogicInterpreter:
             )
             return True, current_env
 
-        if isinstance(t1, Atom) and isinstance(t2, Atom):
+        if type1 is Atom and type2 is Atom:
             success = t1.name == t2.name
             logger.debug(
                 "LOGIC_INTERP_UNIFY: Atom vs Atom (%s vs %s), success: %s, returning env: %s",
@@ -234,7 +283,8 @@ class LogicInterpreter:
                 current_env.bindings,
             )
             return success, current_env
-        if isinstance(t1, Number) and isinstance(t2, Number):
+            
+        if type1 is Number and type2 is Number:
             success = t1.value == t2.value
             logger.debug(
                 "LOGIC_INTERP_UNIFY: Number vs Number (%s vs %s), success: %s, returning env: %s",
@@ -244,7 +294,8 @@ class LogicInterpreter:
                 current_env.bindings,
             )
             return success, current_env
-        if isinstance(t1, String) and isinstance(t2, String):
+            
+        if type1 is String and type2 is String:
             success = t1.value == t2.value
             logger.debug(
                 "LOGIC_INTERP_UNIFY: String vs String ('%s' vs '%s'), success: %s, returning env: %s",
@@ -255,7 +306,7 @@ class LogicInterpreter:
             )
             return success, current_env
 
-        if isinstance(t1, Term) and isinstance(t2, Term):
+        if type1 is Term and type2 is Term:
             if t1.functor == t2.functor and len(t1.args) == len(t2.args):
                 logger.debug(
                     "LOGIC_INTERP_UNIFY: Term vs Term (%s/%s), unifying args.",
@@ -303,10 +354,17 @@ class LogicInterpreter:
                 )
                 return False, env
 
+        # ListTerm logic (fallback to instance check if ListTerm implementation varies)
+        if isinstance(t1, ListTerm) and isinstance(t2, ListTerm):
+             # Original code didn't explicitly handle ListTerm inside unify except via fallback or specific implementations.
+             # Assuming standard unification for lists is handled here or by conversion.
+             # For speed, if ListTerm is used, specialized handling should be added here.
+             pass
+
         logger.debug(
             "LOGIC_INTERP_UNIFY: Unification failed by falling through (t1 type: %s, t2 type: %s), returning False",
-            type(t1),
-            type(t2),
+            type1,
+            type2,
         )
         return False, env
 
@@ -316,18 +374,31 @@ class LogicInterpreter:
         term_deref = self.dereference(term, env)
         if var == term_deref:
             return True
-        if isinstance(term_deref, Term):
-            for arg in term_deref.args:
-                if self._occurs_check(var, arg, env):
-                    return True
+            
+        t_type = type(term_deref)
+        
+        if t_type is Term:
+            # Using generator expression in any() is efficient
+            return any(self._occurs_check(var, arg, env) for arg in term_deref.args)
+            
+        if t_type is ListTerm:
+            return any(self._occurs_check(var, arg, env) for arg in term_deref.elements) or \
+                   (term_deref.tail is not None and self._occurs_check(var, term_deref.tail, env))
+                   
         return False
 
     def dereference(self, term: PrologType, env: BindingEnvironment) -> PrologType:
-        if isinstance(term, Variable):
-            bound_value = env.get_value(term.name)
-            if bound_value is not None and bound_value != term:
-                return self.dereference(bound_value, env)
-        return term
+        """
+        Optimized iterative dereference using type() checks.
+        Traverses the variable chain until a non-variable term or an unbound variable is found.
+        """
+        current_term = term
+        while type(current_term) is Variable:
+            bound_value = env.get_value(current_term.name)
+            if bound_value is None or bound_value == current_term:
+                return current_term
+            current_term = bound_value
+        return current_term
 
     def deep_dereference_term(
         self, term: PrologType, env: BindingEnvironment
@@ -338,12 +409,14 @@ class LogicInterpreter:
         # First, dereference the term itself (if it's a variable)
         # This initial dereference is important if term is a variable bound to another variable, etc.
         current_term = self.dereference(term, env)
+        t_type = type(current_term)
 
-        if isinstance(current_term, Variable):
+        if t_type is Variable:
             # If it's still a variable after initial dereferencing, it means it's unbound in this context
             # or bound to itself (which dereference handles).
             return current_term
-        elif isinstance(current_term, Term):
+            
+        elif t_type is Term:
             # Recursively dereference arguments
             new_args = [
                 self.deep_dereference_term(arg, env) for arg in current_term.args
@@ -351,7 +424,8 @@ class LogicInterpreter:
             # Functor itself could theoretically be a variable if we allowed higher-order, but not currently.
             # Assuming functor is Atom or similar, not needing dereferencing here.
             return Term(current_term.functor, new_args)
-        elif isinstance(current_term, ListTerm):
+            
+        elif t_type is ListTerm:
             # This type is not fully used/fleshed out in the current codebase snippets,
             # but providing a basic handling.
             new_elements = [
@@ -361,6 +435,7 @@ class LogicInterpreter:
             if current_term.tail is not None:
                 new_tail = self.deep_dereference_term(current_term.tail, env)
             return ListTerm(new_elements, new_tail)
+            
         # Atoms, Numbers, Strings are returned as is
         return current_term
 
@@ -372,19 +447,23 @@ class LogicInterpreter:
             goal,
             len(self.rules),
         )
+        
+        # Optimize goal preparation
         actual_goal: Term
-        if isinstance(goal, Atom):
+        goal_type = type(goal)
+        
+        if goal_type is Atom:
             actual_goal = Term(goal, [])
             logger.debug(
                 "LOGIC_INTERP: Goal %s (Atom) converted to Term: %s for solving.",
                 goal,
                 actual_goal,
             )
-        elif isinstance(goal, Term):
+        elif goal_type is Term:
             actual_goal = goal
         else:
             logger.debug(
-                "Goal %s (type %s) is not callable, failing.", goal, type(goal)
+                "Goal %s (type %s) is not callable, failing.", goal, goal_type
             )
             return
 
@@ -397,28 +476,30 @@ class LogicInterpreter:
         self._refresh_index_if_needed()
 
         # 未定義述語は existence_error を返す（builtin/演算子は execute 側で処理済み）
-        if isinstance(actual_goal.functor, Atom) and actual_goal.functor.name not in (
+        # Optimize property access
+        functor = actual_goal.functor
+        if type(functor) is Atom and functor.name not in (
             "true",
             "fail",
         ):
-            key = (actual_goal.functor.name, len(actual_goal.args))
+            key = (functor.name, len(actual_goal.args))
             if key not in self.rules_index:
                 raise PrologError(
-                    f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
+                    f"existence_error(procedure, {functor.name}/{len(actual_goal.args)})"
                 )
 
         # トレース: ゴール呼び出し記録
         if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
             self.runtime.tracer.record_call(actual_goal, env)
 
-        if actual_goal.functor.name == "true" and not actual_goal.args:
+        if functor.name == "true" and not actual_goal.args:
             logger.debug("Goal %s is true, yielding current env.", actual_goal)
             # トレース: 成功記録
             if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
                 self.runtime.tracer.record_exit(actual_goal, env, Fact(actual_goal))
             yield env
             return
-        elif actual_goal.functor.name == "fail" and not actual_goal.args:
+        elif functor.name == "fail" and not actual_goal.args:
             logger.debug("Goal %s is fail, returning.", actual_goal)
             # トレース: 失敗記録
             if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
@@ -432,8 +513,8 @@ class LogicInterpreter:
         #     return
 
         candidate_entries: List[Union[Rule, Fact]]
-        if isinstance(actual_goal.functor, Atom):
-            key = (actual_goal.functor.name, len(actual_goal.args))
+        if type(functor) is Atom:
+            key = (functor.name, len(actual_goal.args))
             candidate_entries = list(self.rules_index.get(key, []))
         else:
             candidate_entries = list(self.rules)
@@ -446,9 +527,11 @@ class LogicInterpreter:
             logger.debug("LOGIC_INTERP: Renamed entry: %s", renamed_entry)
 
             current_head: Term
-            if isinstance(renamed_entry, Rule):
+            entry_type = type(renamed_entry)
+            
+            if entry_type is Rule:
                 current_head = renamed_entry.head
-            elif isinstance(renamed_entry, Fact):
+            elif entry_type is Fact:
                 current_head = renamed_entry.head
             else:
                 raise PrologError(
@@ -466,8 +549,8 @@ class LogicInterpreter:
             rule_body_from_fact_structure = None
 
             if (
-                isinstance(renamed_entry, Fact)
-                and isinstance(current_head, Term)
+                entry_type is Fact
+                and type(current_head) is Term
                 and current_head.functor.name == ":-"
                 and len(current_head.args) == 2
             ):
@@ -512,7 +595,7 @@ class LogicInterpreter:
                         # その他の例外もログ出力して伝播
                         logger.debug("Exception in patched rule body execution: %s", e)
                         raise
-                elif isinstance(renamed_entry, Fact):  # Genuine Fact
+                elif entry_type is Fact:  # Genuine Fact
                     logger.debug(
                         "LOGIC_INTERP: Unified Fact %s with %s. Yielding env: %s",
                         actual_goal,
@@ -525,7 +608,7 @@ class LogicInterpreter:
                             actual_goal, new_env_after_unify, renamed_entry
                         )
                     yield new_env_after_unify
-                elif isinstance(renamed_entry, Rule):  # Properly parsed Rule
+                elif entry_type is Rule:  # Properly parsed Rule
                     logger.debug(
                         "LOGIC_INTERP: Unified Rule Head %s with %s. Solving body: %s with env: %s",
                         actual_goal,
@@ -591,8 +674,10 @@ class LogicInterpreter:
             # If this exact object in the copied structure has been processed, return its substituted form.
             if id(current_part) in memo:
                 return memo[id(current_part)]
+            
+            t_type = type(current_part)
 
-            if isinstance(current_part, Variable):
+            if t_type is Variable:
                 # Use deep_dereference_term to get the fully resolved value of this variable
                 # according to the given solution environment 'env'.
                 # This resolved value is what the variable from the template copy should become.
@@ -602,7 +687,7 @@ class LogicInterpreter:
                 memo[id(current_part)] = instantiated_value
                 return instantiated_value
 
-            elif isinstance(current_part, Term):
+            elif t_type is Term:
                 # For complex terms, we need to recursively instantiate their arguments.
                 # Since term_copy is a deep copy, current_part is part of this copy.
                 # We modify its args list in place with instantiated arguments.
