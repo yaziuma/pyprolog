@@ -87,11 +87,17 @@ class BindingEnvironment:
     def to_dict(self):
         """
         バインディング環境を辞書に変換
+        自己参照（変数が自分自身に束縛されている）は除外される
         """
+        from pyprolog.core.types import Variable
+
         result = {}
         if self.parent:
             result.update(self.parent.to_dict())
-        
+
         for k, v in self.bindings.items():
+            # 自己参照をスキップ
+            if isinstance(v, Variable) and v.name == k:
+                continue
             result[k] = v
         return result
