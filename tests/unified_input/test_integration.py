@@ -518,7 +518,7 @@ class TestComplexScenarios:
             results2 = list(predicate2.execute(runtime, BindingEnvironment()))
             assert len(results2) == 1
             assert runtime.io_manager.unified_input.threading_enabled
-            
+
             predicate3 = TestReadLinePredicate("X3")
             results3 = list(predicate3.execute(runtime, BindingEnvironment()))
             assert len(results3) == 1

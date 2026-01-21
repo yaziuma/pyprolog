@@ -47,7 +47,7 @@ class LengthPredicate:
                         yield new_env
 
         except Exception as e:
-            logger.error(f"Error in length/2: {e}")
+            logger.error("Error in length/2: %s", e)
             raise PrologError(f"length/2 execution failed: {e}")
 
     def _calculate_list_length(self, term):
@@ -95,7 +95,7 @@ class SumListPredicate:
                     yield new_env
 
         except Exception as e:
-            logger.error(f"Error in sum_list/2: {e}")
+            logger.error("Error in sum_list/2: %s", e)
             raise PrologError(f"sum_list/2 execution failed: {e}")
 
     def _calculate_sum(self, term, runtime, env: BindingEnvironment):
@@ -152,7 +152,7 @@ class SortPredicate:
                         yield new_env
 
         except Exception as e:
-            logger.error(f"Error in sort/3: {e}")
+            logger.error("Error in sort/3: %s", e)
             raise PrologError(f"sort/3 execution failed: {e}")
 
     def _convert_to_python_list(self, term, runtime, env):

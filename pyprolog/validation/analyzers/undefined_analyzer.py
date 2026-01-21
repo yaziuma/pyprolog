@@ -33,7 +33,7 @@ class UndefinedAnalyzer:
         # 削除された述語の参照をチェック
         issues.extend(self._check_missing_imports(symbol_table, dependency_graph))
 
-        logger.info(f"未定義述語分析完了: {len(issues)} 個の問題を発見")
+        logger.info("未定義述語分析完了: %d 個の問題を発見", len(issues))
         return issues
 
     def _check_undefined_predicates(

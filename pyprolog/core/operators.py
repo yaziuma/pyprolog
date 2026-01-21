@@ -72,7 +72,7 @@ class OperatorRegistry:
         self._initialize_builtin_operators()
         self._initialized = True
         logger.info(
-            f"OperatorRegistry initialized with {len(self._operators)} operators"
+            "OperatorRegistry initialized with %d operators", len(self._operators)
         )
 
     def _initialize_builtin_operators(self):
@@ -352,7 +352,7 @@ class OperatorRegistry:
 
     def register_operator(self, operator_info: OperatorInfo):
         """演算子を登録（重複対応版）"""
-        logger.debug(f"Registering operator: {operator_info.symbol}")
+        logger.debug("Registering operator: %s", operator_info.symbol)
 
         # 同じ記号で異なるarityの演算子をサポート
         key = f"{operator_info.symbol}_{operator_info.arity}"
@@ -443,7 +443,7 @@ class OperatorRegistry:
             symbol, precedence, associativity, op_type, arity, evaluator, token_type
         )
         self.register_operator(op_info)
-        logger.info(f"Added user operator: {symbol}")
+        logger.info("Added user operator: %s", symbol)
 
 
 # グローバルインスタンス（シングルトン）

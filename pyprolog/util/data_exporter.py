@@ -64,11 +64,11 @@ class DataExporter:
                     row = self._fact_to_csv_row(fact, max_args)
                     writer.writerow(row)
 
-            logger.info(f"Exported {len(facts)} facts to CSV: {filepath}")
+            logger.info("Exported %d facts to CSV: %s", len(facts), filepath)
             return True
 
         except Exception as e:
-            logger.error(f"Failed to export CSV to {filepath}: {e}")
+            logger.error("Failed to export CSV to %s: %s", filepath, e)
             return False
 
     def export_to_json(self, facts: List[Fact], filepath: str) -> bool:
@@ -95,11 +95,11 @@ class DataExporter:
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(json_data, f, ensure_ascii=False, indent=2)
 
-            logger.info(f"Exported {len(facts)} facts to JSON: {filepath}")
+            logger.info("Exported %d facts to JSON: %s", len(facts), filepath)
             return True
 
         except Exception as e:
-            logger.error(f"Failed to export JSON to {filepath}: {e}")
+            logger.error("Failed to export JSON to %s: %s", filepath, e)
             return False
 
     def export_to_tsv(self, facts: List[Fact], filepath: str) -> bool:
@@ -138,11 +138,11 @@ class DataExporter:
                     row = self._fact_to_csv_row(fact, max_args)  # CSV と同じ行データ
                     f.write("\t".join(str(cell) for cell in row) + "\n")
 
-            logger.info(f"Exported {len(facts)} facts to TSV: {filepath}")
+            logger.info("Exported %d facts to TSV: %s", len(facts), filepath)
             return True
 
         except Exception as e:
-            logger.error(f"Failed to export TSV to {filepath}: {e}")
+            logger.error("Failed to export TSV to %s: %s", filepath, e)
             return False
 
     def _extract_args(self, term: Term) -> List[PrologType]:
@@ -467,5 +467,5 @@ class DataExporter:
                 return self.export_to_csv(facts, filepath)
 
         except Exception as e:
-            logger.error(f"Failed to export facts: {e}")
+            logger.error("Failed to export facts: %s", e)
             return False

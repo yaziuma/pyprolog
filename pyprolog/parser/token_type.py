@@ -76,9 +76,9 @@ class TokenTypeManager:
                     TokenType, token_name
                 )
 
-                logger.debug(f"Added dynamic token: {token_name}")
+                logger.debug("Added dynamic token: %s", token_name)
 
-        logger.info(f"Ensured {len(self._dynamic_tokens)} dynamic operator tokens")
+        logger.info("Ensured %d dynamic operator tokens", len(self._dynamic_tokens))
 
     def get_token_type(self, name: str):
         """トークンタイプを取得（存在しない場合は作成）"""
@@ -91,7 +91,7 @@ class TokenTypeManager:
         TokenType._member_map_[name] = getattr(TokenType, name)
         TokenType._value2member_map_[name] = getattr(TokenType, name)
 
-        logger.debug(f"Dynamically created token: {name}")
+        logger.debug("Dynamically created token: %s", name)
         return getattr(TokenType, name)
 
 

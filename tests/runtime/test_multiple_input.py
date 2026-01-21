@@ -3,7 +3,6 @@
 multiple_input_calculator.plの機能をテスト
 """
 
-
 from pyprolog import Runtime
 from pyprolog.runtime.io_streams import StringStream
 from pyprolog.runtime.unified_input_system import StreamInputHandler
@@ -22,7 +21,9 @@ class TestMultipleInputCalculator:
         """正常な2つの数値入力のテスト"""
         # 入力ストリームを設定（5と3を入力）
         input_data = "5\n3\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         # 出力をキャプチャするためのストリーム
         output_stream = StringStream("")
@@ -42,7 +43,9 @@ class TestMultipleInputCalculator:
         """1つ目の入力が無効、再入力で有効な値のテスト"""
         # 1つ目に無効値"abc"、再入力で"7"、2つ目に"4"
         input_data = "abc\n7\n4\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
@@ -61,7 +64,9 @@ class TestMultipleInputCalculator:
         """2つ目の入力が無効、再入力で有効な値のテスト"""
         # 1つ目に"6"、2つ目に無効値"xyz"、再入力で"2"
         input_data = "6\nxyz\n2\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
@@ -80,7 +85,9 @@ class TestMultipleInputCalculator:
         """両方の入力が無効、それぞれ再入力で有効な値のテスト"""
         # 1つ目に"hello"→再入力"10"、2つ目に"world"→再入力"5"
         input_data = "hello\n10\nworld\n5\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
@@ -99,7 +106,9 @@ class TestMultipleInputCalculator:
     def test_negative_numbers(self):
         """負の数値の入力テスト"""
         input_data = "-5\n3\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
@@ -114,7 +123,9 @@ class TestMultipleInputCalculator:
     def test_decimal_numbers(self):
         """小数点数の入力テスト"""
         input_data = "2.5\n1.5\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
@@ -129,7 +140,9 @@ class TestMultipleInputCalculator:
     def test_zero_values(self):
         """ゼロ値の入力テスト"""
         input_data = "0\n0\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
@@ -144,7 +157,9 @@ class TestMultipleInputCalculator:
     def test_large_numbers(self):
         """大きな数値の入力テスト"""
         input_data = "1000000\n2000000\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
@@ -160,7 +175,9 @@ class TestMultipleInputCalculator:
         """複数回の無効入力後に有効入力のテスト"""
         # 1つ目に複数回の無効入力後に"8"、2つ目に"2"
         input_data = "abc\ndef\n8\n2\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
@@ -178,7 +195,9 @@ class TestMultipleInputCalculator:
     def test_input_prompts_appear(self):
         """入力プロンプトが正しく表示されることのテスト"""
         input_data = "5\n3\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
@@ -194,7 +213,9 @@ class TestMultipleInputCalculator:
         """個別の述語のテスト"""
         # get_first_numberのテスト
         input_data = "42\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
@@ -230,7 +251,9 @@ class TestMultipleInputCalculator:
 
         # 非数値の検証テスト（再帰呼び出しが発生するため入力ストリームが必要）
         input_data = "100\n"
-        self.runtime.io_manager.set_input_handler(StreamInputHandler(StringStream(input_data)))
+        self.runtime.io_manager.set_input_handler(
+            StreamInputHandler(StringStream(input_data))
+        )
 
         output_stream = StringStream("")
         self.runtime.io_manager.set_output_stream(output_stream)
@@ -247,4 +270,3 @@ class TestMultipleInputCalculator:
         else:
             value = prolog_value
         assert abs(value - 100) < 0.001
-

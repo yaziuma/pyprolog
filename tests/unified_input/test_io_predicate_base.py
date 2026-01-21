@@ -183,6 +183,7 @@ class IOPredicate(BuiltinPredicate, ABC):
 # テスト用具象クラス
 class TestGetCharPredicate(IOPredicate):
     """get_char/1述語のテスト用実装"""
+
     __test__ = False
 
     def _get_expected_arg_count(self) -> int:
@@ -208,6 +209,7 @@ class TestGetCharPredicate(IOPredicate):
 
 class TestReadLinePredicate(IOPredicate):
     """read_line/1述語のテスト用実装"""
+
     __test__ = False
 
     def _get_expected_arg_count(self) -> int:

@@ -35,7 +35,7 @@ class SearchEngine:
         self.is_indexed = True
         self._index_cache_valid = True
 
-        logger.info(f"検索インデックス構築完了: {len(self.runtime.rules)} ルール処理")
+        logger.info("検索インデックス構築完了: %d ルール処理", len(self.runtime.rules))
 
     def search(
         self, pattern: str, search_type: str = "predicate", limit: int = 100
@@ -75,11 +75,11 @@ class SearchEngine:
             # 結果数制限を適用
             results = results[:limit]
 
-            logger.debug(f"検索完了: {len(results)} 件の結果")
+            logger.debug("検索完了: %d 件の結果", len(results))
             return results
 
         except Exception as e:
-            logger.error(f"検索エラー: {e}")
+            logger.error("検索エラー: %s", e)
             return []
 
     def _search_predicate(self, pattern: str, limit: int) -> List[SearchResult]:
@@ -156,7 +156,7 @@ class SearchEngine:
                         if len(results) >= limit:
                             break
                 except Exception as e:
-                    logger.debug(f"引数マッチングエラー: {e}")
+                    logger.debug("引数マッチングエラー: %s", e)
                     continue
 
         return results

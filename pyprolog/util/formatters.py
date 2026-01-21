@@ -45,7 +45,7 @@ class PrologFormatter:
             term_str = self._format_term(fact.head)
             return f"{term_str}."
         except Exception as e:
-            logger.warning(f"Failed to format fact {fact}: {e}")
+            logger.warning("Failed to format fact %s: %s", fact, e)
             return f"% Error formatting fact: {fact}"
 
     def format_rule(self, rule: Rule) -> str:
@@ -63,7 +63,7 @@ class PrologFormatter:
             body_str = self._format_term(rule.body)
             return f"{head_str} :- {body_str}."
         except Exception as e:
-            logger.warning(f"Failed to format rule {rule}: {e}")
+            logger.warning("Failed to format rule %s: %s", rule, e)
             return f"% Error formatting rule: {rule}"
 
     def format_rules_list(self, rules: List[Union[Rule, Fact]]) -> str:
@@ -97,7 +97,7 @@ class PrologFormatter:
                 elif isinstance(rule, Rule):
                     formatted_lines.append(self.format_rule(rule))
                 else:
-                    logger.warning(f"Unknown rule type: {type(rule)}")
+                    logger.warning("Unknown rule type: %s", type(rule))
                     formatted_lines.append(f"% Unknown rule type: {rule}")
 
             formatted_lines.append("")  # 述語グループ間の空行
@@ -152,7 +152,7 @@ class PrologFormatter:
         elif isinstance(term, Term):
             return self._format_compound_term(term)
         else:
-            logger.warning(f"Unknown term type: {type(term)}")
+            logger.warning("Unknown term type: %s", type(term))
             return str(term)
 
     def _format_atom(self, atom: Atom) -> str:
@@ -410,7 +410,7 @@ class PrologFormatter:
                 groups[predicate_key].append(rule)
 
             except Exception as e:
-                logger.warning(f"Error grouping rule {rule}: {e}")
+                logger.warning("Error grouping rule %s: %s", rule, e)
                 continue
 
         return groups
@@ -486,7 +486,7 @@ class PrologFormatter:
                     filtered.append(rule)
 
             except Exception as e:
-                logger.warning(f"Error filtering rule {rule}: {e}")
+                logger.warning("Error filtering rule %s: %s", rule, e)
                 continue
 
         return filtered

@@ -45,7 +45,7 @@ class Validator:
         Returns:
             検証結果
         """
-        logger.info(f"バリデーション開始: type={check_type}, detailed={detailed}")
+        logger.info("バリデーション開始: type=%s, detailed=%s", check_type, detailed)
         start_time = time.time()
 
         try:
@@ -61,21 +61,21 @@ class Validator:
                     self.symbol_table, self.dependency_graph
                 )
                 all_issues.extend(issues)
-                logger.debug(f"矛盾解析: {len(issues)} 個の問題")
+                logger.debug("矛盾解析: %d 個の問題", len(issues))
 
             if check_type == "all" or check_type == "unreachable":
                 issues = self.analyzers["unreachable"].analyze(
                     self.symbol_table, self.dependency_graph
                 )
                 all_issues.extend(issues)
-                logger.debug(f"到達可能性解析: {len(issues)} 個の問題")
+                logger.debug("到達可能性解析: %d 個の問題", len(issues))
 
             if check_type == "all" or check_type == "undefined":
                 issues = self.analyzers["undefined"].analyze(
                     self.symbol_table, self.dependency_graph
                 )
                 all_issues.extend(issues)
-                logger.debug(f"未定義述語解析: {len(issues)} 個の問題")
+                logger.debug("未定義述語解析: %d 個の問題", len(issues))
 
             # 詳細解析
             if detailed:
@@ -95,7 +95,7 @@ class Validator:
             return result
 
         except Exception as e:
-            logger.error(f"バリデーションエラー: {e}")
+            logger.error("バリデーションエラー: %s", e)
             analysis_duration = time.time() - start_time
             error_issue = ValidationIssue(
                 issue_type="system",
@@ -126,7 +126,7 @@ class Validator:
             self._analyze_rule_or_fact(rule_or_fact, None, i + 1)
 
         stats = self.symbol_table.get_statistics()
-        logger.info(f"シンボルテーブル構築完了: {stats}")
+        logger.info("シンボルテーブル構築完了: %s", stats)
 
     def build_dependency_graph(self) -> None:
         """依存関係グラフを構築"""
@@ -153,7 +153,7 @@ class Validator:
                         self.dependency_graph.add_edge(caller_key, callee_key)
 
         stats = self.dependency_graph.get_statistics()
-        logger.info(f"依存関係グラフ構築完了: {stats}")
+        logger.info("依存関係グラフ構築完了: %s", stats)
 
     def _analyze_rule_or_fact(
         self,
@@ -243,7 +243,7 @@ class Validator:
         # パフォーマンス問題の検出
         issues.extend(self._check_performance_issues())
 
-        logger.debug(f"詳細解析完了: {len(issues)} 個の問題")
+        logger.debug("詳細解析完了: %d 個の問題", len(issues))
         return issues
 
     def _analyze_complexity(self) -> List[ValidationIssue]:

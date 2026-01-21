@@ -241,4 +241,3 @@ class TestIOPredicates:
         input_stream = StringStream("actual\n")
         self.runtime.io_manager.set_input_handler(StreamInputHandler(input_stream))
         self.assertQueryFalse("test_bound_line_fail(What)")
-

@@ -40,7 +40,9 @@ class EnhancedRuntime(Runtime):
         self.builtin_predicates = self._initialize_builtins()
 
         logger.info(
-            f"EnhancedRuntime initialized with {len(self.rules)} rules, debug={debug_trace}"
+            "EnhancedRuntime initialized with %d rules, debug=%s",
+            len(self.rules),
+            debug_trace,
         )
 
     def _initialize_builtins(self) -> Dict[str, Any]:
@@ -68,12 +70,12 @@ class EnhancedRuntime(Runtime):
             if pred_name in ["sort", "sum_list", "length"]:
                 # 新規実装済み述語として登録
                 builtins[pred_name] = True
-                logger.info(f"Registered new builtin predicate: {builtin}")
+                logger.info("Registered new builtin predicate: %s", builtin)
             else:
                 builtins[pred_name] = True
 
         if missing_builtins:
-            logger.warning(f"Missing builtin predicates: {missing_builtins}")
+            logger.warning("Missing builtin predicates: %s", missing_builtins)
         else:
             logger.info("All required builtin predicates are available")
 
@@ -115,7 +117,7 @@ class EnhancedRuntime(Runtime):
                 self.trace_fail(goal, e)
 
             # 分析ファイルの提案: Pythonレベルの例外を詳細ログ出力
-            logger.error(f"Python exception in goal {goal}: {e}", exc_info=True)
+            logger.error("Python exception in goal %s: %s", goal, e, exc_info=True)
 
             # 分析ファイルの提案: Prologレベルでの適切なエラー報告
             raise PrologError(f"Execution failed for {goal}: {str(e)}") from e
@@ -147,7 +149,10 @@ class EnhancedRuntime(Runtime):
         # 引数チェックと型変換の強化
 
         logger.debug(
-            f"_execute_internal: goal={goal} (type={type(goal)}) env={env.bindings}"
+            "_execute_internal: goal=%s (type=%s) env=%s",
+            goal,
+            type(goal),
+            env.bindings,
         )
 
         # 引数チェック強化
@@ -175,13 +180,13 @@ class EnhancedRuntime(Runtime):
             )
             arity = len(processed_goal.args)
 
-            logger.debug(f"Processed goal: {functor_name}/{arity}")
+            logger.debug("Processed goal: %s/%d", functor_name, arity)
 
             # 引数の型チェック（5引数の複雑な述語用）
             if arity >= 5:
-                logger.debug(f"Complex predicate detected: {functor_name}/{arity}")
+                logger.debug("Complex predicate detected: %s/%d", functor_name, arity)
                 for i, arg in enumerate(processed_goal.args):
-                    logger.debug(f"  Arg {i}: {arg} (type: {type(arg)})")
+                    logger.debug("  Arg %d: %s (type: %s)", i, arg, type(arg))
 
             # 組み込み述語のチェックと実行
             if functor_name in self.builtin_predicates:
@@ -191,7 +196,7 @@ class EnhancedRuntime(Runtime):
                 yield from self.logic_interpreter.solve_goal(processed_goal, env)
 
         except Exception as e:
-            logger.error(f"Error in _execute_internal: {e}", exc_info=True)
+            logger.error("Error in _execute_internal: %s", e, exc_info=True)
             raise
 
     def _execute_builtin(
@@ -211,11 +216,13 @@ class EnhancedRuntime(Runtime):
             else:
                 # その他の組み込み述語
                 logger.warning(
-                    f"Builtin predicate {predicate_name}/{len(args)} not fully implemented"
+                    "Builtin predicate %s/%d not fully implemented",
+                    predicate_name,
+                    len(args),
                 )
 
         except Exception as e:
-            logger.error(f"Error in builtin {predicate_name}: {e}", exc_info=True)
+            logger.error("Error in builtin %s: %s", predicate_name, e, exc_info=True)
             raise
 
     def _safe_findall(
@@ -233,7 +240,10 @@ class EnhancedRuntime(Runtime):
             yield from findall_pred.execute(self, env)
         except Exception as e:
             logger.error(
-                f"Error in findall/3: template={template}, goal={goal}, error={e}",
+                "Error in findall/3: template=%s, goal=%s, error=%s",
+                template,
+                goal,
+                e,
                 exc_info=True,
             )
             # findallの失敗は空リストで処理
@@ -293,7 +303,7 @@ class EnhancedRuntime(Runtime):
             return results
 
         except Exception as e:
-            logger.error(f"Query failed: {query_string} - {e}", exc_info=True)
+            logger.error("Query failed: %s - %s", query_string, e, exc_info=True)
             if self.debug_trace:
                 print(f"=== QUERY FAILED: {e} ===\n")
             raise

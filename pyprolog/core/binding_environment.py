@@ -42,6 +42,7 @@ class BindingEnvironment:
 
     def __repr__(self) -> str:
         from pyprolog.core.types import Variable
+
         items = []
         env: Optional[BindingEnvironment] = self
         level = 0
@@ -91,7 +92,7 @@ class BindingEnvironment:
         result = {}
         if self.parent:
             result.update(self.parent.to_dict())
-        
+
         for k, v in self.bindings.items():
             result[k] = v
         return result

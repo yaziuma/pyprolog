@@ -65,7 +65,7 @@ def merge_bindings(bindings1, bindings2=None):
         return bindings1.merge_with(env)
 
     logger.warning(
-        f"merge_bindings: Unexpected types: {type(bindings1)}, {type(bindings2)}"
+        "merge_bindings: Unexpected types: %s, %s", type(bindings1), type(bindings2)
     )
     return bindings1 if bindings1 is not None else bindings2
 
@@ -91,7 +91,7 @@ def bindings_to_dict(bindings):
         # BindingEnvironmentの新しいto_dictメソッドを使用
         return bindings.to_dict()
 
-    logger.warning(f"bindings_to_dict: Unexpected type: {type(bindings)}")
+    logger.warning("bindings_to_dict: Unexpected type: %s", type(bindings))
     return {}
 
 

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def default_error_handler(line: int, message: str):
-    logger.error(f"[line {line}] Scan error: {message}")
+    logger.error("[line %d] Scan error: %s", line, message)
 
 
 class Scanner:
@@ -71,7 +71,7 @@ class Scanner:
 
     def scan_tokens(self) -> List[Token]:
         """トークンスキャンのメインメソッド"""
-        logger.debug(f"Scanning source: {len(self._source)} characters")
+        logger.debug("Scanning source: %d characters", len(self._source))
 
         while not self._is_at_end():
             self._start = self._current
@@ -79,7 +79,7 @@ class Scanner:
 
         self._tokens.append(Token(TokenType.EOF, "", None, self._line))
 
-        logger.debug(f"Scanned {len(self._tokens)} tokens")
+        logger.debug("Scanned %d tokens", len(self._tokens))
         return self._tokens
 
     def _scan_token(self):
@@ -159,7 +159,7 @@ class Scanner:
 
                 token_type = self._operator_symbols[operator]
                 self._add_token(token_type, operator)
-                logger.debug(f"Scanned operator: {operator}")
+                logger.debug("Scanned operator: %s", operator)
                 return True
 
         return False

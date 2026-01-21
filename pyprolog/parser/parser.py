@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def default_error_handler(token: Token, message: str):
-    logger.error(f"Parse error at '{token.lexeme}': {message}")
+    logger.error("Parse error at '%s': %s", token.lexeme, message)
 
 
 class Parser:
@@ -32,7 +32,7 @@ class Parser:
             variable_mapper if variable_mapper is not None else VariableMapper()
         )  # Initialize variable_mapper
         self._functor_mapper = functor_mapper  # Store functor_mapper
-        logger.debug(f"Parser initialized with {len(tokens)} tokens")
+        logger.debug("Parser initialized with %d tokens", len(tokens))
 
     def parse(self) -> List[Union[Rule, Fact]]:
         """プログラム全体を解析"""
@@ -51,7 +51,7 @@ class Parser:
                     self._error(self._peek(), "Expected '.' after rule or fact")
                 break
 
-        logger.info(f"Parsed {len(rules)} rules/facts")
+        logger.info("Parsed %d rules/facts", len(rules))
         return rules
 
     def _parse_rule(self) -> Optional[Union[Rule, Fact]]:

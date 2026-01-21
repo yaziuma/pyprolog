@@ -22,7 +22,7 @@ class TraceFormatter:
         try:
             return TraceFormatter._safe_format_text(events)
         except Exception as e:
-            logger.error(f"Error formatting trace as text: {e}")
+            logger.error("Error formatting trace as text: %s", e)
             return f"Error formatting trace: {e}\nRaw events: {len(events)} events recorded"
 
     @staticmethod
@@ -59,7 +59,7 @@ class TraceFormatter:
         try:
             return TraceFormatter._safe_format_tree(events)
         except Exception as e:
-            logger.error(f"Error formatting trace as tree: {e}")
+            logger.error("Error formatting trace as tree: %s", e)
             return f"Error formatting trace tree: {e}"
 
     @staticmethod
@@ -85,7 +85,7 @@ class TraceFormatter:
         try:
             return TraceFormatter._safe_format_json(events, query, solutions)
         except Exception as e:
-            logger.error(f"Error formatting trace as JSON: {e}")
+            logger.error("Error formatting trace as JSON: %s", e)
             return json.dumps(
                 {"error": f"Error formatting trace: {e}", "event_count": len(events)},
                 indent=2,

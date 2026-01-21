@@ -362,20 +362,25 @@ class DynamicAssertAPredicate(BuiltinPredicate):
     def execute(
         self, runtime: "Runtime", env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
-        logger.debug(f"ASSERTA: Entered with arg: {self.args[0]}")
+        logger.debug("ASSERTA: Entered with arg: %s", self.args[0])
         clause_val = runtime.logic_interpreter.dereference(self.args[0], env)
         logger.debug(
-            f"ASSERTA: Dereferenced clause_val: {clause_val} (type: {type(clause_val)})"
+            "ASSERTA: Dereferenced clause_val: %s (type: %s)",
+            clause_val,
+            type(clause_val),
         )
 
         if isinstance(clause_val, Variable):
             logger.warning(
-                f"ASSERTA: Attempt to assert an uninstantiated variable: {clause_val}. Failing."
+                "ASSERTA: Attempt to assert an uninstantiated variable: %s. Failing.",
+                clause_val,
             )
             return
         if not isinstance(clause_val, (Term, Atom)):
             logger.warning(
-                f"ASSERTA: Attempt to assert a non-term/non-atom: {clause_val} (type: {type(clause_val)}). Failing."
+                "ASSERTA: Attempt to assert a non-term/non-atom: %s (type: %s). Failing.",
+                clause_val,
+                type(clause_val),
             )
             return
 
@@ -383,7 +388,7 @@ class DynamicAssertAPredicate(BuiltinPredicate):
             clause_val_as_term = (
                 Term(clause_val, []) if isinstance(clause_val, Atom) else clause_val
             )
-            logger.debug(f"ASSERTA: clause_val_as_term: {clause_val_as_term}")
+            logger.debug("ASSERTA: clause_val_as_term: %s", clause_val_as_term)
 
             if (
                 clause_val_as_term.functor.name == ":-"
@@ -391,38 +396,49 @@ class DynamicAssertAPredicate(BuiltinPredicate):
             ):
                 head = clause_val_as_term.args[0]
                 body = clause_val_as_term.args[1]
-                logger.debug(f"ASSERTA: Identified as rule. Head: {head}, Body: {body}")
+                logger.debug(
+                    "ASSERTA: Identified as rule. Head: %s, Body: %s", head, body
+                )
                 if not isinstance(head, (Term, Atom)):
                     logger.warning(
-                        f"ASSERTA: Rule head is not Term or Atom: {head}. Failing on clause: {clause_val}"
+                        "ASSERTA: Rule head is not Term or Atom: %s. Failing on clause: %s",
+                        head,
+                        clause_val,
                     )
                     return
                 if isinstance(head, Atom):
                     head = Term(head, [])
-                    logger.debug(f"ASSERTA: Converted Atom head to Term: {head}")
+                    logger.debug("ASSERTA: Converted Atom head to Term: %s", head)
 
                 processed_body = body
                 if isinstance(body, Atom):
                     processed_body = Term(body, [])
                     logger.debug(
-                        f"ASSERTA: Converted Atom body {body} to Term: {processed_body}"
+                        "ASSERTA: Converted Atom body %s to Term: %s",
+                        body,
+                        processed_body,
                     )
                 elif not isinstance(body, Term):
                     logger.warning(
-                        f"ASSERTA: Rule body {body} (type: {type(body)}) is not an Atom or Term. Failing assertion for clause: {clause_val}"
+                        "ASSERTA: Rule body %s (type: %s) is not an Atom or Term. Failing assertion for clause: %s",
+                        body,
+                        type(body),
+                        clause_val,
                     )
                     return  # Fail the assertion
 
-                new_rule = Rule(head, processed_body)  # Now head and processed_body are Term
-                logger.debug(f"ASSERTA: Created Rule: {new_rule}")
+                new_rule = Rule(
+                    head, processed_body
+                )  # Now head and processed_body are Term
+                logger.debug("ASSERTA: Created Rule: %s", new_rule)
                 runtime.logic_interpreter.add_rule(new_rule, position="first")
-                logger.info(f"ASSERTA: Successfully asserted rule: {new_rule}")
+                logger.info("ASSERTA: Successfully asserted rule: %s", new_rule)
             else:
-                logger.debug(f"ASSERTA: Identified as fact: {clause_val_as_term}")
+                logger.debug("ASSERTA: Identified as fact: %s", clause_val_as_term)
                 new_fact = Fact(clause_val_as_term)
-                logger.debug(f"ASSERTA: Created Fact: {new_fact}")
+                logger.debug("ASSERTA: Created Fact: %s", new_fact)
                 runtime.logic_interpreter.add_rule(new_fact, position="first")
-                logger.info(f"ASSERTA: Successfully asserted fact: {new_fact}")
+                logger.info("ASSERTA: Successfully asserted fact: %s", new_fact)
 
             # This line is intentionally left as is, as per instructions.
             # runtime.logic_interpreter.rules = runtime.rules
@@ -450,7 +466,7 @@ class DynamicAssertZPredicate(BuiltinPredicate):
     def execute(
         self, runtime: "Runtime", env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
-        logger.debug(f"ASSERTZ: Entered with arg: {self.args[0]}")
+        logger.debug("ASSERTZ: Entered with arg: %s", self.args[0])
         clause_val = runtime.logic_interpreter.dereference(self.args[0], env)
         logger.debug(
             f"ASSERTZ: Dereferenced clause_val: {clause_val} (type: {type(clause_val)})"
@@ -471,7 +487,7 @@ class DynamicAssertZPredicate(BuiltinPredicate):
             clause_val_as_term = (
                 Term(clause_val, []) if isinstance(clause_val, Atom) else clause_val
             )
-            logger.debug(f"ASSERTZ: clause_val_as_term: {clause_val_as_term}")
+            logger.debug("ASSERTZ: clause_val_as_term: %s", clause_val_as_term)
 
             if (
                 clause_val_as_term.functor.name == ":-"
@@ -479,53 +495,66 @@ class DynamicAssertZPredicate(BuiltinPredicate):
             ):
                 head = clause_val_as_term.args[0]
                 body = clause_val_as_term.args[1]
-                logger.debug(f"ASSERTZ: Identified as rule. Head: {head}, Body: {body}")
+                logger.debug(
+                    "ASSERTZ: Identified as rule. Head: %s, Body: %s", head, body
+                )
                 if not isinstance(head, (Term, Atom)):
                     logger.warning(
-                        f"ASSERTZ: Rule head is not Term or Atom: {head}. Failing on clause: {clause_val}"
+                        "ASSERTZ: Rule head is not Term or Atom: %s. Failing on clause: %s",
+                        head,
+                        clause_val,
                     )
                     return
                 if isinstance(head, Atom):
                     head = Term(head, [])
-                    logger.debug(f"ASSERTZ: Converted Atom head to Term: {head}")
+                    logger.debug("ASSERTZ: Converted Atom head to Term: %s", head)
 
                 processed_body = body
                 if isinstance(body, Atom):
                     processed_body = Term(body, [])
                     logger.debug(
-                        f"ASSERTZ: Converted Atom body {body} to Term: {processed_body}"
+                        "ASSERTZ: Converted Atom body %s to Term: %s",
+                        body,
+                        processed_body,
                     )
                 elif not isinstance(body, Term):
                     logger.warning(
-                        f"ASSERTZ: Rule body {body} (type: {type(body)}) is not an Atom or Term. Failing assertion for clause: {clause_val}"
+                        "ASSERTZ: Rule body %s (type: %s) is not an Atom or Term. Failing assertion for clause: %s",
+                        body,
+                        type(body),
+                        clause_val,
                     )
                     return  # Fail the assertion
 
-                new_rule = Rule(head, processed_body)  # Now head and processed_body are Term
-                logger.debug(f"ASSERTZ: Created Rule: {new_rule}")
+                new_rule = Rule(
+                    head, processed_body
+                )  # Now head and processed_body are Term
+                logger.debug("ASSERTZ: Created Rule: %s", new_rule)
                 runtime.logic_interpreter.add_rule(new_rule, position="last")
-                logger.info(f"ASSERTZ: Successfully asserted rule: {new_rule}")
+                logger.info("ASSERTZ: Successfully asserted rule: %s", new_rule)
             else:
-                logger.debug(f"ASSERTZ: Identified as fact: {clause_val_as_term}")
+                logger.debug("ASSERTZ: Identified as fact: %s", clause_val_as_term)
                 new_fact = Fact(clause_val_as_term)
-                logger.debug(f"ASSERTZ: Created Fact: {new_fact}")
+                logger.debug("ASSERTZ: Created Fact: %s", new_fact)
                 runtime.logic_interpreter.add_rule(new_fact, position="last")
-                logger.info(f"ASSERTZ: Successfully asserted fact: {new_fact}")
+                logger.info("ASSERTZ: Successfully asserted fact: %s", new_fact)
 
             # This line is intentionally left as is, as per instructions.
             # runtime.logic_interpreter.rules = runtime.rules
 
             logger.debug(
-                f"ASSERTZ: About to yield environment for: {clause_val_as_term}"
+                "ASSERTZ: About to yield environment for: %s", clause_val_as_term
             )
             yield env
             logger.debug(
-                f"ASSERTZ: Successfully yielded environment for: {clause_val_as_term}"
+                "ASSERTZ: Successfully yielded environment for: %s", clause_val_as_term
             )
 
         except Exception as e:
             logger.error(
-                f"ASSERTZ: Unexpected Python exception during assertion of {clause_val}: {e}",
+                "ASSERTZ: Unexpected Python exception during assertion of %s: %s",
+                clause_val,
+                e,
                 exc_info=True,
             )
             return  # Ensure no yield happens if an error occurred
@@ -663,9 +692,9 @@ class AppendPredicate(BuiltinPredicate):
                 recursive_predicate = AppendPredicate(t1_var, self.args[1], t3_var)
                 yield from recursive_predicate.execute(runtime, env_clause2_after_l3)
             else:
-                logger.debug(f"APPEND_CP2: L3 failed to unify with '{list3_pattern}'.")
+                logger.debug("APPEND_CP2: L3 failed to unify with '%s'.", list3_pattern)
         else:
-            logger.debug(f"APPEND_CP2: L1 failed to unify with '{list1_pattern}'.")
+            logger.debug("APPEND_CP2: L1 failed to unify with '%s'.", list1_pattern)
         return  # End of AppendPredicate
 
 
@@ -779,7 +808,7 @@ class DynamicRetractPredicate(BuiltinPredicate):
     def execute(
         self, runtime: "Runtime", env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
-        logger.debug(f"RETRACT: Entered with arg: {self.args[0]}")
+        logger.debug("RETRACT: Entered with arg: %s", self.args[0])
 
         # Dereference the argument to retract
         clause_to_retract_orig = self.args[0]
@@ -859,7 +888,7 @@ class DynamicRetractPredicate(BuiltinPredicate):
                     # or if db_body is Atom('true') - this part is not implemented here yet.
                     pass  # Allow retract(H) to potentially match Rule(H,B) head.
             else:
-                logger.error(f"RETRACT: Unknown clause type in DB: {db_clause}")
+                logger.error("RETRACT: Unknown clause type in DB: %s", db_clause)
                 continue
 
             # Try to unify the head parts
@@ -905,7 +934,7 @@ class DynamicRetractPredicate(BuiltinPredicate):
                     yield head_env  # Yield the environment from head unification
                     return  # Retract first match
 
-        logger.debug(f"RETRACT: No matching clause found for: {target_clause_struct}")
+        logger.debug("RETRACT: No matching clause found for: %s", target_clause_struct)
         return  # Failed to find a match
 
 
@@ -938,7 +967,7 @@ class AtEndOfStreamPredicate(BuiltinPredicate):
         except Exception as e:
             # ストリーム操作エラーは予期される例外
             if "not support" in str(e).lower():
-                logger.warning(f"at_end_of_stream stream operation failed: {e}")
+                logger.warning("at_end_of_stream stream operation failed: %s", e)
                 return  # 失敗として処理
             else:
                 logger.error(
@@ -993,7 +1022,7 @@ class ListingPredicate(BuiltinPredicate):
             yield env
 
         except Exception as e:
-            logger.error(f"Error in listing/0: {e}", exc_info=True)
+            logger.error("Error in listing/0: %s", e, exc_info=True)
             return  # 失敗時は何もyieldしない
 
 
@@ -1039,7 +1068,7 @@ class ListingWithPredicatePredicate(BuiltinPredicate):
             yield env
 
         except Exception as e:
-            logger.error(f"Error in listing/1: {e}", exc_info=True)
+            logger.error("Error in listing/1: %s", e, exc_info=True)
             return  # 失敗時は何もyieldしない
 
     def _parse_predicate_spec(
@@ -1094,7 +1123,7 @@ class ListingWithPredicatePredicate(BuiltinPredicate):
                             )
                             return (None, None)
                     else:
-                        logger.warning(f"Invalid arity in predicate spec: {arity_arg}")
+                        logger.warning("Invalid arity in predicate spec: %s", arity_arg)
                         return (None, None)
 
                     return (predicate_name, arity)
@@ -1105,7 +1134,7 @@ class ListingWithPredicatePredicate(BuiltinPredicate):
             return (None, None)
 
         except Exception as e:
-            logger.warning(f"Failed to parse predicate spec {spec}: {e}")
+            logger.warning("Failed to parse predicate spec %s: %s", spec, e)
             return (None, None)
 
 
@@ -1150,7 +1179,7 @@ class ExportFactsPredicate(BuiltinPredicate):
                 return  # 失敗
 
         except Exception as e:
-            logger.error(f"Error in export_facts/2: {e}", exc_info=True)
+            logger.error("Error in export_facts/2: %s", e, exc_info=True)
             return  # 失敗時は何もyieldしない
 
     def _parse_predicate_spec(
@@ -1205,7 +1234,7 @@ class ExportFactsPredicate(BuiltinPredicate):
                             )
                             return (None, None)
                     else:
-                        logger.warning(f"Invalid arity in predicate spec: {arity_arg}")
+                        logger.warning("Invalid arity in predicate spec: %s", arity_arg)
                         return (None, None)
 
                     return (predicate_name, arity)
@@ -1216,7 +1245,7 @@ class ExportFactsPredicate(BuiltinPredicate):
             return (None, None)
 
         except Exception as e:
-            logger.warning(f"Failed to parse predicate spec {spec}: {e}")
+            logger.warning("Failed to parse predicate spec %s: %s", spec, e)
             return (None, None)
 
     def _extract_facts(
@@ -1253,7 +1282,7 @@ class ExportFactsPredicate(BuiltinPredicate):
                     facts.append(rule)
 
             except Exception as e:
-                logger.warning(f"Error checking rule {rule}: {e}")
+                logger.warning("Error checking rule %s: %s", rule, e)
                 continue
 
         return facts
@@ -1308,7 +1337,7 @@ class ExportFactsPredicate(BuiltinPredicate):
             return name_match and term_arity == arity
 
         except Exception as e:
-            logger.warning(f"Error matching predicate for term {term}: {e}")
+            logger.warning("Error matching predicate for term %s: %s", term, e)
             return False
 
     def _get_functor_name(self, functor: PrologType, runtime: "Runtime") -> str:

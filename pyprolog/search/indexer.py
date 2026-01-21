@@ -32,7 +32,7 @@ class SearchIndex:
             rules: インデックス化するルールと事実のリスト
             file_path: ファイルパス（オプション）
         """
-        logger.debug(f"インデックス構築開始: {len(rules)} ルール")
+        logger.debug("インデックス構築開始: %d ルール", len(rules))
 
         # インデックスをクリア
         self.predicate_index.clear()
@@ -49,8 +49,10 @@ class SearchIndex:
             self.file_mapping[file_path] = rules
 
         logger.info(
-            f"インデックス構築完了: 述語={len(self.predicate_index)}, "
-            f"引数={len(self.argument_index)}, テキスト={len(self.text_index)}"
+            "インデックス構築完了: 述語=%d, 引数=%d, テキスト=%d",
+            len(self.predicate_index),
+            len(self.argument_index),
+            len(self.text_index),
         )
 
     def _build_predicate_index(

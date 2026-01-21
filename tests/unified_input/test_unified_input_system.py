@@ -324,6 +324,7 @@ class UnifiedInputSystem:
 # テスト用InputHandler実装
 class TestInputHandler(InputHandler):
     """テスト用InputHandler"""
+
     __test__ = False
 
     def __init__(self, responses=None):
