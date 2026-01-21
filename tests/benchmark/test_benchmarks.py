@@ -1,5 +1,6 @@
 import pytest
 import os
+import sys
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.core.types import Variable
 
@@ -20,6 +21,9 @@ def runtime():
 
 def test_crypt(benchmark, runtime):
     """crypt.pl (SEND+MORE=MONEY) のベンチマーク"""
+    sys.stderr.write("\n[Benchmark] Starting crypt (SEND+MORE=MONEY)...\n")
+    sys.stderr.flush()
+    
     runtime.consult(get_benchmark_path("crypt.pl"))
     
     # solve述語を直接呼び出して計測
@@ -31,6 +35,9 @@ def test_crypt(benchmark, runtime):
 
 def test_nrev(benchmark, runtime):
     """nrev.pl (Naive Reverse) のベンチマーク"""
+    sys.stderr.write("\n[Benchmark] Starting nrev (Naive Reverse list=30)...")
+    sys.stderr.flush()
+    
     runtime.consult(get_benchmark_path("nrev.pl"))
     
     # リスト長 30 で実行
@@ -42,6 +49,9 @@ def test_nrev(benchmark, runtime):
 
 def test_primes(benchmark, runtime):
     """primes.pl (素数生成) のベンチマーク"""
+    sys.stderr.write("\n[Benchmark] Starting primes (Sieve limit=100)...")
+    sys.stderr.flush()
+    
     runtime.consult(get_benchmark_path("primes.pl"))
     
     # 100までの素数を生成
@@ -53,11 +63,12 @@ def test_primes(benchmark, runtime):
 
 def test_queens(benchmark, runtime):
     """queens.pl (N-Queens) のベンチマーク"""
+    sys.stderr.write("\n[Benchmark] Starting queens (8-Queens)...")
+    sys.stderr.flush()
+    
     runtime.consult(get_benchmark_path("queens.pl"))
     
-    # 8-Queens問題を解く (benchmark/1述語を使用)
-    # benchmark/1は解を表示してfailするため、実行自体は成功とみなせない場合があるが、
-    # 処理負荷をかけることが目的なので、solve_queens/2を直接呼ぶ
+    # 8-Queens問題を解く
     def run_queens():
         # 全解探索ではなく最初の解を見つける
         return run_query(runtime, "solve_queens(8, Solution).")
@@ -67,6 +78,9 @@ def test_queens(benchmark, runtime):
 
 def test_tak(benchmark, runtime):
     """tak.pl (竹内関数) のベンチマーク"""
+    sys.stderr.write("\n[Benchmark] Starting tak (Tak function 18,12,6)...")
+    sys.stderr.flush()
+    
     runtime.consult(get_benchmark_path("tak.pl"))
     
     # tak(18, 12, 6, R) を実行
