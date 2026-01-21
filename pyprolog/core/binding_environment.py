@@ -4,10 +4,6 @@ import rpds
 
 _MISSING = object()
 
-# from prolog.core.types import Variable, Term, Atom, Number, String, PrologType
-# 上記のフルインポートは循環参照のリスクがあるため、型ヒントでは文字列リテラルを使用
-# from typing import TYPE_CHECKING # この行は Union を追加した行と重複するため削除
-
 if TYPE_CHECKING:
     from pyprolog.core.types import PrologType, Variable
 
@@ -25,15 +21,6 @@ class BindingEnvironment:
 
     def bind(self, var_name: str, value: "PrologType"):
         """変数を値に束縛する"""
-        # Prologでは再束縛は通常単一化の失敗として扱われる。
-        # ここでは単純に上書きするが、単一化ロジックで矛盾をチェックする。
-        # 既に束縛されていて、異なる値に束縛しようとした場合は、
-        # unify ロジック側で失敗として扱われるべき。
-        # ここでチェックを入れると、unify のロジックと重複する可能性がある。
-        # 例えば、X=Y, X=a. の場合、Yもaに束縛される。
-        # unify(X,Y) -> env1 (X -> Y)
-        # unify(X,a) in env1 -> deref(X)=Y, deref(a)=a. unify(Y,a) -> env2 (X->Y, Y->a)
-        # この bind は、dereference 後の変数に対する束縛に使われる。
         self.bindings = self.bindings.insert(var_name, value)
 
     def get_value(self, var_name: str) -> Optional["PrologType"]:
@@ -51,20 +38,17 @@ class BindingEnvironment:
 
     def copy(self) -> "BindingEnvironment":
         """環境のシャローコピーを作成する"""
-        # 親環境は共有し、現在のレベルの束縛のみをコピーする
         return BindingEnvironment(self.parent, bindings=self.bindings)
 
     def __repr__(self) -> str:
+        from pyprolog.core.types import Variable
         items = []
         env: Optional[BindingEnvironment] = self
         level = 0
         while env:
             level_items = []
             for k, v in env.bindings.items():
-                # 変数自身への束縛は表示しない (例: X=X)
-                if (
-                    isinstance(v, Variable) and v.name == k
-                ):  # Variable型をインポートする必要がある
+                if isinstance(v, Variable) and v.name == k:
                     continue
                 level_items.append(f"{k}: {v}")
             if level_items:
@@ -86,18 +70,15 @@ class BindingEnvironment:
         merged = self.copy()
 
         if isinstance(other, BindingEnvironment):
-            # 他の環境の束縛をコピー
             for var_name, value in other.bindings.items():
                 merged.bind(var_name, value)
 
-            # 親環境も考慮（再帰的にマージ）
-            if other.parent and not merged.parent:
-                merged.parent = other.parent
-            elif other.parent and merged.parent:
-                merged.parent = merged.parent.merge_with(other.parent)
-
+            if other.parent:
+                if merged.parent:
+                    merged.parent = merged.parent.merge_with(other.parent)
+                else:
+                    merged.parent = other.parent.copy()
         elif isinstance(other, dict):
-            # 辞書の場合は直接束縛
             for var_name, value in other.items():
                 merged.bind(var_name, value)
 
@@ -106,29 +87,11 @@ class BindingEnvironment:
     def to_dict(self):
         """
         バインディング環境を辞書に変換
-
-        Returns:
-            dict: バインディング辞書
         """
         result = {}
-
-        # 現在の環境の束縛を取得
-        # type: ignore[misc]
-        for var_name, value in self.bindings.items():  # type: ignore
-            # 自分自身への束縛（X -> X）は除外
-            if not (isinstance(value, Variable) and value.name == var_name):
-                result[var_name] = value
-
-        # 親環境の束縛も取得（子が優先）
         if self.parent:
-            parent_dict = self.parent.to_dict()
-            for var_name, value in parent_dict.items():
-                if var_name not in result:
-                    result[var_name] = value
-
+            result.update(self.parent.to_dict())
+        
+        for k, v in self.bindings.items():
+            result[k] = v
         return result
-
-
-# __repr__ で Variable を使うため、ここでインポート (TYPE_CHECKING の外)
-# unify, to_dict でも Variable を使うため、この位置で正しい
-from pyprolog.core.types import Variable
