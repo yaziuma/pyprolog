@@ -2,518 +2,219 @@
 
 ## 概要
 
-このドキュメントは、pyprolog プロジェクトの実装済み機能と述語の詳細なリストです。pyprolog は、Python で実装されたシンプルな Prolog インタープリターです。
+このドキュメントは、PyProlog プロジェクトの実装済み機能と述語の詳細なリストです。
+PyProlog は、Python で実装されたシンプルな Prolog インタープリターですが、このドキュメントでは Prolog 言語としての機能仕様に焦点を当てています。
+
+Python ライブラリとしての API やクラス構造については、[Python API リファレンス](python_api_reference.md)を参照してください。
 
 ## 最新の更新情報
 
-**2025年8月27日** - 知識ベース管理機能の実装:
-- 新しい組み込み述語 `listing/0`, `listing/1` を追加（読み込み済み述語の表示）
-- 新しい組み込み述語 `export_facts/2` を追加（事実データの外部エクスポート）
-- CSV、JSON、TSV形式でのデータ出力サポート
-- 日本語述語名・変数名での表示・エクスポート完全対応
-- PrologFormatterによる美しいコード整形機能
-- DataExporterによる柔軟なファイル出力機能
-- 34個の包括的テストケースで品質保証
+**2025年8月27日** - 知識ベース管理機能:
+* 新しい組み込み述語 `listing/0`, `listing/1` を追加（読み込み済み述語の表示）
+* 新しい組み込み述語 `export_facts/2` を追加（事実データの外部エクスポート）
+* CSV、JSON、TSV形式でのデータ出力サポート
+* 日本語述語名・変数名での表示・エクスポート完全対応
 
-**2025年8月21日** - atom_number/2述語の実装と入力システム改良:
-- 新しい組み込み述語 `atom_number/2` を追加（文字列⇔数値変換）
-- `ast.literal_eval()` を使用した標準Python方式の安全な数値変換
-- `read_line/1` と `get_char/1` で数値文字列の自動変換機能を追加
-- `write/1` と `nl/0` 演算子がIOManagerストリームを使用するよう改良
-- 複数回入力を必要とするPrologプログラムの完全サポート
-- 包括的テストスイートによる品質保証
+**2025年8月21日** - 型変換と入力システム改良:
+* 新しい組み込み述語 `atom_number/2` を追加（文字列⇔数値変換）
+* `read_line/1` と `get_char/1` で数値文字列の自動変換機能を追加
+* 複数回入力を必要とするPrologプログラムの完全サポート
 
-**2025年8月7日** - 非ブロッキング入力述語の実装:
-- 新しい入出力述語 `peek_char/1` および `at_end_of_stream/0` を追加
-- 非破壊的な文字先読みとEOF状態確認機能を実装
-- クロスプラットフォーム対応（Windows/Unix）の非ブロッキング読み取り
-- 条件付き入力処理パターンをサポート（パーサー実装等に有用）
-- 16個の包括的テストケースで品質保証
+**2025年8月7日** - 非ブロッキング入力:
+* 新しい入出力述語 `peek_char/1` および `at_end_of_stream/0` を追加
+* 非破壊的な文字先読みとEOF状態確認機能を実装
 
 **2025年7月7日** - 入出力述語の拡張:
-- 新しい入出力述語 `read_line/1` を追加
-- 行単位での入力読み込み機能を実装
-- 日本語文字列対応とEOF処理を含む包括的なテスト
+* 新しい入出力述語 `read_line/1` を追加
+* 行単位での入力読み込み機能を実装
 
-**2025年6月21日** - 演算子システムの重要な更新:
-- 新しい非等価演算子 `<>` と `!=` を追加（従来の `\=` の代替）
-- パーサーの安定性向上とユーザビリティ改善
-- バックスラッシュ演算子（`\=`, `\==`, `=\=`）の使用を禁止
+**2025年6月21日** - 演算子システムの更新:
+* 新しい非等価演算子 `<>` と `!=` を追加（従来の `\=` の代替）
+* ビット単位演算子の追加
 
 ## 目次
 
-1. [コアコンポーネント](#コアコンポーネント)
-2. [データ型](#データ型)
-3. [組み込み述語](#組み込み述語)
-4. [演算子](#演算子)
-5. [パーサー機能](#パーサー機能)
-6. [ランタイム機能](#ランタイム機能)
-7. [入出力機能](#入出力機能)
-8. [使用例](#使用例)
-
-## コアコンポーネント
-
-### 主要クラス
-
-- **[`Runtime`](../pyprolog/runtime/interpreter.py:32)** - メインインタープリタークラス
-- **[`Parser`](../pyprolog/parser/parser.py)** - Prolog コードパーサー
-- **[`Scanner`](../pyprolog/parser/scanner.py)** - 字句解析器
-- **[`LogicInterpreter`](../pyprolog/runtime/logic_interpreter.py)** - 論理推論エンジン
-- **[`MathInterpreter`](../pyprolog/runtime/math_interpreter.py:12)** - 算術評価エンジン
-
-### エラーハンドリング
-
-- **[`PrologError`](../pyprolog/core/errors.py)** - 基本例外クラス
-- **[`InterpreterError`](../pyprolog/core/errors.py)** - インタープリターエラー
-- **[`ScannerError`](../pyprolog/core/errors.py)** - 字句解析エラー
-- **[`ParserError`](../pyprolog/core/errors.py)** - 構文解析エラー
-- **[`CutException`](../pyprolog/core/errors.py)** - カット例外
+1. [データ型](#データ型)
+2. [組み込み述語](#組み込み述語)
+3. [演算子](#演算子)
+4. [パーサー機能](#パーサー機能)
+5. [制限事項](#制限事項と今後の拡張予定)
 
 ## データ型
 
 ### 基本データ型
 
-| 型     | クラス                                      | 説明                                        |
-| ------ | ------------------------------------------- | ------------------------------------------- | ----- |
-| アトム | [`Atom`](../pyprolog/core/types.py:16)      | 文字列定数（例：`hello`, `world`）          |
-| 変数   | [`Variable`](../pyprolog/core/types.py:30)  | 論理変数（例：`X`, `Y`, `_Var`）            |
-| 数値   | [`Number`](../pyprolog/core/types.py:44)    | 整数・浮動小数点（例：`42`, `3.14`）        |
-| 文字列 | [`String`](../pyprolog/core/types.py:58)    | 文字列リテラル（例：`'hello'`）             |
-| 項     | [`Term`](../pyprolog/core/types.py:72)      | 複合項（例：`f(a, b)`, `person(john, 25)`） |
-| リスト | [`ListTerm`](../pyprolog/core/types.py:102) | リスト構造（例：`[1, 2, 3]`, `[H            | T]`） |
+| 型 | 説明 |
+| --- | --- |
+| アトム | 文字列定数（例：`hello`, `world`） |
+| 変数 | 論理変数（例：`X`, `Y`, `_Var`） |
+| 数値 | 整数・浮動小数点（例：`42`, `3.14`） |
+| 文字列 | 文字列リテラル（例：`'hello'`） |
+| 項 | 複合項（例：`f(a, b)`, `person(john, 25)`） |
+| リスト | リスト構造（例：`[1, 2, 3]`, `[H|T]`） |
 
 ### 論理構造
 
-| 型       | クラス                                  | 説明                                            |
-| -------- | --------------------------------------- | ----------------------------------------------- |
-| ファクト | [`Fact`](../pyprolog/core/types.py:174) | 単純な事実（例：`likes(mary, wine).`）          |
-| ルール   | [`Rule`](../pyprolog/core/types.py:155) | 論理ルール（例：`happy(X) :- likes(X, wine).`） |
+| 型 | 説明 |
+| --- | --- |
+| ファクト | 単純な事実（例：`likes(mary, wine).`） |
+| ルール | 論理ルール（例：`happy(X) :- likes(X, wine).`） |
 
 ## 組み込み述語
 
 ### 型検査述語
 
-| 述語       | アリティ | 実装クラス                                              | 説明                         |
-| ---------- | -------- | ------------------------------------------------------- | ---------------------------- |
-| `var/1`    | 1        | [`VarPredicate`](../pyprolog/runtime/builtins.py:26)    | 引数が変数かどうかをテスト   |
-| `atom/1`   | 1        | [`AtomPredicate`](../pyprolog/runtime/builtins.py:38)   | 引数がアトムかどうかをテスト |
-| `number/1` | 1        | [`NumberPredicate`](../pyprolog/runtime/builtins.py:50) | 引数が数値かどうかをテスト   |
+| 述語 | アリティ | 説明 |
+| --- | --- | --- |
+| `var/1` | 1 | 引数が変数かどうかをテスト |
+| `atom/1` | 1 | 引数がアトムかどうかをテスト |
+| `number/1` | 1 | 引数が数値かどうかをテスト |
 
 ### 型変換述語
 
-| 述語           | アリティ | 実装クラス                                                     | 説明                           |
-| -------------- | -------- | -------------------------------------------------------------- | ------------------------------ |
-| `atom_number/2`| 2        | [`AtomNumberPredicate`](../pyprolog/runtime/builtins.py:84)   | アトム⇔数値の相互変換         |
+| 述語 | アリティ | 説明 |
+| --- | --- | --- |
+| `atom_number/2` | 2 | アトム⇔数値の相互変換 |
 
 ### 項操作述語
 
-| 述語        | アリティ | 実装クラス                                               | 説明                                |
-| ----------- | -------- | -------------------------------------------------------- | ----------------------------------- |
-| `functor/3` | 3        | [`FunctorPredicate`](../pyprolog/runtime/builtins.py:62) | 項のファンクタとアリティを取得/構築 |
-| `arg/3`     | 3        | [`ArgPredicate`](../pyprolog/runtime/builtins.py:146)    | 項の指定位置の引数を取得            |
-| `=../2`     | 2        | [`UnivPredicate`](../pyprolog/runtime/builtins.py:179)   | 項とリストの相互変換（univ）        |
+| 述語 | アリティ | 説明 |
+| --- | --- | --- |
+| `functor/3` | 3 | 項のファンクタとアリティを取得/構築 |
+| `arg/3` | 3 | 項の指定位置の引数を取得 |
+| `=../2` | 2 | 項とリストの相互変換（univ） |
 
 ### 動的述語操作
 
-| 述語        | アリティ | 実装クラス                                                       | 説明                       |
-| ----------- | -------- | ---------------------------------------------------------------- | -------------------------- |
-| `asserta/1` | 1        | [`DynamicAssertAPredicate`](../pyprolog/runtime/builtins.py:283) | 知識ベースの先頭に節を追加 |
-| `assertz/1` | 1        | [`DynamicAssertZPredicate`](../pyprolog/runtime/builtins.py:373) | 知識ベースの末尾に節を追加 |
-| `retract/1` | 1        | [`DynamicRetractPredicate`](../pyprolog/runtime/builtins.py:724) | 知識ベースから節を削除     |
+| 述語 | アリティ | 説明 |
+| --- | --- | --- |
+| `asserta/1` | 1 | 知識ベースの先頭に節を追加 |
+| `assertz/1` | 1 | 知識ベースの末尾に節を追加 |
+| `retract/1` | 1 | 知識ベースから節を削除 |
 
 ### リスト操作述語
 
-| 述語       | アリティ | 実装クラス                                               | 説明                         |
-| ---------- | -------- | -------------------------------------------------------- | ---------------------------- |
-| `member/2` | 2        | [`MemberPredicate`](../pyprolog/runtime/builtins.py:463) | リストのメンバーシップテスト |
-| `append/3` | 3        | [`AppendPredicate`](../pyprolog/runtime/builtins.py:491) | リストの連結                 |
+| 述語 | アリティ | 説明 |
+| --- | --- | --- |
+| `member/2` | 2 | リストのメンバーシップテスト |
+| `append/3` | 3 | リストの連結 |
 
 ### メタ述語
 
-| 述語        | アリティ | 実装クラス                                                | 説明                             |
-| ----------- | -------- | --------------------------------------------------------- | -------------------------------- |
-| `findall/3` | 3        | [`FindallPredicate`](../pyprolog/runtime/builtins.py:556) | 解の収集（bagof/setof の簡易版） |
+| 述語 | アリティ | 説明 |
+| --- | --- | --- |
+| `findall/3` | 3 | 解の収集（bagof/setof の簡易版） |
 
 ### 入出力述語
 
-| 述語               | アリティ | 実装クラス                                                   | 説明                                    |
-| ------------------ | -------- | ------------------------------------------------------------ | --------------------------------------- |
-| `get_char/1`       | 1        | [`GetCharPredicate`](../pyprolog/runtime/builtins.py:704)   | 現在の入力ストリームから 1 文字読み取り |
-| `read_line/1`      | 1        | [`ReadLinePredicate`](../pyprolog/runtime/builtins.py:769)  | 現在の入力ストリームから 1 行読み取り   |
-| `peek_char/1`      | 1        | [`PeekCharPredicate`](../pyprolog/runtime/builtins.py:944)  | 次の文字を非破壊的に先読み             |
-| `at_end_of_stream/0` | 0      | [`AtEndOfStreamPredicate`](../pyprolog/runtime/builtins.py:1023) | EOF状態を非破壊的に確認               |
+| 述語 | アリティ | 説明 |
+| --- | --- | --- |
+| `get_char/1` | 1 | 現在の入力ストリームから 1 文字読み取り |
+| `read_line/1` | 1 | 現在の入力ストリームから 1 行読み取り |
+| `peek_char/1` | 1 | 次の文字を非破壊的に先読み |
+| `at_end_of_stream/0` | 0 | EOF状態を非破壊的に確認 |
+| `write/1` | 1 | 項の出力 |
+| `nl/0` | 0 | 改行出力 |
+| `tab/1` | 1 | タブ出力 |
 
 ### 知識ベース管理述語
 
-| 述語            | アリティ | 実装クラス                                                       | 説明                                      |
-| --------------- | -------- | ---------------------------------------------------------------- | ----------------------------------------- |
-| `listing/0`     | 0        | [`ListingPredicate`](../pyprolog/runtime/builtins.py:1214)     | **NEW** 読み込み済み全述語を整形表示      |
-| `listing/1`     | 1        | [`ListingWithPredicatePredicate`](../pyprolog/runtime/builtins.py:1240) | **NEW** 指定述語のみを整形表示      |
-| `export_facts/2` | 2       | [`ExportFactsPredicate`](../pyprolog/runtime/builtins.py:1291)  | **NEW** 事実データを外部形式でエクスポート |
+| 述語 | アリティ | 説明 |
+| --- | --- | --- |
+| `listing/0` | 0 | **NEW** 読み込み済み全述語を整形表示 |
+| `listing/1` | 1 | **NEW** 指定述語のみを整形表示 |
+| `export_facts/2` | 2 | **NEW** 事実データを外部形式でエクスポート |
 
 ## 演算子
 
 ### 算術演算子
 
-| 演算子 | アリティ | 優先度 | 結合性 | 説明         |
-| ------ | -------- | ------ | ------ | ------------ |
-| `**`   | 2        | 200    | 右     | べき乗       |
-| `-`    | 1        | 200    | なし   | 単項マイナス |
-| `+`    | 1        | 200    | なし   | 単項プラス   |
-| `*`    | 2        | 400    | 左     | 乗算         |
-| `/`    | 2        | 400    | 左     | 除算         |
-| `//`   | 2        | 400    | 左     | 整数除算     |
-| `mod`  | 2        | 400    | 左     | 剰余         |
-| `+`    | 2        | 500    | 左     | 加算         |
-| `-`    | 2        | 500    | 左     | 減算         |
+| 演算子 | アリティ | 優先度 | 結合性 | 説明 |
+| --- | --- | --- | --- | --- |
+| `**` | 2 | 200 | 右 | べき乗 |
+| `-` | 1 | 200 | なし | 単項マイナス |
+| `+` | 1 | 200 | なし | 単項プラス |
+| `~` | 1 | 200 | なし | ビット単位否定 (NOT) |
+| `<<` | 2 | 300 | 左 | 左シフト |
+| `>>` | 2 | 300 | 左 | 右シフト |
+| `*` | 2 | 400 | 左 | 乗算 |
+| `/` | 2 | 400 | 左 | 除算 |
+| `//` | 2 | 400 | 左 | 整数除算 |
+| `mod` | 2 | 400 | 左 | 剰余 |
+| `&` | 2 | 400 | 左 | ビット単位論理積 (AND) |
+| `|` | 2 | 400 | 左 | ビット単位論理和 (OR) |
+| `^` | 2 | 400 | 左 | ビット単位排他的論理和 (XOR) |
+| `+` | 2 | 500 | 左 | 加算 |
+| `-` | 2 | 500 | 左 | 減算 |
+
+### 算術関数
+
+`is` 演算子内で使用可能な関数です。
+
+| 関数 | アリティ | 説明 |
+| --- | --- | --- |
+| `abs/1` | 1 | 絶対値 |
+| `max/2` | 2 | 最大値 |
+| `min/2` | 2 | 最小値 |
 
 ### 比較演算子
 
-| 演算子 | アリティ | 優先度 | 説明       |
-| ------ | -------- | ------ | ---------- |
-| `=:=`  | 2        | 700    | 算術等価   |
-| `=\\=` | 2        | 700    | 算術非等価 |
-| `<`    | 2        | 700    | 未満       |
-| `=<`   | 2        | 700    | 以下       |
-| `>`    | 2        | 700    | 超過       |
-| `>=`   | 2        | 700    | 以上       |
+| 演算子 | アリティ | 優先度 | 説明 |
+| --- | --- | --- | --- |
+| `=:=` | 2 | 700 | 算術等価 |
+| `=\=` | 2 | 700 | 算術非等価 |
+| `<` | 2 | 700 | 未満 |
+| `=<` | 2 | 700 | 以下 |
+| `>` | 2 | 700 | 超過 |
+| `>=` | 2 | 700 | 以上 |
 
 ### 論理演算子
 
-| 演算子 | アリティ | 優先度 | 説明             | 状態     |
-| ------ | -------- | ------ | ---------------- | -------- |
-| `=`    | 2        | 700    | 単一化           | ✅       |
-| `\\=`  | 2        | 700    | 単一化失敗       | ❌ 禁止  |
-| `<>`   | 2        | 700    | 非等価（推奨）   | ✅ 新規  |
-| `!=`   | 2        | 700    | 非等価（代替）   | ✅ 新規  |
-| `==`   | 2        | 700    | 項等価           | ✅       |
-| `\\==` | 2        | 700    | 項非等価         | ❌ 禁止  |
-| `is`   | 2        | 700    | 算術評価と単一化 | ✅       |
+| 演算子 | アリティ | 優先度 | 説明 | 状態 |
+| --- | --- | --- | --- | --- |
+| `=` | 2 | 700 | 単一化 | ✅ |
+| `\=` | 2 | 700 | 単一化失敗 | ✅ (非推奨) |
+| `<>` | 2 | 700 | 非等価（推奨） | ✅ 新規 |
+| `!=` | 2 | 700 | 非等価（代替） | ✅ 新規 |
+| `==` | 2 | 700 | 項等価 | ✅ |
+| `\==` | 2 | 700 | 項非等価 | ✅ (非推奨) |
+| `is` | 2 | 700 | 算術評価と単一化 | ✅ |
 
 ### 制御演算子
 
-| 演算子 | アリティ | 優先度 | 説明        |
-| ------ | -------- | ------ | ----------- |
-| `!`    | 0        | 1200   | カット      |
-| `->`   | 2        | 1050   | if-then     |
-| `;`    | 2        | 1100   | OR（選択）  |
-| `,`    | 2        | 1000   | AND（連言） |
-
-### 入出力演算子
-
-| 演算子  | アリティ | 説明     |
-| ------- | -------- | -------- |
-| `write` | 1        | 項の出力 |
-| `nl`    | 0        | 改行出力 |
+| 演算子 | アリティ | 優先度 | 説明 |
+| --- | --- | --- | --- |
+| `!` | 0 | 1200 | カット |
+| `->` | 2 | 1050 | if-then |
+| `;` | 2 | 1100 | OR（選択） |
+| `,` | 2 | 1000 | AND（連言） |
 
 ## パーサー機能
 
 ### サポートする構文要素
 
-- **アトム**: 小文字で始まる識別子、引用符で囲まれた文字列
-- **変数**: 大文字または`_`で始まる識別子
-- **数値**: 整数、浮動小数点数
-- **複合項**: `functor(arg1, arg2, ...)`
-- **リスト**: `[element1, element2, ...]`, `[Head|Tail]`
-- **演算子**: 中置、前置、後置演算子
-- **コメント**: `%`行コメント、`/* */`ブロックコメント
-
-### トークン型
-
-定義されたトークン型は[`TokenType`](../pyprolog/parser/token_type.py)に列挙されています。
-
-## ランタイム機能
-
-### 主要メソッド
-
-| メソッド                                                                  | 説明                                   |
-| ------------------------------------------------------------------------- | -------------------------------------- |
-| [`Runtime.query(query_string)`](../pyprolog/runtime/interpreter.py:514)   | クエリ文字列を実行し、解のリストを返す |
-| [`Runtime.add_rule(rule_string)`](../pyprolog/runtime/interpreter.py:610) | ルール文字列を知識ベースに追加         |
-| [`Runtime.consult(filename)`](../pyprolog/runtime/interpreter.py:636)     | Prolog ファイルを読み込む              |
-| [`Runtime.execute(goal, env)`](../pyprolog/runtime/interpreter.py:317)    | ゴールを環境で実行し、解を生成         |
-
-### 単一化アルゴリズム
-
-[`LogicInterpreter`](../pyprolog/runtime/logic_interpreter.py)クラスで実装された単一化機能：
-
-- 変数と項の単一化
-- 複合項同士の単一化
-- occurs check による無限ループ防止
-
-### バックトラッキング
-
-- 選択点の管理
-- 解の探索順序制御
-- カットによる探索剪定
-
-## 入出力機能
-
-### IOManager
-
-[`IOManager`](../pyprolog/runtime/io_manager.py)クラスが入出力を管理：
-
-- 標準入力/出力
-- ファイル入出力
-- ストリーム管理
-
-### サポート機能
-
-- 文字単位入力
-- 項の出力
-- 改行制御
-
-## 使用例
-
-### 基本的な使用法
-
-```python
-from pyprolog import Runtime
-
-# ランタイム初期化
-runtime = Runtime()
-
-# ファクト追加
-runtime.add_rule("likes(mary, wine).")
-runtime.add_rule("likes(john, wine).")
-
-# ルール追加
-runtime.add_rule("happy(X) :- likes(X, wine).")
-
-# クエリ実行
-results = runtime.query("happy(X)")
-for result in results:
-    print(f"X = {result['X']}")
-```
-
-### 算術演算例
-
-```python
-# 算術計算
-results = runtime.query("X is 3 + 4 * 2")
-print(f"X = {results[0]['X']}")  # X = 11
-
-# 比較演算
-results = runtime.query("5 > 3")
-print(f"Success: {len(results) > 0}")  # Success: True
-```
-
-### リスト操作例
-
-```python
-# member述語
-results = runtime.query("member(X, [1, 2, 3])")
-for result in results:
-    print(f"X = {result['X']}")  # X = 1, X = 2, X = 3
-
-# append述語
-results = runtime.query("append([1, 2], [3, 4], L)")
-print(f"L = {results[0]['L']}")  # L = [1, 2, 3, 4]
-```
-
-### 入出力操作例
-
-```python
-# get_char述語（文字単位入力）
-from pyprolog.runtime.io_streams import StringStream
-runtime.io_manager.set_input_stream(StringStream("hello"))
-results = runtime.query("get_char(X)")
-print(f"X = {results[0]['X']}")  # X = h
-
-# read_line述語（行単位入力）
-runtime.io_manager.set_input_stream(StringStream("Hello World\n"))
-results = runtime.query("read_line(Line)")
-print(f"Line = {results[0]['Line']}")  # Line = Hello World
-
-# 日本語の行読み込み
-runtime.io_manager.set_input_stream(StringStream("こんにちは世界\n"))
-results = runtime.query("read_line(X)")
-print(f"X = {results[0]['X']}")  # X = こんにちは世界
-
-# EOF処理
-runtime.io_manager.set_input_stream(StringStream(""))
-results = runtime.query("read_line(X)")
-print(f"X = {results[0]['X']}")  # X = end_of_file
-```
-
-### 型変換操作例
-
-```python
-# atom_number/2述語（アトム⇔数値変換）
-results = runtime.query("atom_number('42', X)")
-print(f"X = {results[0]['X']}")  # X = 42
-
-results = runtime.query("atom_number(Atom, 3.14)")
-print(f"Atom = {results[0]['Atom']}")  # Atom = '3.14'
-
-# 自動数値変換を利用した入力処理
-from pyprolog.runtime.io_streams import StringStream
-runtime.io_manager.set_input_stream(StringStream("42\n"))
-results = runtime.query("read_line(X)")
-print(f"X = {results[0]['X']}, Type: {type(results[0]['X'])}")  # X = 42, Type: <class 'pyprolog.core.types.Number'>
-
-# 複数回入力処理の例
-runtime.consult("multiple_input_calculator.pl")
-# このファイルは数値入力を繰り返し、無効入力時は再入力を求める
-```
-
-### 知識ベース管理操作例
-
-```python
-# ファクトとルールを追加
-runtime.add_rule("person(alice, 28, engineer).")
-runtime.add_rule("person(bob, 35, doctor).")
-runtime.add_rule("adult(X) :- person(X, Age, _), Age >= 18.")
-
-# listing/0: 全述語を表示
-from pyprolog.runtime.io_streams import StringStream
-output_buffer = []
-string_stream = StringStream(initial_input="", output_buffer=output_buffer)
-runtime.io_manager.set_output_stream(string_stream)
-
-results = runtime.query("listing.")
-output_content = ''.join(output_buffer)
-print("全述語一覧:")
-print(output_content)
-# 出力例:
-# % person/3
-# person(alice, 28.0, engineer).
-# person(bob, 35.0, doctor).
-#
-# % adult/1
-# adult(X) :- person(X, Age, _), Age >= 18.
-
-# listing/1: 指定述語のみ表示
-output_buffer.clear()
-results = runtime.query("listing(person/3).")
-output_content = ''.join(output_buffer)
-print("person/3 述語のみ:")
-print(output_content)
-# 出力例:
-# % person/3
-# person(alice, 28.0, engineer).
-# person(bob, 35.0, doctor).
-
-# export_facts/2: CSV形式でエクスポート
-import tempfile
-import os
-temp_dir = tempfile.mkdtemp()
-output_file = os.path.join(temp_dir, "persons.csv")
-
-results = runtime.query(f"export_facts(person/3, '{output_file}').")
-print(f"Export success: {len(results) > 0}")
-
-# ファイル内容確認
-with open(output_file, 'r') as f:
-    csv_content = f.read()
-    print("CSV内容:")
-    print(csv_content)
-# 出力例:
-# functor,arg1,arg2,arg3
-# person,alice,28.0,engineer
-# person,bob,35.0,doctor
-
-# JSON形式でエクスポート
-json_file = os.path.join(temp_dir, "persons.json")
-results = runtime.query(f"export_facts(person/3, json('{json_file}')).")
-
-with open(json_file, 'r') as f:
-    json_content = f.read()
-    print("JSON内容:")
-    print(json_content)
-# 出力例:
-# [
-#   {
-#     "functor": "person",
-#     "args": ["alice", "28.0", "engineer"]
-#   },
-#   {
-#     "functor": "person", 
-#     "args": ["bob", "35.0", "doctor"]
-#   }
-# ]
-
-# 日本語述語でのエクスポート
-runtime.add_rule("社員(田中, 30, エンジニア).")
-runtime.add_rule("社員(佐藤, 25, デザイナー).")
-
-japanese_file = os.path.join(temp_dir, "japanese_employees.csv")
-results = runtime.query(f"export_facts(社員/3, '{japanese_file}').")
-# 日本語述語もそのままエクスポートされる
-```
-
-### 新しい演算子の使用例
-
-```python
-# 新しい非等価演算子 <> の使用（推奨）
-runtime.add_rule("different(X, Y) :- X <> Y.")
-results = runtime.query("different(a, b)")
-print(f"Success: {len(results) > 0}")  # Success: True
-
-results = runtime.query("different(a, a)")
-print(f"Success: {len(results) > 0}")  # Success: False
-
-# 代替非等価演算子 != の使用
-results = runtime.query("1 != 2")
-print(f"Success: {len(results) > 0}")  # Success: True
-
-results = runtime.query("1 != 1")
-print(f"Success: {len(results) > 0}")  # Success: False
-
-# ❌ 禁止: バックスラッシュ演算子は使用不可
-# runtime.query("X \\= Y")  # 使用禁止！
-```
-
-## テスト仕様
-
-### テストカバレッジ
-
-pyprolog は以下のエリアで包括的なテストを提供（総計532テスト）：
-
-- **コア機能**: [`tests/core/`](../tests/core/)
-- **パーサー**: [`tests/parser/`](../tests/parser/)
-- **ランタイム**: [`tests/runtime/`](../tests/runtime/) - 280テスト（listing/export機能含む）
-- **統合テスト**: [`tests/integration/`](../tests/integration/) - 60テスト
-- **ツールテスト**: [`tests/tools/`](../tests/tools/) - 120テスト
-- **日本語テスト**: [`tests/japanese/`](../tests/japanese/) - 30テスト
-
-### 主要テストケース
-
-- 算術演算の境界値テスト
-- リスト操作の総合テスト
-- 動的述語操作のテスト
-- 単一化アルゴリズムのテスト
-- 再帰ルールのテスト
-- メタ述語のテスト
-- **listing/export機能の統合テスト**: 34テストケース
-  - 基本的なlisting表示機能
-  - 述語指定によるフィルタリング
-  - CSV/JSON/TSV形式でのデータエクスポート
-  - 日本語述語名での表示・エクスポート
-  - エラーハンドリングと回復機能
-  - 大規模データセットでのパフォーマンス
+* **アトム**: 小文字で始まる識別子、引用符で囲まれた文字列
+* **変数**: 大文字または`_`で始まる識別子
+* **数値**: 整数、浮動小数点数
+* **複合項**: `functor(arg1, arg2, ...)`
+* **リスト**: `[element1, element2, ...]`, `[Head|Tail]`
+* **演算子**: 中置、前置、後置演算子
+* **コメント**: `%`行コメント、`/* */`ブロックコメント
 
 ## 制限事項と今後の拡張予定
 
 ### 現在の制限事項
 
-- DCG（Definite Clause Grammar）未サポート
-- モジュールシステム未実装
-- 一部の標準述語未実装（`bagof/3`, `setof/3`など）
-- 制約論理プログラミング（CLP）未サポート
+* DCG（Definite Clause Grammar）未サポート
+* モジュールシステム未実装
+* 一部の標準述語未実装（`bagof/3`, `setof/3`など）
+* 制約論理プログラミング（CLP）未サポート
 
-### 禁止事項
+### 運用方針
 
-- バックスラッシュ演算子（`\==`, `\=`, `=\=`）の使用は禁止
-- 代替として新しい演算子（`<>`, `!=`）を使用すること
-
-### 将来の拡張候補
-
-- より多くの組み込み述語
-- デバッグ機能の強化
-- パフォーマンス最適化
-- 標準 Prolog 互換性の向上
+* バックスラッシュ演算子（`\==`, `\=`, `=\=`）の使用は非推奨です。
+* 非等価判定には新しい演算子（`<>`, `!=`）を使用することを推奨します。
 
 ---
 
-**注意**: このドキュメントは実装状況に基づいて作成されています。詳細な仕様や使用方法については、対応するソースコードとテストケースを参照してください。
+**注意**: このドキュメントは実装状況に基づいています。詳細な仕様や使用方法については、[Python API リファレンス](python_api_reference.md)やソースコードも参照してください。
