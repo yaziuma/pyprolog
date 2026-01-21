@@ -125,7 +125,7 @@ class SymbolTable:
         self.predicates[key].append(predicate_info)
         self.user_defined.add(key)
 
-        logger.debug(f"述語定義を追加: {key}")
+        logger.debug("述語定義を追加: %s", key)
 
     def add_reference(
         self,
@@ -163,7 +163,7 @@ class SymbolTable:
             if reference not in predicate_info.references:
                 predicate_info.references.append(reference)
 
-        logger.debug(f"述語参照を追加: {name}/{arity} in {container_key}")
+        logger.debug("述語参照を追加: %s/%d in %s", name, arity, container_key)
 
     def get_predicate_info(
         self, name: str, arity: int

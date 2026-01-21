@@ -122,7 +122,7 @@ class IOPredicate(BuiltinPredicate, ABC):
             if "PrologInputRequiredException" in e.__class__.__name__:
                 raise
             # その他のエラーはログ出力後、述語失敗
-            logger.error(f"{self._get_predicate_name()}/1 execution error: {e}")
+            logger.error("%s/1 execution error: %s", self._get_predicate_name(), e)
             return  # 述語失敗（何もyieldしない）
 
     def _validate_arguments(self):

@@ -22,7 +22,7 @@ class DependencyGraph:
     def add_node(self, predicate_key: str) -> None:
         """ノード（述語）を追加"""
         self.nodes.add(predicate_key)
-        logger.debug(f"グラフノード追加: {predicate_key}")
+        logger.debug("グラフノード追加: %s", predicate_key)
 
     def add_edge(self, caller: str, callee: str) -> None:
         """エッジ（依存関係）を追加"""
@@ -30,7 +30,7 @@ class DependencyGraph:
         self.nodes.add(callee)
         self.edges[caller].add(callee)
         self.reverse_edges[callee].add(caller)
-        logger.debug(f"依存関係追加: {caller} -> {callee}")
+        logger.debug("依存関係追加: %s -> %s", caller, callee)
 
     def get_dependencies(self, predicate_key: str) -> Set[str]:
         """指定された述語の依存先を取得"""
@@ -59,7 +59,9 @@ class DependencyGraph:
                 if dependent not in visited:
                     queue.append(dependent)
 
-        logger.debug(f"到達可能ノード数: {len(reachable)} (開始: {len(start_nodes)})")
+        logger.debug(
+            "到達可能ノード数: %d (開始: %d)", len(reachable), len(start_nodes)
+        )
         return reachable
 
     def get_unreachable_nodes(self, entry_points: Set[str]) -> Set[str]:
@@ -67,7 +69,7 @@ class DependencyGraph:
         reachable = self.get_reachable_from(entry_points)
         unreachable = self.nodes - reachable
 
-        logger.debug(f"到達不可能ノード数: {len(unreachable)}")
+        logger.debug("到達不可能ノード数: %d", len(unreachable))
         return unreachable
 
     def detect_cycles(self) -> List[List[str]]:
@@ -103,7 +105,7 @@ class DependencyGraph:
             if node not in visited:
                 dfs_cycle_detection(node, [])
 
-        logger.debug(f"循環依存検出: {len(cycles)} 個")
+        logger.debug("循環依存検出: %d 個", len(cycles))
         return cycles
 
     def topological_sort(self) -> Optional[List[str]]:
@@ -175,7 +177,7 @@ class DependencyGraph:
                 if component:
                     components.append(component)
 
-        logger.debug(f"強連結成分数: {len(components)}")
+        logger.debug("強連結成分数: %d", len(components))
         return components
 
     def get_path(self, start: str, end: str) -> Optional[List[str]]:

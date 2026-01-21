@@ -37,7 +37,7 @@ class ConflictAnalyzer:
         # 無限再帰の可能性をチェック
         issues.extend(self._check_infinite_recursion(symbol_table, dependency_graph))
 
-        logger.info(f"矛盾分析完了: {len(issues)} 個の問題を発見")
+        logger.info("矛盾分析完了: %d 個の問題を発見", len(issues))
         return issues
 
     def _check_multiple_definitions(
@@ -239,7 +239,7 @@ class ConflictAnalyzer:
 
             return False
         except Exception as e:
-            logger.debug(f"事実競合チェックエラー: {e}")
+            logger.debug("事実競合チェックエラー: %s", e)
             return False
 
     def _rules_potentially_conflict(self, rule1: Rule, rule2: Rule) -> bool:
@@ -248,7 +248,7 @@ class ConflictAnalyzer:
             # ヘッドが同じ構造かチェック
             return self._same_argument_structure(rule1.head, rule2.head)
         except Exception as e:
-            logger.debug(f"ルール競合チェックエラー: {e}")
+            logger.debug("ルール競合チェックエラー: %s", e)
             return False
 
     def _same_argument_structure(self, term1: Any, term2: Any) -> bool:
@@ -320,7 +320,7 @@ class ConflictAnalyzer:
                                 pattern.append("variable")
                         type_patterns.add(tuple(pattern))
             except Exception as e:
-                logger.debug(f"引数型分析エラー: {e}")
+                logger.debug("引数型分析エラー: %s", e)
                 continue
 
         return type_patterns

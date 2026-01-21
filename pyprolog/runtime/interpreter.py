@@ -81,7 +81,9 @@ class Runtime:
         )  # Pass self (Runtime) to LogicInterpreter
         self._operator_evaluators = self._build_unified_evaluator_system()
         logger.info(
-            f"Runtime initialized with {len(self.rules)} rules, IOManager, VariableMapper, FunctorMapper, Tracer, and {len(self._operator_evaluators)} operator evaluators"
+            "Runtime initialized with %d rules, IOManager, VariableMapper, FunctorMapper, Tracer, and %d operator evaluators",
+            len(self.rules),
+            len(self._operator_evaluators),
         )
 
     def _extract_existing_functors(self) -> set:
@@ -145,7 +147,7 @@ class Runtime:
         io_ops = operator_registry.get_operators_by_type(OperatorType.IO)
         for op_info in io_ops:
             evaluators[op_info.symbol] = self._create_io_evaluator(op_info)
-        logger.debug(f"Built {len(evaluators)} unified operator evaluators")
+        logger.debug("Built %d unified operator evaluators", len(evaluators))
         return evaluators
 
     def _create_arithmetic_evaluator(self, op_info: OperatorInfo) -> Callable:
@@ -200,7 +202,7 @@ class Runtime:
                 if unified:
                     yield new_env
             except Exception as e:
-                logger.debug(f"'is' evaluation failed: {e}")
+                logger.debug("'is' evaluation failed: %s", e)
 
         return evaluator
 
@@ -227,14 +229,18 @@ class Runtime:
                 try:
                     for left_env in self.execute(left_goal, env):
                         logger.debug(
-                            f"LOGICAL_EVAL ,: left_env for {left_goal} is {left_env.bindings}"
+                            "LOGICAL_EVAL ,: left_env for %s is %s",
+                            left_goal,
+                            left_env.bindings,
                         )
                         try:
                             for right_env_solution in self.execute(
                                 right_goal, left_env
                             ):
                                 logger.debug(
-                                    f"LOGICAL_EVAL ,: right_env_solution for {right_goal} is {right_env_solution.bindings}"
+                                    "LOGICAL_EVAL ,: right_env_solution for %s is %s",
+                                    right_goal,
+                                    right_env_solution.bindings,
                                 )
                                 yield right_env_solution
                         except CutException:
@@ -273,7 +279,8 @@ class Runtime:
                         break
                 except CutException:
                     logger.debug(
-                        f"CutException inside \\+ for goal {goal_to_negate}. Standard \\+ would fail here."
+                        "CutException inside \\+ for goal %s. Standard \\+ would fail here.",
+                        goal_to_negate,
                     )
                     success_found = True
                 if not success_found:
@@ -341,7 +348,7 @@ class Runtime:
             if op_info.symbol == "!":
                 if args:
                     raise PrologError("Cut !/0 takes no arguments")
-                logger.debug(f"CUTTING! Environment: {env.bindings}")
+                logger.debug("CUTTING! Environment: %s", env.bindings)
                 yield env
                 raise CutException()
             elif op_info.symbol == "->":
@@ -421,7 +428,10 @@ class Runtime:
         self, goal: Any, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
         logger.debug(
-            f"EXECUTE: Called with goal: {goal} (type: {type(goal)}) in env: {env.bindings}"
+            "EXECUTE: Called with goal: %s (type: %s) in env: %s",
+            goal,
+            type(goal),
+            env.bindings,
         )
 
         processed_goal: Term
@@ -439,40 +449,47 @@ class Runtime:
         elif isinstance(goal, Atom):
             # IOオペレータの特別処理を追加
             if goal.name in self._operator_evaluators:
-                logger.debug(f"EXECUTE Atom IO Operator: {goal.name}")
+                logger.debug("EXECUTE Atom IO Operator: %s", goal.name)
                 # AtomをTermに変換してIOオペレータとして処理
                 processed_goal = Term(goal, [])
                 evaluator = self._operator_evaluators[goal.name]
                 try:
                     for item in evaluator(processed_goal.args, env):
                         logger.debug(
-                            f"EXECUTE Atom IO op {goal.name}: Yielding: {item.bindings if item else 'None'}"
+                            "EXECUTE Atom IO op %s: Yielding: %s",
+                            goal.name,
+                            item.bindings if item else "None",
                         )
                         yield item
                 except Exception as e:
-                    logger.debug(f"Exception in Atom IO operator {goal.name}: {e}")
+                    logger.debug("Exception in Atom IO operator %s: %s", goal.name, e)
                     raise
                 return
 
             # 既存の通常述語処理
             logger.debug(
-                f"EXECUTE Atom: Attempting Normal Predicate solve_goal for Atom: {goal}"
+                "EXECUTE Atom: Attempting Normal Predicate solve_goal for Atom: %s",
+                goal,
             )
             try:
                 for item in self.logic_interpreter.solve_goal(goal, env):
                     logger.debug(
-                        f"EXECUTE Atom (solve_goal): Yielding: {item.bindings if item else 'None'}"
+                        "EXECUTE Atom (solve_goal): Yielding: %s",
+                        item.bindings if item else "None",
                     )
                     yield item
             except CutException:
                 logger.debug(
-                    f"CutException propagated from solve_goal for Atom: {goal}. Re-raising."
+                    "CutException propagated from solve_goal for Atom: %s. Re-raising.",
+                    goal,
                 )
                 raise
             return
         else:
             logger.debug(
-                f"Goal {goal} (type {type(goal)}) is not directly executable by Runtime.execute, failing."
+                "Goal %s (type %s) is not directly executable by Runtime.execute, failing.",
+                goal,
+                type(goal),
             )
             return
 
@@ -492,35 +509,44 @@ class Runtime:
                 ):
                     if evaluator(processed_goal.args, env):
                         logger.debug(
-                            f"EXECUTE op {functor_name}: Yielding env (bool success): {env.bindings}"
+                            "EXECUTE op %s: Yielding env (bool success): %s",
+                            functor_name,
+                            env.bindings,
                         )
                         yield env
                 elif op_info.operator_type == OperatorType.COMPARISON:
                     if evaluator(processed_goal.args, env):
                         logger.debug(
-                            f"EXECUTE op {functor_name}: Yielding env (bool success): {env.bindings}"
+                            "EXECUTE op %s: Yielding env (bool success): %s",
+                            functor_name,
+                            env.bindings,
                         )
                         yield env
                 else:
                     for item in evaluator(processed_goal.args, env):
                         logger.debug(
-                            f"EXECUTE op {functor_name}: Yielding item from evaluator: {item.bindings if item else 'None'}"
+                            "EXECUTE op %s: Yielding item from evaluator: %s",
+                            functor_name,
+                            item.bindings if item else "None",
                         )
                         yield item
             except CutException:
                 logger.debug(
-                    f"CutException caught while evaluating operator {functor_name}. Re-raising."
+                    "CutException caught while evaluating operator %s. Re-raising.",
+                    functor_name,
                 )
                 raise
             except Exception as e:
                 # IOManager例外などの重要な例外は伝播
                 if "Input required" in str(e) or hasattr(e, "input_type"):
-                    logger.debug(f"Critical exception in operator {functor_name}: {e}")
+                    logger.debug(
+                        "Critical exception in operator %s: %s", functor_name, e
+                    )
                     raise
                 if isinstance(e, PrologError):
                     raise
                 logger.error(
-                    f"Error evaluating operator {functor_name}: {e}", exc_info=True
+                    "Error evaluating operator %s: %s", functor_name, e, exc_info=True
                 )
                 return
         elif functor_name == "var" and len(processed_goal.args) == 1:
@@ -627,7 +653,7 @@ class Runtime:
                     yield item
             except Exception as e:
                 # IOManager例外などをそのまま伝播
-                logger.debug(f"Exception in {functor_name}: {e}")
+                logger.debug("Exception in %s: %s", functor_name, e)
                 raise
         elif functor_name == "read_line" and len(processed_goal.args) == 1:
             read_line_pred = create_read_line_predicate(processed_goal.args[0])
@@ -636,7 +662,7 @@ class Runtime:
                     yield item
             except Exception as e:
                 # IOManager例外などをそのまま伝播
-                logger.debug(f"Exception in {functor_name}: {e}")
+                logger.debug("Exception in %s: %s", functor_name, e)
                 raise
         elif functor_name == "peek_char" and len(processed_goal.args) == 1:
             peek_char_pred = create_peek_char_predicate(processed_goal.args[0])
@@ -666,22 +692,25 @@ class Runtime:
                 yield item
         else:
             logger.debug(
-                f"EXECUTE Term: Attempting Normal Predicate solve_goal for: {processed_goal}"
+                "EXECUTE Term: Attempting Normal Predicate solve_goal for: %s",
+                processed_goal,
             )
             try:
                 for item in self.logic_interpreter.solve_goal(processed_goal, env):
                     logger.debug(
-                        f"EXECUTE Term (solve_goal): Yielding: {item.bindings if item else 'None'}"
+                        "EXECUTE Term (solve_goal): Yielding: %s",
+                        item.bindings if item else "None",
                     )
                     yield item
             except CutException:
                 logger.debug(
-                    f"CutException propagated from solve_goal for Term: {processed_goal}. Re-raising."
+                    "CutException propagated from solve_goal for Term: %s. Re-raising.",
+                    processed_goal,
                 )
                 raise
 
     def query(self, query_string: str) -> List[Dict[Variable, Any]]:
-        logger.debug(f"QUERY: Executing query: {query_string}")
+        logger.debug("QUERY: Executing query: %s", query_string)
         solutions = []
         try:
             # Ensure query ends with a dot for parsing consistency
@@ -712,7 +741,8 @@ class Runtime:
 
             if query_goal is None:
                 logger.error(
-                    f"Could not extract a valid goal from parsed: {parsed_structures[0]}"
+                    "Could not extract a valid goal from parsed: %s",
+                    parsed_structures[0],
                 )
                 return []
 
@@ -725,16 +755,19 @@ class Runtime:
                 term_for_vars_extraction = query_goal
             else:
                 logger.error(
-                    f"Cannot extract vars from non-Term/Atom goal: {query_goal}"
+                    "Cannot extract vars from non-Term/Atom goal: %s",
+                    query_goal,
                 )
                 return []
             query_vars_names = self._extract_variables_names(term_for_vars_extraction)
 
             try:
-                logger.debug(f"QUERY: Starting execute loop for goal: {query_goal}")
+                logger.debug("QUERY: Starting execute loop for goal: %s", query_goal)
                 for i, env_solution in enumerate(self.execute(query_goal, initial_env)):
                     logger.debug(
-                        f"QUERY: Received solution #{i} from execute: {env_solution.bindings if env_solution else 'None'}"
+                        "QUERY: Received solution #%d from execute: %s",
+                        i,
+                        env_solution.bindings if env_solution else "None",
                     )
                     if env_solution is None:
                         continue
@@ -760,21 +793,24 @@ class Runtime:
                     solutions.append(result)
             except CutException:
                 logger.info(
-                    f"Cut execution stopped further solutions at query level. Returning {len(solutions)} solution(s)."
+                    "Cut execution stopped further solutions at query level. Returning %d solution(s).",
+                    len(solutions),
                 )
 
-            logger.debug(f"QUERY: Completed with {len(solutions)} solutions")
+            logger.debug("QUERY: Completed with %d solutions", len(solutions))
             return solutions
 
         except PrologError as pe:  # Catch PrologError specifically
             logger.warning(
-                f"PrologError during query execution: {pe}", exc_info=True
+                "PrologError during query execution: %s", pe, exc_info=True
             )  # Log as warning or info
             raise pe  # Re-throw PrologError so tests can catch it
 
         except Exception as e:  # Catch other, unexpected exceptions
             logger.error(
-                f"Unexpected query execution error during query '{query_string}': {e}",
+                "Unexpected query execution error during query '%s': %s",
+                query_string,
+                e,
                 exc_info=True,
             )
             # Re-raise the exception to make it visible in test output
@@ -785,7 +821,7 @@ class Runtime:
     ) -> Tuple[List[Dict[Variable, Any]], List]:
         """トレース付きでクエリを実行"""
 
-        logger.debug(f"TRACE QUERY: Executing query with trace: {query_string}")
+        logger.debug("TRACE QUERY: Executing query with trace: %s", query_string)
 
         # 新しいTracerインスタンスを作成
         self.tracer = Tracer(max_depth)
@@ -832,16 +868,16 @@ class Runtime:
                         self.logic_interpreter.add_rule(item, position="last")
                         added_count += 1
                     else:
-                        logger.warning(f"Skipping non-rule/fact from add_rule: {item}")
+                        logger.warning("Skipping non-rule/fact from add_rule: %s", item)
                 if added_count > 0:
-                    logger.info(f"Added {added_count} rule(s)/fact(s) from string.")
+                    logger.info("Added %d rule(s)/fact(s) from string.", added_count)
                 else:
                     logger.warning("No rules/facts parsed from add_rule string.")
                 return added_count > 0
             logger.warning("No rules/facts parsed from add_rule string.")
             return False
         except Exception as e:
-            logger.error(f"Failed to add rule: {e}", exc_info=True)
+            logger.error("Failed to add rule: %s", e, exc_info=True)
             return False
 
     def consult(self, filename: str) -> bool:
@@ -864,14 +900,14 @@ class Runtime:
                     self.logic_interpreter.add_rule(item, position="last")
                     added_count += 1
                 else:
-                    logger.warning(f"Skipping non-rule/fact during consult: {item}")
+                    logger.warning("Skipping non-rule/fact during consult: %s", item)
             if added_count > 0:
-                logger.info(f"Consulted {added_count} rules/facts from {filename}")
+                logger.info("Consulted %d rules/facts from %s", added_count, filename)
             else:
-                logger.info(f"No rules or facts consulted from {filename}")
+                logger.info("No rules or facts consulted from %s", filename)
             return True
         except Exception as e:
-            logger.error(f"Failed to consult {filename}: {e}", exc_info=True)
+            logger.error("Failed to consult %s: %s", filename, e, exc_info=True)
             return False
 
     def _convert_vars_to_japanese(self, term: Any) -> Any:

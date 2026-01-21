@@ -33,7 +33,7 @@ class ExplainTool:
             説明結果を含む辞書
         """
         try:
-            logger.debug(f"Explaining query: {query_str} with format: {format_type}")
+            logger.debug("Explaining query: %s with format: %s", query_str, format_type)
 
             # トレース付きでクエリを実行
             solutions, trace_events = self.runtime.query_with_trace(
@@ -62,7 +62,7 @@ class ExplainTool:
             }
 
         except Exception as e:
-            logger.error(f"Error explaining query '{query_str}': {e}")
+            logger.error("Error explaining query '%s': %s", query_str, e)
             return {
                 "query": query_str,
                 "error": str(e),
@@ -129,5 +129,5 @@ class ExplainTool:
             return query, format_type, depth
 
         except Exception as e:
-            logger.warning(f"Error parsing explain command '{explain_command}': {e}")
+            logger.warning("Error parsing explain command '%s': %s", explain_command, e)
             return explain_command, "text", None

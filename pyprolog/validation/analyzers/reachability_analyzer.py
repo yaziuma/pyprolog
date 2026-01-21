@@ -26,7 +26,7 @@ class ReachabilityAnalyzer:
 
         # エントリーポイントを特定
         entry_points = self._get_entry_points(symbol_table)
-        logger.debug(f"エントリーポイント: {len(entry_points)} 個")
+        logger.debug("エントリーポイント: %d 個", len(entry_points))
 
         # 到達可能な述語を計算
         reachable = dependency_graph.get_reachable_from(entry_points)
@@ -58,7 +58,7 @@ class ReachabilityAnalyzer:
         # 孤立したコンポーネントの検出
         issues.extend(self._check_isolated_components(symbol_table, dependency_graph))
 
-        logger.info(f"到達可能性分析完了: {len(issues)} 個の問題を発見")
+        logger.info("到達可能性分析完了: %d 個の問題を発見", len(issues))
         return issues
 
     def _get_entry_points(self, symbol_table: SymbolTable) -> Set[str]:

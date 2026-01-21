@@ -46,7 +46,7 @@ class Tracer:
     def stop_trace(self) -> None:
         """トレースを停止します"""
         self.enabled = False
-        logger.debug(f"Tracing stopped. Recorded {len(self.events)} events")
+        logger.debug("Tracing stopped. Recorded %d events", len(self.events))
 
     def record_call(self, goal: Term, bindings: BindingEnvironment) -> None:
         """ゴール呼び出しを記録します"""
@@ -68,7 +68,7 @@ class Tracer:
             self.current_depth += 1
 
         except Exception as e:
-            logger.warning(f"Failed to record call event: {e}")
+            logger.warning("Failed to record call event: %s", e)
 
     def record_exit(
         self, goal: Term, bindings: BindingEnvironment, rule: Union[Rule, Fact]
@@ -92,7 +92,7 @@ class Tracer:
             self._record_event(event)
 
         except Exception as e:
-            logger.warning(f"Failed to record exit event: {e}")
+            logger.warning("Failed to record exit event: %s", e)
 
     def record_fail(self, goal: Term) -> None:
         """ゴール失敗を記録します"""
@@ -113,7 +113,7 @@ class Tracer:
             self._record_event(event)
 
         except Exception as e:
-            logger.warning(f"Failed to record fail event: {e}")
+            logger.warning("Failed to record fail event: %s", e)
 
     def record_redo(self, goal: Term) -> None:
         """バックトラッキングを記録します"""
@@ -132,7 +132,7 @@ class Tracer:
             self.current_depth += 1
 
         except Exception as e:
-            logger.warning(f"Failed to record redo event: {e}")
+            logger.warning("Failed to record redo event: %s", e)
 
     def get_events(self) -> List[TraceEvent]:
         """記録されたイベントのリストを取得します"""

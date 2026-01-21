@@ -42,7 +42,7 @@ def setup_logging(
 
     # 初期化完了のログ出力
     logger = logging.getLogger("prolog.util.logger")
-    logger.info(f"ログシステムを初期化しました (環境: {environment})")
+    logger.info("ログシステムを初期化しました (環境: %s)", environment)
 
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:

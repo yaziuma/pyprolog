@@ -219,4 +219,3 @@ def test_basic_functionality():
     # EOF確認
     eof_result = runtime.query("at_end_of_stream")
     assert len(eof_result) == 0  # False（まだデータあり）
-

@@ -57,7 +57,7 @@ class PatternMatcher:
             return False
 
         except Exception as e:
-            logger.warning(f"述語名マッチングエラー '{pattern}': {e}")
+            logger.warning("述語名マッチングエラー '%s': %s", pattern, e)
             return False
 
     @staticmethod
@@ -81,7 +81,7 @@ class PatternMatcher:
             return is_match, confidence
 
         except Exception as e:
-            logger.warning(f"引数パターンマッチングエラー '{pattern}': {e}")
+            logger.warning("引数パターンマッチングエラー '%s': %s", pattern, e)
             return False, 0.0
 
     @staticmethod
@@ -117,7 +117,7 @@ class PatternMatcher:
             return Atom(pattern)
 
         except Exception as e:
-            logger.warning(f"パターン解析エラー '{pattern}': {e}")
+            logger.warning("パターン解析エラー '%s': %s", pattern, e)
             return Atom(pattern)
 
     @staticmethod
@@ -192,7 +192,7 @@ class PatternMatcher:
             return confidence > 0.5, confidence
 
         except Exception as e:
-            logger.warning(f"単一化エラー: {e}")
+            logger.warning("単一化エラー: %s", e)
             return False, 0.0
 
     @staticmethod

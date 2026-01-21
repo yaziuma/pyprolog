@@ -39,9 +39,7 @@ class LogicInterpreter:
         if len(self.rules) != self._rules_len:
             self._build_index()
 
-    def _effective_head_for_index(
-        self, entry: Union[Rule, Fact]
-    ) -> Optional[Term]:
+    def _effective_head_for_index(self, entry: Union[Rule, Fact]) -> Optional[Term]:
         head = entry.head
 
         if (
@@ -169,9 +167,9 @@ class LogicInterpreter:
         logger.debug(
             "LOGIC_INTERP_UNIFY: Unifying term1: %s (type %s) with term2: %s (type %s) in env: %s",
             term1,
-            type(term1),
+            type(term1).__name__,
             term2,
-            type(term2),
+            type(term2).__name__,
             env.bindings,
         )
         current_env = env.copy()
@@ -180,9 +178,9 @@ class LogicInterpreter:
         logger.debug(
             "LOGIC_INTERP_UNIFY: Dereferenced t1: %s (type %s), t2: %s (type %s)",
             t1,
-            type(t1),
+            type(t1).__name__,
             t2,
-            type(t2),
+            type(t2).__name__,
         )
 
         if t1 == t2:
@@ -370,30 +368,38 @@ class LogicInterpreter:
         self, goal: PrologType, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
         logger.debug(
-            f"LOGIC_INTERP: solve_goal called with goal: {goal}, rules in DB: {[str(r) for r in self.rules]}"
+            "LOGIC_INTERP: solve_goal called with goal: %s, rules count: %d",
+            goal,
+            len(self.rules),
         )
         actual_goal: Term
         if isinstance(goal, Atom):
             actual_goal = Term(goal, [])
             logger.debug(
-                f"LOGIC_INTERP: Goal {goal} (Atom) converted to Term: {actual_goal} for solving."
+                "LOGIC_INTERP: Goal %s (Atom) converted to Term: %s for solving.",
+                goal,
+                actual_goal,
             )
         elif isinstance(goal, Term):
             actual_goal = goal
         else:
-            logger.debug(f"Goal {goal} (type {type(goal)}) is not callable, failing.")
+            logger.debug(
+                "Goal %s (type %s) is not callable, failing.", goal, type(goal)
+            )
             return
 
         logger.debug(
-            f"LOGIC_INTERP: Attempting to solve actual_goal: {actual_goal} with env: {env.bindings}"
+            "LOGIC_INTERP: Attempting to solve actual_goal: %s with env: %s",
+            actual_goal,
+            env.bindings,
         )
 
         self._refresh_index_if_needed()
 
         # 未定義述語は existence_error を返す（builtin/演算子は execute 側で処理済み）
-        if (
-            isinstance(actual_goal.functor, Atom)
-            and actual_goal.functor.name not in ("true", "fail")
+        if isinstance(actual_goal.functor, Atom) and actual_goal.functor.name not in (
+            "true",
+            "fail",
         ):
             key = (actual_goal.functor.name, len(actual_goal.args))
             if key not in self.rules_index:
@@ -406,14 +412,14 @@ class LogicInterpreter:
             self.runtime.tracer.record_call(actual_goal, env)
 
         if actual_goal.functor.name == "true" and not actual_goal.args:
-            logger.debug(f"Goal {actual_goal} is true, yielding current env.")
+            logger.debug("Goal %s is true, yielding current env.", actual_goal)
             # トレース: 成功記録
             if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
                 self.runtime.tracer.record_exit(actual_goal, env, Fact(actual_goal))
             yield env
             return
         elif actual_goal.functor.name == "fail" and not actual_goal.args:
-            logger.debug(f"Goal {actual_goal} is fail, returning.")
+            logger.debug("Goal %s is fail, returning.", actual_goal)
             # トレース: 失敗記録
             if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
                 self.runtime.tracer.record_fail(actual_goal)
@@ -433,9 +439,11 @@ class LogicInterpreter:
             candidate_entries = list(self.rules)
 
         for db_entry_idx, db_entry in enumerate(candidate_entries):
-            logger.debug(f"LOGIC_INTERP: Trying rule/fact #{db_entry_idx}: {db_entry}")
+            logger.debug(
+                "LOGIC_INTERP: Trying rule/fact #%d: %s", db_entry_idx, db_entry
+            )
             renamed_entry = self._rename_variables(db_entry)
-            logger.debug(f"LOGIC_INTERP: Renamed entry: {renamed_entry}")
+            logger.debug("LOGIC_INTERP: Renamed entry: %s", renamed_entry)
 
             current_head: Term
             if isinstance(renamed_entry, Rule):
@@ -447,7 +455,8 @@ class LogicInterpreter:
                     "Internal error: Renamed DB entry is not Rule or Fact."
                 )
             logger.debug(
-                f"LOGIC_INTERP: Current head to unify against from db_entry: {current_head}"
+                "LOGIC_INTERP: Current head to unify against from db_entry: %s",
+                current_head,
             )
 
             # PATCH for potential parser issue where a rule H:-B might be stored as Fact(Term(':-', [H,B]))
@@ -463,7 +472,8 @@ class LogicInterpreter:
                 and len(current_head.args) == 2
             ):
                 logger.warning(
-                    f"LOGIC_INTERP (PATCH DETECTED): Fact's head is a ':-' term: {current_head}. Treating as rule."
+                    "LOGIC_INTERP (PATCH DETECTED): Fact's head is a ':-' term: %s. Treating as rule.",
+                    current_head,
                 )
                 effective_head = current_head.args[0]  # The actual head H
                 rule_body_from_fact_structure = current_head.args[
@@ -476,7 +486,10 @@ class LogicInterpreter:
             if unified:
                 if is_rule_from_fact_structure:
                     logger.debug(
-                        f"LOGIC_INTERP (PATCH USED): Unified {actual_goal} with {effective_head} (from Fact). Solving body: {rule_body_from_fact_structure}"
+                        "LOGIC_INTERP (PATCH USED): Unified %s with %s (from Fact). Solving body: %s",
+                        actual_goal,
+                        effective_head,
+                        rule_body_from_fact_structure,
                     )
                     try:
                         yield from self.runtime.execute(
@@ -484,22 +497,27 @@ class LogicInterpreter:
                         )
                     except CutException:
                         logger.debug(
-                            f"CutException propagated from patched rule body: {rule_body_from_fact_structure}. Re-raising."
+                            "CutException propagated from patched rule body: %s. Re-raising.",
+                            rule_body_from_fact_structure,
                         )
                         raise
                     except Exception as e:
                         # IOManager例外などの重要な例外は伝播
                         if "Input required" in str(e) or hasattr(e, "input_type"):
                             logger.debug(
-                                f"Critical exception propagated from patched rule body: {e}"
+                                "Critical exception propagated from patched rule body: %s",
+                                e,
                             )
                             raise
                         # その他の例外もログ出力して伝播
-                        logger.debug(f"Exception in patched rule body execution: {e}")
+                        logger.debug("Exception in patched rule body execution: %s", e)
                         raise
                 elif isinstance(renamed_entry, Fact):  # Genuine Fact
                     logger.debug(
-                        f"LOGIC_INTERP: Unified Fact {actual_goal} with {effective_head}. Yielding env: {new_env_after_unify.bindings}"
+                        "LOGIC_INTERP: Unified Fact %s with %s. Yielding env: %s",
+                        actual_goal,
+                        effective_head,
+                        new_env_after_unify.bindings,
                     )
                     # トレース: 事実による成功記録
                     if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
@@ -509,7 +527,11 @@ class LogicInterpreter:
                     yield new_env_after_unify
                 elif isinstance(renamed_entry, Rule):  # Properly parsed Rule
                     logger.debug(
-                        f"LOGIC_INTERP: Unified Rule Head {actual_goal} with {effective_head}. Solving body: {renamed_entry.body} with env: {new_env_after_unify.bindings}"
+                        "LOGIC_INTERP: Unified Rule Head %s with %s. Solving body: %s with env: %s",
+                        actual_goal,
+                        effective_head,
+                        renamed_entry.body,
+                        new_env_after_unify.bindings,
                     )
                     try:
                         yield from self.runtime.execute(
@@ -517,18 +539,19 @@ class LogicInterpreter:
                         )
                     except CutException:
                         logger.debug(
-                            f"CutException propagated from rule body: {renamed_entry.body}. Re-raising."
+                            "CutException propagated from rule body: %s. Re-raising.",
+                            renamed_entry.body,
                         )
                         raise
                     except Exception as e:
                         # IOManager例外などの重要な例外は伝播
                         if "Input required" in str(e) or hasattr(e, "input_type"):
                             logger.debug(
-                                f"Critical exception propagated from rule body: {e}"
+                                "Critical exception propagated from rule body: %s", e
                             )
                             raise
                         # その他の例外もログ出力して伝播
-                        logger.debug(f"Exception in rule body execution: {e}")
+                        logger.debug("Exception in rule body execution: %s", e)
                         raise
 
         # If we've iterated through all rules and no solution was yielded by this path,
@@ -541,7 +564,8 @@ class LogicInterpreter:
             self.runtime.tracer.record_fail(actual_goal)
 
         logger.debug(
-            f"LOGIC_INTERP: Finished iterating DB for goal {actual_goal}. No more (or no) solutions found from this path."
+            "LOGIC_INTERP: Finished iterating DB for goal %s. No more (or no) solutions found from this path.",
+            actual_goal,
         )
 
     def instantiate_term(self, term: PrologType, env: BindingEnvironment) -> PrologType:

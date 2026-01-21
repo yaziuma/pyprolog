@@ -58,7 +58,7 @@ class FunctorMapper:
         self._non_ascii_to_english[functor] = english_functor
         self._english_to_non_ascii[english_functor] = functor
 
-        logger.debug(f"Mapped non-ASCII functor '{functor}' to '{english_functor}'")
+        logger.debug("Mapped non-ASCII functor '%s' to '%s'", functor, english_functor)
         return english_functor
 
     def map_english_to_non_ascii(self, english_functor: str) -> str:
@@ -132,4 +132,3 @@ class FunctorMapper:
     def get_existing_functors(self) -> Set[str]:
         """登録済み既存ファンクター名を取得"""
         return self._existing_functors.copy()
-

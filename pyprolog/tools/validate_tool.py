@@ -33,7 +33,7 @@ class ValidateTool:
             検証結果を含む辞書
         """
         try:
-            logger.debug(f"検証実行: type={check_type}, detailed={detailed}")
+            logger.debug("検証実行: type=%s, detailed=%s", check_type, detailed)
 
             # 検証を実行
             result = self.validator.validate(check_type, detailed)
@@ -54,7 +54,7 @@ class ValidateTool:
             }
 
         except Exception as e:
-            logger.error(f"検証エラー: {e}")
+            logger.error("検証エラー: %s", e)
             return {
                 "check_type": check_type,
                 "detailed": detailed,
@@ -91,7 +91,7 @@ class ValidateTool:
                 return self._format_text(validation_result)
 
         except Exception as e:
-            logger.error(f"結果フォーマットエラー: {e}")
+            logger.error("結果フォーマットエラー: %s", e)
             return f"フォーマットエラー: {e}"
 
     def _format_text(self, validation_result: Dict[str, Any]) -> str:
@@ -278,7 +278,7 @@ class ValidateTool:
                 "total_rules": len(self.runtime.rules) if self.runtime else 0,
             }
         except Exception as e:
-            logger.error(f"統計情報取得エラー: {e}")
+            logger.error("統計情報取得エラー: %s", e)
             return {"error": str(e)}
 
     def rebuild_analysis(self) -> bool:
@@ -291,5 +291,5 @@ class ValidateTool:
             logger.info("解析データを再構築しました")
             return True
         except Exception as e:
-            logger.error(f"解析データ再構築エラー: {e}")
+            logger.error("解析データ再構築エラー: %s", e)
             return False

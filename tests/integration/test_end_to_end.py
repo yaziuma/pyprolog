@@ -21,7 +21,10 @@ class TestEndToEnd:
 
         self.runtime = Runtime()
         self.runtime.rules.clear()
-        if hasattr(self.runtime, "logic_interpreter") and self.runtime.logic_interpreter:
+        if (
+            hasattr(self.runtime, "logic_interpreter")
+            and self.runtime.logic_interpreter
+        ):
             self.runtime.logic_interpreter.replace_rules(self.runtime.rules)
 
     def _make_list(self, elements):
@@ -145,9 +148,7 @@ class TestEndToEnd:
         self._add_rules("p(a).", "p(b).")
 
         results = self.runtime.query("findall(X, p(X), L)")
-        assert results[0].get(Variable("L")) == self._make_list(
-            [Atom("a"), Atom("b")]
-        )
+        assert results[0].get(Variable("L")) == self._make_list([Atom("a"), Atom("b")])
 
     def test_error_recovery(self):
         """エラー回復のテスト"""
@@ -208,9 +209,7 @@ class TestEndToEnd:
         results = self.runtime.query("diagnose_disease([fever], Disease, Probability)")
         assert len(results) == 3
 
-        results = self.runtime.query(
-            "patient_diagnosis([fever], 30, [], [], Result)"
-        )
+        results = self.runtime.query("patient_diagnosis([fever], 30, [], [], Result)")
         assert len(results) == 3
         assert "Starting diagnosis" in output.get_output_string()
 
@@ -446,4 +445,3 @@ class TestEndToEnd:
         assert isinstance(result_value3, Term) and result_value3.functor.name == ".", (
             "DiagnosisList from Query 3 should be a Prolog list."
         )
-

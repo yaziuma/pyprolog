@@ -64,7 +64,7 @@ class SearchTool:
             }
 
         except Exception as e:
-            logger.error(f"検索エラー '{pattern}': {e}")
+            logger.error("検索エラー '%s': %s", pattern, e)
             return {
                 "pattern": pattern,
                 "search_type": search_type,
@@ -128,7 +128,7 @@ class SearchTool:
             return pattern, search_type, limit
 
         except Exception as e:
-            logger.warning(f"searchコマンド解析エラー '{search_command}': {e}")
+            logger.warning("searchコマンド解析エラー '%s': %s", search_command, e)
             return search_command, "predicate", 100
 
     def format_results(
@@ -165,7 +165,7 @@ class SearchTool:
                 return self._format_text(search_result)
 
         except Exception as e:
-            logger.error(f"結果フォーマットエラー: {e}")
+            logger.error("結果フォーマットエラー: %s", e)
             return f"フォーマットエラー: {e}"
 
     def _format_text(self, search_result: Dict[str, Any]) -> str:
@@ -222,5 +222,5 @@ class SearchTool:
             self.search_engine.build_index()
             return True
         except Exception as e:
-            logger.error(f"インデックス再構築エラー: {e}")
+            logger.error("インデックス再構築エラー: %s", e)
             return False
