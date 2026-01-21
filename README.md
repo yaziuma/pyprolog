@@ -5,74 +5,71 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Unified Input](https://img.shields.io/badge/Unified%20Input%20System-Active-brightgreen.svg)](#unified-input-system)
 
-このプロジェクトは、**統一入力システム**と**日本語変数名サポート**、**高度な開発ツール**を備えた、Python で実装された本格的な Prolog インタープリタです。`uv` を使用した高速開発環境とツール拡張機能を特徴とします。
+PyPrologは、Pythonで実装された拡張性の高いPrologインタープリタです。**統一入力システム**、**日本語変数名サポート**、および**高度な開発ツール**を備え、`uv` を利用した効率的な開発環境を提供します。
 
-**🆕 2025年9月更新**: 統一入力システム（Unified Input System）実装完了。真の継続実行により、対話的プログラムの応答性が飛躍的に向上しました。
+**2025年9月更新**: 統一入力システム（Unified Input System）の実装が完了しました。継続実行機能により、対話的プログラムの応答性が向上しています。
 
-## 🚀 主な特徴
+## 主な特徴
 
-### ✨ 言語サポート
-- **日本語変数名・ファンクター名完全サポート**: `患者診断(症状, 年齢, 結果)`
-- **Unicode文字対応**: あらゆる言語の文字を使用可能
-- **70種類以上の演算子**: 算術、比較、論理、制御演算子を完備
+### 言語サポート
+- **日本語変数名・ファンクター名のサポート**: `患者診断(症状, 年齢, 結果)` のような日本語記述が可能
+- **Unicode文字対応**: 多言語文字の使用が可能
+- **包括的な演算子サポート**: 70種類以上の算術、比較、論理、制御演算子を実装
 
-### 🛠️ 開発ツール
+### 開発ツール
 - **`prolog_explain`**: クエリの推論過程を可視化（テキスト/ツリー/JSON形式）
-- **`prolog_search`**: 大規模知識ベースの高速検索
-- **`prolog_validate`**: 静的解析による品質チェック
+- **`prolog_search`**: 大規模知識ベースの検索機能
+- **`prolog_validate`**: 静的解析によるコード品質チェック
 
-### 🎯 実用機能
-- **🆕 統一入力システム**: InputHandlerインターフェースによる統一入力管理
-- **🚀 真の継続実行**: スタックフレーム完全保持による中断・再開可能な処理
-- **🔄 スレッドセーフI/O**: 複数同時対話をサポート
-- **包括的な組み込み述語**: 40種類以上の標準述語（`listing/0`, `listing/1`, `export_facts/2`）
-- **知識ベース管理**: listing述語による述語一覧表示、export機能によるデータ出力
-- **自動型変換**: 数値文字列の自動判定・変換機能
-- **高速CLIインターフェース**: インタラクティブREPLと一括処理
-- **豊富なI/O機能**: ファイル読み書き、ストリーム処理、複数回入力対応、**入力待ち検知**
-- **メタ述語サポート**: `findall/3`, 動的述語管理
+### 実用機能
+- **統一入力システム**: InputHandlerインターフェースによる入力処理の統合管理
+- **継続実行**: 中断・再開可能な処理フローの実現
+- **スレッドセーフI/O**: 複数同時対話セッションのサポート
+- **標準的な組み込み述語**: 40種類以上の標準述語（`listing/0`, `listing/1`, `export_facts/2` 等）を実装
+- **知識ベース管理**: 述語一覧表示、データのエクスポート機能
+- **自動型変換**: 数値文字列の自動判定および変換機能
+- **CLIインターフェース**: インタラクティブREPLおよびバッチ処理に対応
+- **拡張I/O機能**: ファイル入出力、ストリーム処理、入力待ち検知
+- **メタ述語**: `findall/3`、動的述語操作をサポート
 
-## 📊 プロジェクト状況（最新）
+## プロジェクト状況
 
-**🆕 2025年9月14日 - 統一入力システム完全実装 (v0.7.0)**
+**2025年9月14日 - 統一入力システム完全実装 (v0.7.0)**
 
-✅ **統一入力システム**: InputHandlerインターフェースで全入力処理を統一  
-✅ **真の継続実行**: Pythonスレッドスタックフレーム完全保持による中断・再開  
-✅ **完全テスト済み**: 71/71統一入力システムテスト + 228/228既存システムテスト全成功  
-✅ **後方互換性100%**: 既存APIの完全動作保証  
-✅ **テストスイート最適化**: 重複テスト削除により49ファイル（51→49）に効率化  
-✅ **ドキュメント完全更新**: 統一入力システム対応ガイド・README・対話システム説明
+- **統一入力システム**: InputHandlerインターフェースによる入力処理の統一
+- **継続実行**: スレッドスタックフレーム保持による処理の中断・再開
+- **テスト**: 既存および新規テストケースによる動作検証済み
+- **後方互換性**: 既存APIとの完全な互換性を維持
 
 **2025年8月27日 - 知識ベース管理機能追加 (v0.6.0)**
 
-✅ **知識ベース表示機能**: `listing/0`, `listing/1` 述語で読み込み済みルールを整形表示  
-✅ **データエクスポート機能**: `export_facts/2` 述語でCSV/JSON/TSV形式出力対応  
-✅ **日本語完全サポート**: 日本語述語名・変数名での表示・エクスポート  
-✅ **フォーマット処理**: Prologフォーマッターによる美しいコード整形  
+- **知識ベース表示**: `listing/0`, `listing/1` によるルール表示
+- **データエクスポート**: `export_facts/2` によるCSV/JSON/TSV形式出力
+- **多言語対応**: 日本語述語名・変数名の表示・エクスポート
 
-**2025年8月21日 - 入力システム大幅強化 (v0.5.0)**
+**2025年8月21日 - 入力システム強化 (v0.5.0)**
 
-✅ **型変換システム追加**: `atom_number/2`述語で安全な文字列⇔数値変換  
-✅ **自動入力変換**: `read_line/1`と`get_char/1`で数値文字列を自動判定  
-✅ **複数入力対応**: 繰り返し入力・バリデーション処理を完全サポート  
-✅ **IOシステム統合**: write/nl演算子がストリーム処理と完全統合
+- **型変換**: `atom_number/2` による型変換
+- **自動入力変換**: `read_line/1`, `get_char/1` における数値自動判定
+- **複数入力対応**: 繰り返し入力およびバリデーション処理のサポート
+- **IOシステム統合**: ストリーム処理との統合
 
-## 🚀 クイックスタート
+## クイックスタート
 
-### 最速で試す（3分で動作確認）
+### 動作確認手順
 
 ```bash
-# 1. プロジェクトをクローン
+# 1. リポジトリのクローン
 git clone <repository-url>
 cd pyprolog
 
-# 2. 依存関係をインストール
+# 2. 依存関係のインストール
 uv sync
 
-# 3. 基本的な Prolog クエリを実行
+# 3. Prolog クエリの実行
 uvx python -m pyprolog.cli.prolog tests/data/puzzle1.prolog
 
-# 4. 日本語医療診断システムを試す
+# 4. 日本語医療診断システムの実行例
 uvx python -c "
 from pyprolog.runtime.interpreter import Runtime
 r = Runtime()
@@ -82,13 +79,13 @@ print(f'診断結果: {solutions}')
 "
 ```
 
-### インタラクティブREPLで対話的に実行
+### インタラクティブREPLの使用
 
 ```bash
-# インタラクティブモードで起動
+# REPLの起動
 uvx python -m pyprolog.cli.interactive_repl
 
-# REPLで日本語変数を使用
+# 実行例
 ?- 年齢 = 25, 年齢 > 20.
 年齢 = 25.
 
@@ -96,7 +93,7 @@ uvx python -m pyprolog.cli.interactive_repl
 リスト = [a, b, c, d].
 ```
 
-## 🛠️ 開発ツールの使用例
+## 開発ツールの使用方法
 
 ### prolog_explain: 推論過程の可視化
 ```python
@@ -120,44 +117,26 @@ tool = ValidateTool(runtime)
 issues = tool.validate(check_type="all")
 ```
 
-### 🆕 統一入力システム: 次世代入力処理 (NEW) 🚀
+### 統一入力システム: InputHandlerの実装
 ```python
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.runtime.unified_input_system import InputHandler, InputEvent
 
-# 新しいInputHandlerインターフェース（統一入力システム）
 class AdvancedInputHandler(InputHandler):
     def handle_input_request(self, event: InputEvent):
-        print(f"🔔 入力要求: {event.input_type} by {event.predicate_name}")
-        
+        # 入力要求の処理ロジックを実装
         if event.input_type == "line":
-            return get_input_from_gui()  # GUI、Web、AI等から取得
+            return get_input_from_gui()
         elif event.input_type == "char":
             return get_single_char()
-        
         return None
 
 runtime = Runtime()
 runtime.io_manager.set_input_handler(AdvancedInputHandler())
-runtime.io_manager.enable_threading()  # 真の継続実行有効化
-
-# 📖 詳細ガイド: docs/入力待ち検知ガイド.md（最新方法記載）
+runtime.io_manager.enable_threading()
 ```
 
-### 入力待ち検知: レガシー対応 (従来互換) ✅
-```python
-# 従来のIOStream方式（後方互換性のため保持）
-from pyprolog.runtime.io_streams import IOStream
-
-class LegacyInputHandler(IOStream):
-    def read_line(self):
-        print("🔍 レガシー入力待ちを検知")
-        return get_input_from_source()  # 既存の入力源
-
-runtime.io_manager.set_input_stream(LegacyInputHandler())
-```
-
-## 📋 インストール・セットアップ
+## インストール・セットアップ
 
 ### 前提条件
 - Python 3.8以上
@@ -174,293 +153,100 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 詳細は [uv 公式ドキュメント](https://astral.sh/uv) を参照してください。
 
-## 1\. プロジェクトのセットアップ
+## プロジェクトのセットアップ
 
-### 1.1. プロジェクトの初期化 (オプション)
-
-新しいプロジェクトとして始める場合、または既存のプロジェクトに `pyproject.toml` を導入する場合は、以下のコマンドを実行します。
+### プロジェクト初期化 (オプション)
 
 ```bash
 uv init
 ```
 
-これにより、対話的に `pyproject.toml` ファイルが生成されます。
-
-### 1.2. Python バージョンの管理
-
-プロジェクトで使用する Python のバージョンを指定・管理できます。
+### Python バージョン管理
 
 ```bash
-# 利用可能なPythonバージョンを検索 (例: 3.10)
-uv python find 3.10
-
-# 特定のPythonバージョンをインストール (もし未インストールの場合)
-uv python install 3.10
-
-# プロジェクトで使用するPythonバージョンを固定
-# これにより .python-version ファイルが作成または更新されます
+# バージョンの指定
 uv python pin 3.10
 ```
 
-### 1.3. 仮想環境の作成と有効化
-
-プロジェクト専用の仮想環境を作成し、有効化します。
+### 仮想環境の作成と有効化
 
 ```bash
-# 仮想環境の作成 (デフォルトでは .venv という名前で作成されます)
+# 作成
 uv venv
-# 特定のPythonバージョンを指定して仮想環境を作成する場合
-# uv venv --python 3.10
 
-# 仮想環境の有効化
-# macOS / Linux
+# 有効化 (macOS / Linux)
 source .venv/bin/activate
-# Windows
+# 有効化 (Windows)
 .\.venv\Scripts\activate
 ```
 
-## 2\. 依存関係の管理
+## 依存関係の管理
 
-プロジェクトの依存関係は `pyproject.toml` ファイルで管理し、`uv` を使ってインストール・同期します。
-
-### 2.1. 依存関係のインストール
-
-`requirements.txt` ファイルがある場合:
+`pyproject.toml` を使用した依存関係管理を推奨します。
 
 ```bash
-# requirements.txt から依存関係をインストール
-uv add -r requirements.txt
-```
-
-`pyproject.toml` を使用する場合 (推奨):
-
-```bash
-# プロジェクトの依存関係を pyproject.toml (または uv.lock) に基づいて同期
+# 依存関係の同期
 uv sync
 
-# 個別のパッケージを依存関係として追加
-uv add <パッケージ名>
-# 例: uv add requests
+# パッケージの追加
+uv add requests
 
-# 開発用の依存関係 (テストツール、リンターなど) を追加
-uv add --dev <パッケージ名>
-# 例: uv add --dev pytest ruff
+# 開発用依存関係の追加
+uv add --dev pytest ruff
 ```
 
-### 2.2. 依存関係のロック
-
-依存関係のバージョンを固定するためにロックファイルを作成・更新します。
-`pyproject.toml` がある場合は、`uv.lock` が生成されます。
-
-```bash
-uv lock
-```
-
-## 3\. REPL の実行
-
-Prolog インタープリタの REPL (Read-Eval-Print Loop) を実行します。
-
-```bash
-# uv を使ってプロジェクト環境内でスクリプトを実行
-uvx python -m pyprolog.cli.prolog [options] path
-```
-
-例えば:
+## REPL の実行
 
 ```bash
 uvx python -m pyprolog.cli.prolog tests/data/puzzle1.prolog
 ```
 
-`pyproject.toml` の `[tool.uv.scripts]` セクションにスクリプトを定義することもできます。
-例 (`pyproject.toml`):
+## 主要機能詳細
 
-```toml
-[tool.uv.scripts]
-prolog-repl = "python -m pyprolog.cli.prolog"
-```
+### 組み込み述語
+- **基本I/O**: `write/1`, `nl/0`, `tab/1`, `get_char/1`, `read_line/1` 等
+- **知識ベース管理**: `listing/0`, `export_facts/2` 等
+- **型チェック**: `var/1`, `atom/1`, `number/1` 等
+- **リスト操作**: `member/2`, `append/3` 等
+- **メタ述語**: `findall/3`, `asserta/1` 等
+- **演算子**: 算術、比較、論理演算子をサポート
 
-その場合、以下のように実行できます:
+### 日本語サポート
+Unicode対応により、日本語を含む多言語での記述が可能です。
 
-```bash
-uvx prolog-repl -- tests/data/puzzle1.prolog
-# (注意: スクリプト定義後の引数は -- の後に記述します)
-```
+### パフォーマンス
+- 大規模知識ベースに対応したインデックス機能
+- 遅延評価によるメモリ効率化
+- 並行処理のサポート
 
-サンプル REPL セッション出力:
+詳細は `docs/pyprolog_実装済み機能・述語リスト.md` を参照してください。
 
-```bash
-python -m pyprolog.cli.prolog tests/data/myadven.prolog
+## テストと品質管理
 
-Welcome to Simple Prolog
-ctrl-c to quit
-> location(desk, office).
-yes
-> location(X, Y).
-X = desk Y = office
-... (以下略) ...
-```
-
-## 🎯 主要機能詳細
-
-### 📝 組み込み述語 (40種類以上)
-
-#### 基本I/O
-- `write/1`, `nl/0`, `tab/0`, `tab/1`
-- `get_char/1`, `peek_char/1`, `read_line/1`
-- `at_end_of_stream/0`
-
-#### 知識ベース管理
-- `listing/0`: 読み込み済み全述語の表示
-- `listing/1`: 指定述語のみ表示
-- `export_facts/2`: 事実データの外部出力
-
-#### 型チェック
-- `var/1`, `atom/1`, `number/1`
-- `functor/3`, `arg/3`, `=../2`
-
-#### リスト操作
-- `member/2`, `append/3`
-- `[H|T]` パターンマッチング
-
-#### メタ述語
-- `findall/3`: 解の収集
-- `asserta/1`, `assertz/1`: 動的述語追加
-- `retract/1`: 述語削除
-
-#### 算術・比較演算子
-- **算術**: `+`, `-`, `*`, `/`, `mod`, `**`, `is/2`
-- **比較**: `=:=`, `=\=`, `<`, `=<`, `>`, `>=`
-- **等価性**: `=`（単一化）, `==`（同一性）
-- **非等価性**: `<>`, `!=`（推奨）, `\=`
-
-### 🌐 日本語サポート
-
-完全な Unicode サポートにより、変数名・ファンクター名・アトムに日本語を使用可能：
-
-```prolog
-% 医療診断の例
-疾患症状(風邪, 発熱, 0.8).
-疾患症状(風邪, 咳, 0.7).
-
-患者診断(症状リスト, 年齢, 基礎疾患, 生活習慣, 診断結果) :-
-    症状マッチング(症状リスト, 疾患確率リスト),
-    最高確率疾患(疾患確率リスト, 診断結果).
-```
-
-### 🔧 開発ツール
-
-#### prolog_explain - 推論過程の可視化
-```python
-tool = ExplainTool(runtime)
-
-# テキスト形式
-result = tool.explain("append([1,2], [3], L)", format="text")
-# CALL: append([1,2], [3], L)
-# EXIT: append([1,2], [3], [1,2,3])
-# SUCCESS: L = [1,2,3]
-
-# JSON形式（他ツールとの連携用）
-result = tool.explain("member(X, [a,b,c])", format="json")
-```
-
-#### prolog_search - 知識ベース検索
-```python
-tool = SearchTool(runtime)
-
-# 述語名検索
-results = tool.search("patient", search_type="predicate")
-
-# 引数パターン検索
-results = tool.search("patient(_, adult)", search_type="argument")
-
-# 全文検索
-results = tool.search("diagnosis", search_type="full_text")
-```
-
-#### prolog_validate - 静的解析
-```python
-tool = ValidateTool(runtime)
-
-# 全項目チェック
-issues = tool.validate(check_type="all")
-
-# 未定義述語のチェック
-issues = tool.validate(check_type="undefined")
-
-# 到達不能ルールの検出
-issues = tool.validate(check_type="unreachable")
-```
-
-### ⚡ パフォーマンス特徴
-
-- **大規模KB対応**: 75ルール以下で最適性能
-- **高速検索**: インデックス付きパターンマッチング
-- **メモリ効率**: 遅延評価による省メモリ実行
-- **並行処理**: 複数クエリの並列実行サポート
-
-詳細な機能リストと使用例については `docs/pyprolog_実装済み機能・述語リスト.md` を参照してください。
-
-## 🧪 テストとコード品質
-
-### 包括的なテストスイート（532テスト）
+### テストの実行
 
 ```bash
 # 全テスト実行
 uvx pytest --cov=pyprolog tests
-
-# 特定のカテゴリのみ実行
-uvx pytest tests/integration/ -v    # 統合テスト
-uvx pytest tests/japanese/ -v      # 日本語サポートテスト
-uvx pytest tests/tools/ -v         # 開発ツールテスト
-uvx pytest tests/runtime/ -v       # ランタイム機能テスト
 ```
-
-### テストカテゴリ
-- **統合テスト (60)**: エンドツーエンド機能テスト（listing/exportテスト含む）
-- **ランタイムテスト (280)**: 組み込み述語、算術演算、I/O機能
-- **日本語テスト (30)**: Unicode文字サポート検証  
-- **ツールテスト (120)**: explain/search/validateツール検証
-- **単体テスト (42)**: パーサー、コア機能、型システム
 
 ### コード品質管理
 
 ```bash
 # リンティングとフォーマット
-uvx ruff check .          # 問題チェック
-uvx ruff format .         # コードフォーマット
-uvx ruff check . --fix    # 自動修正
-
-# 開発用依存関係のインストール
-uv add --dev ruff pytest pytest-cov
+uvx ruff check .
+uvx ruff format .
 ```
 
-### テスト結果例
-```
-========================== 532 passed in 1.70s ==========================
-✅ 統合テスト: 60/60 合格（listing/export機能含む）
-✅ ランタイムテスト: 280/280 合格
-✅ 日本語テスト: 30/30 合格  
-✅ ツールテスト: 120/120 合格
-✅ 単体テスト: 42/42 合格
-```
+## ライブラリとしての利用
 
-## 5\. PyProlog をライブラリとして使用する
-
-PyProlog を自身の Python プロジェクトでライブラリとして使用する方法です。
-
-### 5.1. PyProlog のインストール
-
-ご自身のプロジェクトに `pieprolog` (注意: パッケージ名は `pieprolog` です) を追加します。
+### インストール
 
 ```bash
-# uv を使用してプロジェクトに依存関係として追加 (推奨)
 uv add pieprolog
-
-# もしくは、現在の仮想環境に直接インストールする場合
-# uv pip install pieprolog
 ```
 
-### 5.2. ライブラリ使用例
+### 使用例
 
 ```python
 from pyprolog import Scanner, Parser, Runtime
@@ -468,278 +254,43 @@ from pyprolog import Scanner, Parser, Runtime
 def main():
     source = '''
     location(computer, office).
-    location(knife, kitchen).
-    location(chair, office).
-    location(shoe, hall).
-
-    isoffice(X) :- location(computer, X), location(chair, X).
-    
-    % 新しい演算子の使用例（推奨）
-    different_locations(X, Y) :- location(_, X), location(_, Y), X <> Y.
-    
-    % ❌ 禁止例: バックスラッシュ演算子
-    % old_different(X, Y) :- X \= Y.  % 使用禁止！
+    isoffice(X) :- location(computer, X).
     '''
-
     tokens = Scanner(source).tokenize()
     rules = Parser(tokens).parse_rules()
-
     runtime = Runtime(rules)
-
-    # 基本的なクエリ例
-    goal_text = 'location(X, office).'
-    goal = Parser(Scanner(goal_text).tokenize()).parse_terms()
-
-    # 新しい非等価演算子の使用例
-    different_query = 'different_locations(office, kitchen).'
-    different_goal = Parser(Scanner(different_query).tokenize()).parse_terms()
-
-    x = goal.args[0] # 元のREADMEの記述に合わせる
-
-    has_solution = False
-    for index, item in enumerate(runtime.execute(goal)):
-        has_solution = True
-        print(f"Solution {index + 1}: {item}")
-        # goal.match(item) が辞書を返し、そのキーが変数オブジェクトであると仮定
-        solution_mapping = goal.match(item)
-        if x in solution_mapping:
-            print(f"X = {solution_mapping[x]}")
-        else:
-            # goal.args[0] が直接解決された値を持つ場合など、
-            # Prolog実装によってここの処理は変わります。
-            # print(f"X = {item.args[0]}") # item の構造に依存
-            pass
-
-    # 新しい演算子のテスト
-    print("\n新しい演算子のテスト:")
-    different_solutions = list(runtime.execute(different_goal))
-    print(f"different_locations クエリ: {len(different_solutions)} 個の解")
-
-    if has_solution:
-        print('Query has solution(s)')
-    else:
-        print('Query has no solution')
+    
+    # クエリ実行
+    goal = Parser(Scanner('location(X, office).').tokenize()).parse_terms()
+    for item in runtime.execute(goal):
+        print(f"Solution: {item}")
 
 if __name__ == "__main__":
     main()
 ```
 
-## 5.3. 型変換と複数入力機能（v0.5.0新機能）
+詳細は `docs/python_api_reference.md` を参照してください。
 
-PyProlog 0.5.0から、`atom_number/2`述語による型変換と、入力述語の自動数値変換機能が追加されました。
+## コントリビューション
 
-### atom_number/2述語の使用例
+バグ報告、機能要望、プルリクエストを歓迎します。
 
-```python
-from pyprolog import Runtime
+1. Issueの確認
+2. リポジトリのフォークおよびブランチ作成
+3. 開発、テスト、品質チェック
+4. プルリクエストの作成
 
-runtime = Runtime()
+## ドキュメント
 
-# 文字列 → 数値変換
-results = runtime.query("atom_number('42', X)")
-print(f"X = {results[0]['X']}")  # X = 42
+- [`CLAUDE.md`](CLAUDE.md): 開発者ガイド
+- [`docs/入力待ち検知ガイド.md`](docs/入力待ち検知ガイド.md): 入力システムガイド
+- [`docs/pyprolog_実装済み機能・述語リスト.md`](docs/pyprolog_実装済み機能・述語リスト.md): 機能・述語リスト
+- [`docs/python_api_reference.md`](docs/python_api_reference.md): Python API リファレンス
 
-# 数値 → 文字列変換  
-results = runtime.query("atom_number(Atom, 3.14)")
-print(f"Atom = {results[0]['Atom']}")  # Atom = '3.14'
-
-# 型チェック（成功例）
-results = runtime.query("atom_number('100', 100)")
-print(f"Success: {len(results) > 0}")  # Success: True
-
-# 型チェック（失敗例）
-results = runtime.query("atom_number('abc', 123)")
-print(f"Success: {len(results) > 0}")  # Success: False
-```
-
-### 自動数値変換機能
-
-```python
-from pyprolog.runtime.io_streams import StringStream
-
-# 数値文字列の自動変換
-runtime.io_manager.set_input_stream(StringStream("42\nabc\n3.14\n"))
-
-# read_line/1で自動変換される
-for i in range(3):
-    results = runtime.query("read_line(X)")
-    if results:
-        val = results[0]['X']
-        print(f"Input {i+1}: {val} (Type: {type(val).__name__})")
-# Output:
-# Input 1: 42 (Type: Number)    <- 自動変換
-# Input 2: abc (Type: Atom)     <- 文字列のまま  
-# Input 3: 3.14 (Type: Number)  <- 自動変換
-```
-
-### 複数入力プログラムの例
-
-複数回の入力を必要とするPrologプログラムも簡単に作成できます：
-
-```prolog
-% multiple_input_calculator.pl
-calculate_sum :-
-    write('数値を2つ入力してください'), nl,
-    read_line(First),
-    read_line(Second), 
-    Sum is First + Second,
-    write('合計: '), write(Sum), nl.
-```
-
-```python
-# Python側での使用
-runtime.consult("multiple_input_calculator.pl")
-runtime.io_manager.set_input_stream(StringStream("10\n20\n"))
-results = runtime.query("calculate_sum")
-# 出力: "数値を2つ入力してください\n合計: 30"
-```
-
-## 5.4. 非ブロッキング入力機能（新機能）
-
-PyProlog 0.2.2 から、`peek_char/1` および `at_end_of_stream/0` 述語が追加されました。これにより、入力待ちでアプリケーションが停止することなく、条件付きの入力処理が可能になります。
-
-### 基本的な使用例
-
-```python
-from pyprolog.runtime.interpreter import Runtime
-from pyprolog.runtime.io_streams import StringStream
-from pyprolog.core.types import Variable
-
-# ランタイムの初期化
-runtime = Runtime()
-
-# テスト用の文字列ストリームを設定
-runtime.io_manager.set_input_stream(StringStream("hello"))
-
-# peek_char/1: 次の文字を非破壊的に先読み
-peek_result = runtime.query("peek_char(X)")
-print(f"Next character: {peek_result[0][Variable('X')]}")  # 'h'
-
-# 同じ文字がもう一度取得される（ストリーム位置は変更されない）
-peek_again = runtime.query("peek_char(Y)")  
-print(f"Same character: {peek_again[0][Variable('Y')]}")  # 'h'
-
-# 実際に文字を消費
-consume_result = runtime.query("get_char(Z)")
-print(f"Consumed: {consume_result[0][Variable('Z')]}")  # 'h'
-
-# at_end_of_stream/0: EOF状態の確認
-eof_result = runtime.query("at_end_of_stream")
-print(f"At EOF: {len(eof_result) > 0}")  # False（まだデータあり）
-```
-
-### 条件付き読み取りパターン
-
-```python
-# 数字判定ルールの追加
-runtime.add_rule("""
-read_if_digit(Char) :-
-    peek_char(Next),
-    Next >= '0',
-    Next =< '9',
-    get_char(Char).
-""")
-
-# テストケース1: 数字がある場合
-runtime.io_manager.set_input_stream(StringStream("5abc"))
-digit_result = runtime.query("read_if_digit(D)")
-if digit_result:
-    print(f"Read digit: {digit_result[0][Variable('D')]}")  # '5'
-
-# テストケース2: 数字がない場合
-runtime.io_manager.set_input_stream(StringStream("abc"))
-letter_result = runtime.query("read_if_digit(L)")
-print(f"Failed to read digit: {len(letter_result) == 0}")  # True
-```
-
-### Prologでの使用例
-
-```prolog
-% パーサー実装パターン
-parse_number(Num) :-
-    peek_char(First),
-    First >= '0', First =< '9',
-    collect_digits(Digits),
-    atom_codes(Num, Digits).
-
-% 先読みによる条件分岐
-next_token_type(number) :-
-    peek_char(C),
-    C >= '0', C =< '9'.
-
-next_token_type(letter) :-
-    peek_char(C),
-    C >= 'a', C =< 'z'.
-
-next_token_type(eof) :-
-    at_end_of_stream.
-
-% 空白のスキップ
-skip_whitespace :-
-    peek_char(' '),
-    get_char(_),
-    skip_whitespace.
-
-skip_whitespace :-
-    peek_char(C),
-    C \= ' '.
-```
-
-### 利用場面
-
-- **対話的アプリケーション開発**: 入力待ちでUIが凍結しない制御
-- **パーサー・トークナイザー実装**: 先読みによる構文解析
-- **ライブラリとしての利用**: 予期しない入力待ちの回避
-- **条件付き入力処理**: 入力内容に応じた処理の分岐
-
-## 🤝 コントリビューション
-
-コントリビューションを歓迎します！以下の手順でお願いします：
-
-1. **Issues を確認**: バグ報告や機能要望をGitHubのIssuesで確認
-2. **フォーク & ブランチ**: リポジトリをフォークし、機能ブランチを作成
-3. **開発**: 
-   ```bash
-   # 開発環境のセットアップ
-   uv sync
-   
-   # テストの実行
-   uvx pytest tests/ -v
-   
-   # コード品質チェック
-   uvx ruff check . --fix
-   uvx ruff format .
-   ```
-4. **プルリクエスト**: 変更内容の詳細な説明と共にPRを作成
-
-### 開発ガイドライン
-- 新機能にはテストを追加
-- `CLAUDE.md` の開発指針に従う
-- 日本語文字のサポートを考慮
-- 既存の532テストが全て通ることを確認
-
-## 📚 ドキュメント・参考資料
-
-### プロジェクト内ドキュメント
-- [`CLAUDE.md`](CLAUDE.md): 開発者向け詳細ガイド
-- [`docs/入力待ち検知ガイド.md`](docs/入力待ち検知ガイド.md): **NEW** 入力待ち検知・動的入力の完全ガイド
-- [`docs/pyprolog_実装済み機能・述語リスト.md`](docs/pyprolog_実装済み機能・述語リスト.md): 実装済み機能・述語の詳細リスト
-- [`docs/examples/`](docs/examples/): 実用的な使用例とサンプルコード
-- [`sample_usage/`](sample_usage/): 基本使用例とデモ
-- [`tests/`](tests/): 包括的なテスト例
-
-### 外部リンク
-- [uv公式ドキュメント](https://astral.sh/uv): パッケージマネージャー
-- [Prolog言語仕様](https://www.swi-prolog.org/): 標準的なProlog参考資料
-
-## 📄 ライセンス
+## ライセンス
 
 MIT License - 詳細は [LICENSE](LICENSE) ファイルを参照してください。
 
-## 🎯 作者・保守者
+## 作者・保守者
 
-このプロジェクトは [Claude Code](https://claude.ai/code) との協力により開発・保守されています。
-
----
-
-**PyProlog** で日本語プログラミングとProlog推論の世界をお楽しみください！🚀
+本プロジェクトは Claude Code の協力により開発・保守されています。
