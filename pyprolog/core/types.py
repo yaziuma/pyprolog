@@ -8,7 +8,7 @@ PrologType = Union[
 ]  # ListTerm を追加
 
 
-class BaseTerm(msgspec.Struct, frozen=False):  # Termの基底クラス
+class BaseTerm(msgspec.Struct, frozen=False, array_like=True):  # Termの基底クラス
     pass
 
 
