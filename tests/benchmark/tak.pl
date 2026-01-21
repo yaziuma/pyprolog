@@ -1,24 +1,22 @@
 % ==========================================
-% tak.pl - Takeuchi Function Benchmark
+% tak.pl - Takeuchi function
 % ==========================================
-% 実行方法: ?- benchmark.
-% 標準的な入力 (18, 12, 6) で実行します。
+% 実行方法: ?- benchmark(18, 12, 6, R).
 % ==========================================
 
-benchmark :-
-    write('Calculating tak(18, 12, 6)...'), nl,
-    tak(18, 12, 6, Result),
-    write('Result: '), write(Result), nl.
+benchmark(X, Y, Z, R) :-
+    write('Calculating tak('), write(X), write(','), write(Y), write(','), write(Z), write(')...'), nl,
+    tak(X, Y, Z, R),
+    write('Result: '), write(R), nl.
 
-% 竹内関数の定義
-tak(X, Y, Z, A) :-
-    X =< Y, !,
-    A = Z.
-tak(X, Y, Z, A) :-
+tak(X, Y, Z, Z) :-
+    X =< Y, !.
+tak(X, Y, Z, R) :-
+    X > Y,
     X1 is X - 1,
-    tak(X1, Y, Z, A1),
+    tak(X1, Y, Z, R1),
     Y1 is Y - 1,
-    tak(Y1, Z, X, A2),
+    tak(Y1, Z, X, R2),
     Z1 is Z - 1,
-    tak(Z1, X, Y, A3),
-    tak(A1, A2, A3, A).
+    tak(Z1, X, Y, R3),
+    tak(R1, R2, R3, R).
