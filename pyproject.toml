@@ -71,3 +71,10 @@ dev = [
     "pytest-timeout>=2.4.0",
     "ruff>=0.12.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--ignore=tests/benchmark"
