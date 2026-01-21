@@ -866,7 +866,9 @@ class DynamicRetractPredicate(BuiltinPredicate):
 
             # Important: For unification with DB clause, rename variables from DB clause
             # to avoid clashes and incorrect unifications with variables in target_clause_struct
-            renamed_db_clause = runtime.logic_interpreter._rename_variables(db_clause)
+            renamed_db_clause = runtime.logic_interpreter._rename_variables(
+                db_clause, env
+            )
 
             db_head: Term
             db_body: Optional[PrologType] = None
