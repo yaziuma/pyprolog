@@ -112,8 +112,12 @@ class LogicInterpreter:
         self._build_index()
 
     def _rename_variables(
-        self, term_or_rule: Union[PrologType, Rule, Fact]
+        self,
+        term_or_rule: Union[PrologType, Rule, Fact],
+        env: Optional[BindingEnvironment] = None,
     ) -> Union[PrologType, Rule, Fact]:
+        if env is None:
+            env = BindingEnvironment()
         self._unique_var_counter += 1
         mapping: Dict[str, Variable] = {}
 
@@ -125,6 +129,7 @@ class LogicInterpreter:
                 return mapping[current_term.name]
             elif isinstance(current_term, Term):
                 new_args = [rename_recursive(arg) for arg in current_term.args]
+                env.stats["term_allocs"] += 1
                 return Term(current_term.functor, new_args)
             elif isinstance(current_term, ListTerm):
                 new_elements = [rename_recursive(el) for el in current_term.elements]
@@ -164,6 +169,7 @@ class LogicInterpreter:
     def unify(
         self, term1: PrologType, term2: PrologType, env: BindingEnvironment
     ) -> Tuple[bool, BindingEnvironment]:
+        env.stats["unify_calls"] += 1
         logger.debug(
             "LOGIC_INTERP_UNIFY: Unifying term1: %s (type %s) with term2: %s (type %s) in env: %s",
             term1,
@@ -313,6 +319,7 @@ class LogicInterpreter:
     def _occurs_check(
         self, var: Variable, term: PrologType, env: BindingEnvironment
     ) -> bool:
+        env.stats["occurs_calls"] += 1
         term_deref = self.dereference(term, env)
         if var == term_deref:
             return True
@@ -323,11 +330,32 @@ class LogicInterpreter:
         return False
 
     def dereference(self, term: PrologType, env: BindingEnvironment) -> PrologType:
-        if isinstance(term, Variable):
-            bound_value = env.get_value(term.name)
-            if bound_value is not None and bound_value != term:
-                return self.dereference(bound_value, env)
-        return term
+        if not isinstance(term, Variable):
+            return term
+        env.stats["deref_calls"] += 1
+        current: PrologType = term
+        visited: List[str] = []
+        visited_set = set()
+        trail: List[str] = []
+        while isinstance(current, Variable):
+            var_name = current.name
+            if var_name in visited_set:
+                cycle = " -> ".join(visited + [var_name])
+                raise PrologError(
+                    f"Internal error: dereference cycle detected: {cycle}"
+                )
+            visited_set.add(var_name)
+            visited.append(var_name)
+            bound_value = env.get_value(var_name)
+            if bound_value is None or bound_value == current:
+                break
+            env.stats["deref_steps"] += 1
+            trail.append(var_name)
+            current = bound_value
+        if trail:
+            for name in trail:
+                env.bind(name, current)
+        return current
 
     def deep_dereference_term(
         self, term: PrologType, env: BindingEnvironment
@@ -350,6 +378,7 @@ class LogicInterpreter:
             ]
             # Functor itself could theoretically be a variable if we allowed higher-order, but not currently.
             # Assuming functor is Atom or similar, not needing dereferencing here.
+            env.stats["term_allocs"] += 1
             return Term(current_term.functor, new_args)
         elif isinstance(current_term, ListTerm):
             # This type is not fully used/fleshed out in the current codebase snippets,
@@ -442,7 +471,7 @@ class LogicInterpreter:
             logger.debug(
                 "LOGIC_INTERP: Trying rule/fact #%d: %s", db_entry_idx, db_entry
             )
-            renamed_entry = self._rename_variables(db_entry)
+            renamed_entry = self._rename_variables(db_entry, env)
             logger.debug("LOGIC_INTERP: Renamed entry: %s", renamed_entry)
 
             current_head: Term

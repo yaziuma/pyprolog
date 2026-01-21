@@ -9,6 +9,7 @@ Prologインタープリターの論理的推論エンジンの
 
 import unittest
 from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.errors import PrologError
 from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact
 from typing import Iterator
 
@@ -460,17 +461,17 @@ class TestLogicInterpreter:
         )  # This becomes unify(VY, VY) after deref
         assert s2, "Unification Y=X (after X=Y) should succeed"
 
-        # Test 2: dereference with manually created cyclic bindings X->Y, Y->X should raise RecursionError
+        # Test 2: dereference with manually created cyclic bindings X->Y, Y->X should raise PrologError
         env_circ = BindingEnvironment()
         # Manually create circular binding: X maps to Variable("Y"), Y maps to Variable("X")
         # Note: BindingEnvironment stores values, so Variable("Y") is the value for key "X"
         env_circ.bind(VX.name, VY)
         env_circ.bind(VY.name, VX)
 
-        with pytest.raises(RecursionError):
+        with pytest.raises(PrologError):
             self.logic_interpreter.dereference(VX, env_circ)
 
-        with pytest.raises(RecursionError):  # Also test starting with Y
+        with pytest.raises(PrologError):  # Also test starting with Y
             self.logic_interpreter.dereference(VY, env_circ)
 
     def test_unification_failure_rollback(self):
