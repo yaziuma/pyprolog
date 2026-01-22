@@ -25,14 +25,20 @@ class LogicInterpreter:
         self.rules: List[Union[Rule, Fact]] = rules
         self.runtime: "Runtime" = runtime
         self._unique_var_counter = 0
+        self.rules_by_pred: Dict[Tuple[str, int], List[Union[Rule, Fact]]] = {}
+        self.rules_by_pred_arg0: Dict[
+            Tuple[str, int, str, Union[str, int, float]], List[Union[Rule, Fact]]
+        ] = {}
         self.rules_index: Dict[Tuple[str, int], List[Union[Rule, Fact]]] = {}
         self._rules_len = 0
         self._build_index()
 
     def _build_index(self) -> None:
-        self.rules_index = {}
+        self.rules_by_pred = {}
+        self.rules_by_pred_arg0 = {}
         for rule in self.rules:
             self._add_to_index(rule)
+        self.rules_index = self.rules_by_pred
         self._rules_len = len(self.rules)
 
     def _refresh_index_if_needed(self) -> None:
@@ -66,29 +72,90 @@ class LogicInterpreter:
             return None
         return (head.functor.name, len(head.args))
 
+    def _arg0_index_key_from_head(
+        self, head: Optional[Term]
+    ) -> Optional[Tuple[str, int, str, Union[str, int, float]]]:
+        if head is None or not isinstance(head.functor, Atom):
+            return None
+        if not head.args:
+            return None
+        arg0 = head.args[0]
+        if isinstance(arg0, Atom):
+            return (head.functor.name, len(head.args), "atom", arg0.name)
+        if isinstance(arg0, Number):
+            return (head.functor.name, len(head.args), "number", arg0.value)
+        if isinstance(arg0, String):
+            return (head.functor.name, len(head.args), "string", arg0.value)
+        return None
+
     def _add_to_index(self, entry: Union[Rule, Fact], position: str = "last") -> None:
-        key = self._index_key_from_head(self._effective_head_for_index(entry))
+        effective_head = self._effective_head_for_index(entry)
+        key = self._index_key_from_head(effective_head)
         if key is None:
             return
-        bucket = self.rules_index.setdefault(key, [])
+        bucket = self.rules_by_pred.setdefault(key, [])
         if position == "first":
             bucket.insert(0, entry)
         else:
             bucket.append(entry)
+        arg0_key = self._arg0_index_key_from_head(effective_head)
+        if arg0_key is not None:
+            arg0_bucket = self.rules_by_pred_arg0.setdefault(arg0_key, [])
+            if position == "first":
+                arg0_bucket.insert(0, entry)
+            else:
+                arg0_bucket.append(entry)
 
     def _remove_from_index(self, entry: Union[Rule, Fact]) -> None:
-        key = self._index_key_from_head(self._effective_head_for_index(entry))
+        effective_head = self._effective_head_for_index(entry)
+        key = self._index_key_from_head(effective_head)
         if key is None:
             return
-        bucket = self.rules_index.get(key)
+        bucket = self.rules_by_pred.get(key)
         if not bucket:
-            return
+            bucket = []
         for i, item in enumerate(bucket):
             if item is entry:
                 del bucket[i]
                 break
         if not bucket:
-            self.rules_index.pop(key, None)
+            self.rules_by_pred.pop(key, None)
+        arg0_key = self._arg0_index_key_from_head(effective_head)
+        if arg0_key is None:
+            return
+        arg0_bucket = self.rules_by_pred_arg0.get(arg0_key)
+        if not arg0_bucket:
+            return
+        for i, item in enumerate(arg0_bucket):
+            if item is entry:
+                del arg0_bucket[i]
+                break
+        if not arg0_bucket:
+            self.rules_by_pred_arg0.pop(arg0_key, None)
+
+    def get_candidate_clauses(
+        self, goal: Term, env: BindingEnvironment
+    ) -> List[Union[Rule, Fact]]:
+        if not isinstance(goal.functor, Atom):
+            return list(self.rules)
+        key = (goal.functor.name, len(goal.args))
+        primary_candidates = self.rules_by_pred.get(key, [])
+        if not primary_candidates:
+            return []
+        if not goal.args:
+            return list(primary_candidates)
+        arg0 = self.dereference(goal.args[0], env)
+        if isinstance(arg0, Atom):
+            arg0_key = (goal.functor.name, len(goal.args), "atom", arg0.name)
+        elif isinstance(arg0, Number):
+            arg0_key = (goal.functor.name, len(goal.args), "number", arg0.value)
+        elif isinstance(arg0, String):
+            arg0_key = (goal.functor.name, len(goal.args), "string", arg0.value)
+        else:
+            arg0_key = None
+        if arg0_key is not None and arg0_key in self.rules_by_pred_arg0:
+            return list(self.rules_by_pred_arg0[arg0_key])
+        return list(primary_candidates)
 
     def add_rule(self, entry: Union[Rule, Fact], position: str = "last") -> None:
         if position == "first":
@@ -485,7 +552,7 @@ class LogicInterpreter:
                 "fail",
             ):
                 key = (actual_goal.functor.name, len(actual_goal.args))
-                if key not in self.rules_index:
+                if key not in self.rules_by_pred:
                     raise PrologError(
                         f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
                     )
@@ -517,8 +584,8 @@ class LogicInterpreter:
             candidate_entries: List[Union[Rule, Fact]]
             if isinstance(actual_goal.functor, Atom):
                 key = (actual_goal.functor.name, len(actual_goal.args))
-                candidate_entries = list(self.rules_index.get(key, []))
-                if key in self.rules_index:
+                candidate_entries = self.get_candidate_clauses(actual_goal, env)
+                if key in self.rules_by_pred:
                     env.stats["index_hit_total"] += 1
                 else:
                     env.stats["index_miss_total"] += 1
