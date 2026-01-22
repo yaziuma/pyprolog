@@ -5,7 +5,7 @@ import rpds
 _MISSING = object()
 
 if TYPE_CHECKING:
-    from pyprolog.core.types import PrologType, Variable
+    from pyprolog.core.types import PrologType
 
 
 class BindingEnvironment:

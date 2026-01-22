@@ -45,8 +45,8 @@ from typing import List, Optional, Tuple
 
 LOG_METHODS = {"debug", "info", "warning", "error", "exception", "critical"}
 
-# 実行範囲は scripts/ から ../pyprolog 配下に固定
-BASE_ROOT = (Path(__file__).resolve().parent / ".." / "pyprolog").resolve()
+# 実行範囲は scripts/ から ../pyprolog/pyprolog 配下に固定
+BASE_ROOT = (Path(__file__).resolve().parent / ".." / "pyprolog" / "pyprolog").resolve()
 
 
 @dataclass
