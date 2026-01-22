@@ -393,18 +393,31 @@ class LogicInterpreter:
 
         term_deref = self.dereference(term, env)
 
-        key = (id(var), id(term_deref))
-        if key in seen:
-            return False   # 既に検査済み → 打ち切り
-        seen.add(key)
-
         if isinstance(term_deref, Variable):
             return var == term_deref
 
-        if isinstance(term_deref, (Term, ListTerm)):
+        if isinstance(term_deref, Term):
+            term_id = id(term_deref)
+            if term_id in seen:
+                return False  # 既に検査済み → 打ち切り
+            seen.add(term_id)
+
             for arg in term_deref.args:
                 if self._occurs_check(var, arg, env, seen):
                     return True
+            return False
+
+        if isinstance(term_deref, ListTerm):
+            term_id = id(term_deref)
+            if term_id in seen:
+                return False  # 既に検査済み → 打ち切り
+            seen.add(term_id)
+
+            for element in term_deref.elements:
+                if self._occurs_check(var, element, env, seen):
+                    return True
+            if term_deref.tail is not None:
+                return self._occurs_check(var, term_deref.tail, env, seen)
 
         return False
 
