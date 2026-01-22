@@ -148,5 +148,8 @@ uv.lock
 
 # Claude Code generated files
 CLAUDE.md
-/.claude/hooks
+/.claude/hooks/*
+/.claude/tmp/*
 /*.sqlite3
+/.serena
+*.Identifier
