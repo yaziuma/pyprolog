@@ -242,6 +242,18 @@ class TestLogicInterpreter:
             "Renamed Y and Z should be different (assuming Y and Z are different)"
         )
 
+    def _make_deep_conjunction(self, depth: int) -> Term:
+        goal = Atom("true")
+        for _ in range(depth):
+            goal = Term(Atom(","), [Atom("true"), goal])
+        return goal
+
+    def test_rename_variables_no_recursion(self):
+        """深い構造でも再帰せずに変数リネームできることを確認"""
+        deep = self._make_deep_conjunction(3000)
+        renamed = self.logic_interpreter._rename_variables(deep)
+        assert renamed is not None
+
     def test_goal_resolution(self):
         """ゴール解決のテスト"""
         fact = Fact(Term(Atom("parent"), [Atom("john"), Atom("mary")]))
