@@ -666,6 +666,8 @@ class MockRuntime:
     def __init__(self):
         self.facts = []
         self.rules = []
+        # Runtime互換: LogicInterpreterが参照するフラグ
+        self.occurs_check_enabled = True
 
     def execute(
         self, goal: Atom, env: BindingEnvironment
