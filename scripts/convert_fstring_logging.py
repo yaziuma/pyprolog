@@ -5,7 +5,7 @@
 # 1. まず dry-run（差分表示のみ）
 # uv run python scripts/convert_fstring_logging.py --root pyprolog --dry-run
 # 
-# 2. 実際に書き換え（バックアップ `.bak` 付き）
+# 2. 実際に書き換え（バックアップなし。gitで管理）
 # uv run python scripts/convert_fstring_logging.py --root pyprolog --write
 # 
 # 3. 特定ファイルだけ
@@ -187,8 +187,7 @@ def main() -> None:
     ap.add_argument("--root", type=str, default=".", help="Root directory to scan (recursive)")
     ap.add_argument("--files", nargs="*", help="Specific files to process (overrides --root)")
     ap.add_argument("--dry-run", action="store_true", help="Show diffs but do not write")
-    ap.add_argument("--write", action="store_true", help="Write changes in place (creates .bak)")
-    ap.add_argument("--no-backup", action="store_true", help="Do not create .bak backups")
+    ap.add_argument("--write", action="store_true", help="Write changes in place (no .bak; rely on git)")
     args = ap.parse_args()
 
     if args.write and args.dry_run:
@@ -242,9 +241,6 @@ def main() -> None:
             if args.dry_run:
                 print_diff(path, before, after)
             else:
-                if not args.no_backup:
-                    bak = path.with_suffix(path.suffix + ".bak")
-                    bak.write_text(before, encoding="utf-8")
                 path.write_text(after, encoding="utf-8")
 
     mode = "DRY-RUN" if args.dry_run else "WRITE"
