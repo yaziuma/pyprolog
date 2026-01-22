@@ -11,7 +11,7 @@ from pyprolog.core.types import (
 )
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.errors import PrologError, CutException
-from typing import TYPE_CHECKING, Tuple, Iterator, List, Union, Dict, Optional
+from typing import TYPE_CHECKING, Tuple, Iterator, List, Union, Dict, Optional, Set
 import logging
 
 if TYPE_CHECKING:
@@ -382,17 +382,35 @@ class LogicInterpreter:
         return True, current_env
 
     def _occurs_check(
-        self, var: Variable, term: PrologType, env: BindingEnvironment
+        self,
+        var: Variable,
+        term: PrologType,
+        env: BindingEnvironment,
+        seen: Optional[Set[int]] = None,
     ) -> bool:
         if env.stats_enabled:
             env.stats["occurs_calls"] += 1
+        if seen is None:
+            seen = set()
         term_deref = self.dereference(term, env)
+        key = id(term_deref)
+        if key in seen:
+            return False
+        seen.add(key)
         if var == term_deref:
             return True
         if isinstance(term_deref, Term):
             for arg in term_deref.args:
-                if self._occurs_check(var, arg, env):
+                if self._occurs_check(var, arg, env, seen):
                     return True
+        if isinstance(term_deref, ListTerm):
+            for element in term_deref.elements:
+                if self._occurs_check(var, element, env, seen):
+                    return True
+            if term_deref.tail is not None and self._occurs_check(
+                var, term_deref.tail, env, seen
+            ):
+                return True
         return False
 
     def dereference(self, term: PrologType, env: BindingEnvironment) -> PrologType:
