@@ -1,6 +1,6 @@
 import unittest
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.core.types import Variable, Atom
+from pyprolog.core.types import Atom
 from pyprolog.util.variable_mapper import VariableMapper
 
 

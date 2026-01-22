@@ -478,7 +478,9 @@ class LogicInterpreter:
             self._refresh_index_if_needed()
 
             # 未定義述語は existence_error を返す（builtin/演算子は execute 側で処理済み）
-            if isinstance(actual_goal.functor, Atom) and actual_goal.functor.name not in (
+            if isinstance(
+                actual_goal.functor, Atom
+            ) and actual_goal.functor.name not in (
                 "true",
                 "fail",
             ):
@@ -658,9 +660,7 @@ class LogicInterpreter:
                                 )
                                 raise
                             # その他の例外もログ出力して伝播
-                            logger.debug(
-                                "Exception in rule body execution: %s", e
-                            )
+                            logger.debug("Exception in rule body execution: %s", e)
                             raise
 
             # If we've iterated through all rules and no solution was yielded by this path,
