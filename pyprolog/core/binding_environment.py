@@ -14,11 +14,13 @@ class BindingEnvironment:
         parent: Optional["BindingEnvironment"] = None,
         bindings: Optional[rpds.HashTrieMap] = None,
         stats: Optional[dict] = None,
+        stats_enabled: bool = False,
     ):
         self.bindings: rpds.HashTrieMap = (
             bindings if bindings is not None else rpds.HashTrieMap()
         )
         self.parent: Optional["BindingEnvironment"] = parent
+        self.stats_enabled = stats_enabled
         self.stats = stats or {
             "deref_calls": 0,
             "deref_steps": 0,
@@ -38,6 +40,8 @@ class BindingEnvironment:
             "builtin_calls_by_name": {},
             "index_hit_total": 0,
             "index_miss_total": 0,
+            "index2_hit": 0,
+            "index2_miss_or_fallback": 0,
             "avg_candidates_per_goal": 0.0,
             "current_goal_key": None,
         }
@@ -61,7 +65,12 @@ class BindingEnvironment:
 
     def copy(self) -> "BindingEnvironment":
         """環境のシャローコピーを作成する"""
-        return BindingEnvironment(self.parent, bindings=self.bindings, stats=self.stats)
+        return BindingEnvironment(
+            self.parent,
+            bindings=self.bindings,
+            stats=self.stats,
+            stats_enabled=self.stats_enabled,
+        )
 
     def __repr__(self) -> str:
         from pyprolog.core.types import Variable

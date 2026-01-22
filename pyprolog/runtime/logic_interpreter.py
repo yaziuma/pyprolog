@@ -27,10 +27,11 @@ class LogicInterpreter:
         self._unique_var_counter = 0
         self.rules_by_pred: Dict[Tuple[str, int], List[Union[Rule, Fact]]] = {}
         self.rules_by_pred_arg0: Dict[
-            Tuple[str, int, str, Union[str, int, float]], List[Union[Rule, Fact]]
+            Tuple[str, int, int, Union[str, int, float]], List[Union[Rule, Fact]]
         ] = {}
         self.rules_index: Dict[Tuple[str, int], List[Union[Rule, Fact]]] = {}
         self._rules_len = 0
+        self.empty_list: List[Union[Rule, Fact]] = []
         self._build_index()
 
     def _build_index(self) -> None:
@@ -74,18 +75,18 @@ class LogicInterpreter:
 
     def _arg0_index_key_from_head(
         self, head: Optional[Term]
-    ) -> Optional[Tuple[str, int, str, Union[str, int, float]]]:
+    ) -> Optional[Tuple[str, int, int, Union[str, int, float]]]:
         if head is None or not isinstance(head.functor, Atom):
             return None
         if not head.args:
             return None
         arg0 = head.args[0]
         if isinstance(arg0, Atom):
-            return (head.functor.name, len(head.args), "atom", arg0.name)
+            return (head.functor.name, len(head.args), 1, arg0.name)
         if isinstance(arg0, Number):
-            return (head.functor.name, len(head.args), "number", arg0.value)
+            return (head.functor.name, len(head.args), 2, arg0.value)
         if isinstance(arg0, String):
-            return (head.functor.name, len(head.args), "string", arg0.value)
+            return (head.functor.name, len(head.args), 3, arg0.value)
         return None
 
     def _add_to_index(self, entry: Union[Rule, Fact], position: str = "last") -> None:
@@ -135,27 +136,31 @@ class LogicInterpreter:
 
     def get_candidate_clauses(
         self, goal: Term, env: BindingEnvironment
-    ) -> List[Union[Rule, Fact]]:
+    ) -> Tuple[List[Union[Rule, Fact]], bool]:
         if not isinstance(goal.functor, Atom):
-            return list(self.rules)
-        key = (goal.functor.name, len(goal.args))
-        primary_candidates = self.rules_by_pred.get(key, [])
+            return self.rules, False
+        pred = goal.functor.name
+        arity = len(goal.args)
+        key = (pred, arity)
+        primary_candidates = self.rules_by_pred.get(key)
         if not primary_candidates:
-            return []
-        if not goal.args:
-            return list(primary_candidates)
+            return self.empty_list, False
+        if arity == 0:
+            return primary_candidates, False
         arg0 = self.dereference(goal.args[0], env)
         if isinstance(arg0, Atom):
-            arg0_key = (goal.functor.name, len(goal.args), "atom", arg0.name)
+            arg0_key = (pred, arity, 1, arg0.name)
         elif isinstance(arg0, Number):
-            arg0_key = (goal.functor.name, len(goal.args), "number", arg0.value)
+            arg0_key = (pred, arity, 2, arg0.value)
         elif isinstance(arg0, String):
-            arg0_key = (goal.functor.name, len(goal.args), "string", arg0.value)
+            arg0_key = (pred, arity, 3, arg0.value)
         else:
             arg0_key = None
-        if arg0_key is not None and arg0_key in self.rules_by_pred_arg0:
-            return list(self.rules_by_pred_arg0[arg0_key])
-        return list(primary_candidates)
+        if arg0_key is not None:
+            secondary_candidates = self.rules_by_pred_arg0.get(arg0_key)
+            if secondary_candidates is not None:
+                return secondary_candidates, True
+        return primary_candidates, False
 
     def add_rule(self, entry: Union[Rule, Fact], position: str = "last") -> None:
         if position == "first":
@@ -196,8 +201,9 @@ class LogicInterpreter:
                 return mapping[current_term.name]
             elif isinstance(current_term, Term):
                 new_args = [rename_recursive(arg) for arg in current_term.args]
-                env.stats["term_allocs"] += 1
-                env.stats["term_allocs_rename"] += 1
+                if env.stats_enabled:
+                    env.stats["term_allocs"] += 1
+                    env.stats["term_allocs_rename"] += 1
                 return Term(current_term.functor, new_args)
             elif isinstance(current_term, ListTerm):
                 new_elements = [rename_recursive(el) for el in current_term.elements]
@@ -237,7 +243,8 @@ class LogicInterpreter:
     def unify(
         self, term1: PrologType, term2: PrologType, env: BindingEnvironment
     ) -> Tuple[bool, BindingEnvironment]:
-        env.stats["unify_calls"] += 1
+        if env.stats_enabled:
+            env.stats["unify_calls"] += 1
         logger.debug(
             "LOGIC_INTERP_UNIFY: Unifying term1: %s (type %s) with term2: %s (type %s) in env: %s",
             term1,
@@ -263,12 +270,13 @@ class LogicInterpreter:
                 t1,
                 current_env.bindings,
             )
-            env.stats["unify_success_total"] += 1
-            current_goal_key = env.stats.get("current_goal_key")
-            if current_goal_key:
-                env.stats["unify_success_by_pred"][current_goal_key] = (
-                    env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
-                )
+            if env.stats_enabled:
+                env.stats["unify_success_total"] += 1
+                current_goal_key = env.stats.get("current_goal_key")
+                if current_goal_key:
+                    env.stats["unify_success_by_pred"][current_goal_key] = (
+                        env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
+                    )
             return True, current_env
 
         if isinstance(t1, Variable):
@@ -282,7 +290,8 @@ class LogicInterpreter:
                     t1,
                     t2,
                 )
-                env.stats["unify_fail_total"] += 1
+                if env.stats_enabled:
+                    env.stats["unify_fail_total"] += 1
                 return False, env
             current_env.bind(t1.name, t2)
             logger.debug(
@@ -291,12 +300,13 @@ class LogicInterpreter:
                 t2,
                 current_env.bindings,
             )
-            env.stats["unify_success_total"] += 1
-            current_goal_key = env.stats.get("current_goal_key")
-            if current_goal_key:
-                env.stats["unify_success_by_pred"][current_goal_key] = (
-                    env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
-                )
+            if env.stats_enabled:
+                env.stats["unify_success_total"] += 1
+                current_goal_key = env.stats.get("current_goal_key")
+                if current_goal_key:
+                    env.stats["unify_success_by_pred"][current_goal_key] = (
+                        env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
+                    )
             return True, current_env
         if isinstance(t2, Variable):
             if (
@@ -309,7 +319,8 @@ class LogicInterpreter:
                     t2,
                     t1,
                 )
-                env.stats["unify_fail_total"] += 1
+                if env.stats_enabled:
+                    env.stats["unify_fail_total"] += 1
                 return False, env
             current_env.bind(t2.name, t1)
             logger.debug(
@@ -318,12 +329,13 @@ class LogicInterpreter:
                 t1,
                 current_env.bindings,
             )
-            env.stats["unify_success_total"] += 1
-            current_goal_key = env.stats.get("current_goal_key")
-            if current_goal_key:
-                env.stats["unify_success_by_pred"][current_goal_key] = (
-                    env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
-                )
+            if env.stats_enabled:
+                env.stats["unify_success_total"] += 1
+                current_goal_key = env.stats.get("current_goal_key")
+                if current_goal_key:
+                    env.stats["unify_success_by_pred"][current_goal_key] = (
+                        env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
+                    )
             return True, current_env
 
         if isinstance(t1, Atom) and isinstance(t2, Atom):
@@ -386,13 +398,16 @@ class LogicInterpreter:
                         len(t1.args),
                         temp_env.bindings,
                     )
-                    env.stats["unify_success_total"] += 1
-                    current_goal_key = env.stats.get("current_goal_key")
-                    if current_goal_key:
-                        env.stats["unify_success_by_pred"][current_goal_key] = (
-                            env.stats["unify_success_by_pred"].get(current_goal_key, 0)
-                            + 1
-                        )
+                    if env.stats_enabled:
+                        env.stats["unify_success_total"] += 1
+                        current_goal_key = env.stats.get("current_goal_key")
+                        if current_goal_key:
+                            env.stats["unify_success_by_pred"][current_goal_key] = (
+                                env.stats["unify_success_by_pred"].get(
+                                    current_goal_key, 0
+                                )
+                                + 1
+                            )
                     return True, temp_env
                 else:
                     logger.debug(
@@ -401,7 +416,8 @@ class LogicInterpreter:
                         len(t1.args),
                         env.bindings,
                     )
-                    env.stats["unify_fail_total"] += 1
+                    if env.stats_enabled:
+                        env.stats["unify_fail_total"] += 1
                     return False, env
             else:
                 logger.debug(
@@ -411,7 +427,8 @@ class LogicInterpreter:
                     t2.functor,
                     len(t2.args),
                 )
-                env.stats["unify_fail_total"] += 1
+                if env.stats_enabled:
+                    env.stats["unify_fail_total"] += 1
                 return False, env
 
         logger.debug(
@@ -419,13 +436,15 @@ class LogicInterpreter:
             type(t1),
             type(t2),
         )
-        env.stats["unify_fail_total"] += 1
+        if env.stats_enabled:
+            env.stats["unify_fail_total"] += 1
         return False, env
 
     def _occurs_check(
         self, var: Variable, term: PrologType, env: BindingEnvironment
     ) -> bool:
-        env.stats["occurs_calls"] += 1
+        if env.stats_enabled:
+            env.stats["occurs_calls"] += 1
         term_deref = self.dereference(term, env)
         if var == term_deref:
             return True
@@ -438,7 +457,8 @@ class LogicInterpreter:
     def dereference(self, term: PrologType, env: BindingEnvironment) -> PrologType:
         if not isinstance(term, Variable):
             return term
-        env.stats["deref_calls"] += 1
+        if env.stats_enabled:
+            env.stats["deref_calls"] += 1
         current: PrologType = term
         visited: List[str] = []
         visited_set = set()
@@ -455,7 +475,8 @@ class LogicInterpreter:
             bound_value = env.get_value(var_name)
             if bound_value is None or bound_value == current:
                 break
-            env.stats["deref_steps"] += 1
+            if env.stats_enabled:
+                env.stats["deref_steps"] += 1
             trail.append(var_name)
             current = bound_value
         if trail:
@@ -484,8 +505,9 @@ class LogicInterpreter:
             ]
             # Functor itself could theoretically be a variable if we allowed higher-order, but not currently.
             # Assuming functor is Atom or similar, not needing dereferencing here.
-            env.stats["term_allocs"] += 1
-            env.stats["term_allocs_deep_deref"] += 1
+            if env.stats_enabled:
+                env.stats["term_allocs"] += 1
+                env.stats["term_allocs_deep_deref"] += 1
             return Term(current_term.functor, new_args)
         elif isinstance(current_term, ListTerm):
             # This type is not fully used/fleshed out in the current codebase snippets,
@@ -503,7 +525,8 @@ class LogicInterpreter:
     def solve_goal(
         self, goal: PrologType, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
-        env.stats["solve_calls_total"] += 1
+        if env.stats_enabled:
+            env.stats["solve_calls_total"] += 1
         logger.debug(
             "LOGIC_INTERP: solve_goal called with goal: %s, rules count: %d",
             goal,
@@ -534,12 +557,15 @@ class LogicInterpreter:
         current_goal_key: Optional[Tuple[str, int]] = None
         if isinstance(actual_goal.functor, Atom):
             current_goal_key = (actual_goal.functor.name, len(actual_goal.args))
-        previous_goal_key = env.stats.get("current_goal_key")
-        env.stats["current_goal_key"] = current_goal_key
-        if current_goal_key:
-            env.stats["solve_calls_by_pred"][current_goal_key] = (
-                env.stats["solve_calls_by_pred"].get(current_goal_key, 0) + 1
-            )
+        if env.stats_enabled:
+            previous_goal_key = env.stats.get("current_goal_key")
+            env.stats["current_goal_key"] = current_goal_key
+            if current_goal_key:
+                env.stats["solve_calls_by_pred"][current_goal_key] = (
+                    env.stats["solve_calls_by_pred"].get(current_goal_key, 0) + 1
+                )
+        else:
+            previous_goal_key = None
 
         try:
             self._refresh_index_if_needed()
@@ -583,28 +609,31 @@ class LogicInterpreter:
 
             candidate_entries: List[Union[Rule, Fact]]
             if isinstance(actual_goal.functor, Atom):
-                key = (actual_goal.functor.name, len(actual_goal.args))
-                candidate_entries = self.get_candidate_clauses(actual_goal, env)
-                if key in self.rules_by_pred:
-                    env.stats["index_hit_total"] += 1
-                else:
-                    env.stats["index_miss_total"] += 1
+                candidate_entries, used_secondary_index = self.get_candidate_clauses(
+                    actual_goal, env
+                )
+                if env.stats_enabled:
+                    if used_secondary_index:
+                        env.stats["index2_hit"] += 1
+                    else:
+                        env.stats["index2_miss_or_fallback"] += 1
             else:
-                candidate_entries = list(self.rules)
+                candidate_entries = self.rules
 
-            env.stats["candidate_entries_scanned_total"] += len(candidate_entries)
-            if current_goal_key:
-                env.stats["candidate_entries_scanned_by_pred"][current_goal_key] = (
-                    env.stats["candidate_entries_scanned_by_pred"].get(
-                        current_goal_key, 0
+            if env.stats_enabled:
+                env.stats["candidate_entries_scanned_total"] += len(candidate_entries)
+                if current_goal_key:
+                    env.stats["candidate_entries_scanned_by_pred"][current_goal_key] = (
+                        env.stats["candidate_entries_scanned_by_pred"].get(
+                            current_goal_key, 0
+                        )
+                        + len(candidate_entries)
                     )
-                    + len(candidate_entries)
-                )
-            if env.stats["solve_calls_total"]:
-                env.stats["avg_candidates_per_goal"] = (
-                    env.stats["candidate_entries_scanned_total"]
-                    / env.stats["solve_calls_total"]
-                )
+                if env.stats["solve_calls_total"]:
+                    env.stats["avg_candidates_per_goal"] = (
+                        env.stats["candidate_entries_scanned_total"]
+                        / env.stats["solve_calls_total"]
+                    )
 
             for db_entry_idx, db_entry in enumerate(candidate_entries):
                 logger.debug(
@@ -744,7 +773,8 @@ class LogicInterpreter:
                 actual_goal,
             )
         finally:
-            env.stats["current_goal_key"] = previous_goal_key
+            if env.stats_enabled:
+                env.stats["current_goal_key"] = previous_goal_key
 
     def instantiate_term(self, term: PrologType, env: BindingEnvironment) -> PrologType:
         """

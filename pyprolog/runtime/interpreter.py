@@ -464,9 +464,10 @@ class Runtime:
         )
 
         def _record_builtin_call(name: str) -> None:
-            env.stats["builtin_calls_by_name"][name] = (
-                env.stats["builtin_calls_by_name"].get(name, 0) + 1
-            )
+            if env.stats_enabled:
+                env.stats["builtin_calls_by_name"][name] = (
+                    env.stats["builtin_calls_by_name"].get(name, 0) + 1
+                )
 
         processed_goal: Term
         if (

@@ -29,3 +29,22 @@ class TestClauseIndexing:
             (Atom("b"), Number(2)),
             (Atom("c"), Number(3)),
         ]
+
+    def test_secondary_index_preserves_consult_order(self):
+        runtime = Runtime()
+        runtime.add_rule("p(a, 1).")
+        runtime.add_rule("p(a, 2).")
+        runtime.add_rule("p(a, 3).")
+
+        results = runtime.query("p(a, X).")
+        values = [list(result.values())[0] for result in results]
+
+        assert values == [Number(1), Number(2), Number(3)]
+
+    def test_secondary_index_miss_falls_back_to_primary(self):
+        runtime = Runtime()
+        runtime.add_rule("p(b, 1).")
+
+        results = runtime.query("p(a, X).")
+
+        assert list(results) == []
