@@ -112,6 +112,30 @@ class TestLogicInterpreter:
             "Unification Y = g(X) (effectively Y = g(f(Y))) should fail due to occurs check"
         )
 
+    def test_occurs_check_toggle(self):
+        """発生チェックの有無での単一化結果の違いを確認"""
+        self._skip_if_not_implemented()
+
+        var_x = Variable("X")
+        term_fx = Term(Atom("f"), [var_x])
+
+        success_enabled, _ = self.logic_interpreter.unify(
+            var_x, term_fx, BindingEnvironment()
+        )
+        assert not success_enabled, "Occurs check enabled should reject X = f(X)"
+
+        from pyprolog.runtime.logic_interpreter import LogicInterpreter
+
+        runtime_no_check = MockRuntime()
+        runtime_no_check.occurs_check_enabled = False
+        logic_interpreter_no_check = LogicInterpreter(self.rules, runtime_no_check)
+
+        success_disabled, env_disabled = logic_interpreter_no_check.unify(
+            var_x, term_fx, BindingEnvironment()
+        )
+        assert success_disabled, "Occurs check disabled should allow X = f(X)"
+        assert env_disabled.get_value("X") == term_fx
+
     def test_variable_renaming(self):
         """変数リネームのテスト"""
         rule = Rule(
@@ -560,6 +584,27 @@ class TestLogicInterpreter:
         assert self.logic_interpreter.dereference(Z, new_env) == Z, (
             "Z should dereference to itself (as it's the target of Y's binding and initially unbound)"
         )
+
+    def test_deep_term_unification_stack(self):
+        """深い複合項の単一化テスト（スタック化の回帰防止）"""
+        env = BindingEnvironment()
+        X = Variable("X")
+        Y = Variable("Y")
+
+        term1 = Term(
+            Atom("f"),
+            [Term(Atom("g"), [Term(Atom("h"), [X])]), Y],
+        )
+        term2 = Term(
+            Atom("f"),
+            [Term(Atom("g"), [Term(Atom("h"), [Atom("a")])]), Atom("b")],
+        )
+
+        success, new_env = self.logic_interpreter.unify(term1, term2, env)
+
+        assert success, "Deep term unification should succeed"
+        assert self.logic_interpreter.dereference(X, new_env) == Atom("a")
+        assert self.logic_interpreter.dereference(Y, new_env) == Atom("b")
 
     def test_list_unification(self):
         """リスト単一化テスト（ドットペア表記をTermで模擬）"""
