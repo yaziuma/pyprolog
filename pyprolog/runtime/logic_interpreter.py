@@ -191,40 +191,77 @@ class LogicInterpreter:
     ) -> Union[PrologType, Rule, Fact]:
         if env is None:
             env = BindingEnvironment()
+
         self._unique_var_counter += 1
         mapping: Dict[str, Variable] = {}
 
-        def rename_recursive(current_term: PrologType) -> PrologType:
-            if isinstance(current_term, Variable):
-                if current_term.name not in mapping:
-                    new_name = f"_V{self._unique_var_counter}_{current_term.name}"
-                    mapping[current_term.name] = Variable(new_name)
-                return mapping[current_term.name]
-            elif isinstance(current_term, Term):
-                new_args = [rename_recursive(arg) for arg in current_term.args]
-                if env.stats_enabled:
-                    env.stats["term_allocs"] += 1
-                    env.stats["term_allocs_rename"] += 1
-                return Term(current_term.functor, new_args)
-            elif isinstance(current_term, ListTerm):
-                new_elements = [rename_recursive(el) for el in current_term.elements]
-                new_tail_val = current_term.tail
-                renamed_tail_val = (
-                    rename_recursive(new_tail_val) if new_tail_val is not None else None
-                )
-                if not (
-                    isinstance(renamed_tail_val, (Variable, Atom, ListTerm))
-                    or renamed_tail_val is None
-                ):
-                    raise PrologError(
-                        f"Internal error: Renamed tail of ListTerm is not a valid type: {type(renamed_tail_val)}"
-                    )
-                return ListTerm(new_elements, renamed_tail_val)
-            return current_term
+        def rename_var(current_term: Variable) -> Variable:
+            if current_term.name not in mapping:
+                new_name = f"_V{self._unique_var_counter}_{current_term.name}"
+                mapping[current_term.name] = Variable(new_name)
+            return mapping[current_term.name]
+
+        def rename_iter(root: PrologType) -> PrologType:
+            out: Dict[int, PrologType] = {}
+            stack: list[tuple[PrologType, bool]] = [(root, False)]
+
+            while stack:
+                node, expanded = stack.pop()
+                node_id = id(node)
+
+                if node_id in out:
+                    continue
+
+                if isinstance(node, Variable):
+                    out[node_id] = rename_var(node)
+                    continue
+
+                if isinstance(node, Term):
+                    if not expanded:
+                        stack.append((node, True))
+                        for arg in reversed(node.args):
+                            stack.append((arg, False))
+                    else:
+                        new_args = [out[id(arg)] for arg in node.args]
+                        if env.stats_enabled:
+                            env.stats["term_allocs"] += 1
+                            env.stats["term_allocs_rename"] += 1
+                        out[node_id] = Term(node.functor, new_args)
+                    continue
+
+                if isinstance(node, ListTerm):
+                    if not expanded:
+                        stack.append((node, True))
+                        if node.tail is not None:
+                            stack.append((node.tail, False))
+                        for element in reversed(node.elements):
+                            stack.append((element, False))
+                    else:
+                        new_elements = [out[id(element)] for element in node.elements]
+                        if node.tail is None:
+                            renamed_tail_val = None
+                        else:
+                            renamed_tail_val = out[id(node.tail)]
+
+                        if not (
+                            isinstance(renamed_tail_val, (Variable, Atom, ListTerm))
+                            or renamed_tail_val is None
+                        ):
+                            raise PrologError(
+                                "Internal error: Renamed tail of ListTerm is not a valid type: "
+                                f"{type(renamed_tail_val)}"
+                            )
+
+                        out[node_id] = ListTerm(new_elements, renamed_tail_val)
+                    continue
+
+                out[node_id] = node
+
+            return out[id(root)]
 
         if isinstance(term_or_rule, Rule):
-            renamed_head = rename_recursive(term_or_rule.head)
-            renamed_body = rename_recursive(term_or_rule.body)
+            renamed_head = rename_iter(term_or_rule.head)
+            renamed_body = rename_iter(term_or_rule.body)
             if not isinstance(renamed_head, Term):
                 raise PrologError("Internal error: Renamed head of Rule is not a Term.")
             # Allow body to be a Term, Atom, or Variable
@@ -234,12 +271,12 @@ class LogicInterpreter:
                 )
             return Rule(renamed_head, renamed_body)
         elif isinstance(term_or_rule, Fact):
-            renamed_head = rename_recursive(term_or_rule.head)
+            renamed_head = rename_iter(term_or_rule.head)
             if not isinstance(renamed_head, Term):
                 raise PrologError("Internal error: Renamed head of Fact is not a Term.")
             return Fact(renamed_head)
         else:
-            return rename_recursive(term_or_rule)
+            return rename_iter(term_or_rule)
 
     def unify(
         self, term1: PrologType, term2: PrologType, env: BindingEnvironment
