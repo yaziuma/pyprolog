@@ -245,7 +245,11 @@ class LogicInterpreter:
         self, term1: PrologType, term2: PrologType, env: BindingEnvironment
     ) -> Tuple[bool, BindingEnvironment]:
         current_env = env.copy()
-        stack = [(term1, term2)]
+        deref = self.dereference
+        occurs_enabled = self.runtime.occurs_check_enabled
+        bind = current_env.bind
+        a_stack = [term1]
+        b_stack = [term2]
         success_marker = object()
 
         def record_success() -> None:
@@ -261,15 +265,16 @@ class LogicInterpreter:
             if env.stats_enabled:
                 env.stats["unify_fail_total"] += 1
 
-        while stack:
-            t1, t2 = stack.pop()
+        while a_stack:
+            t1 = a_stack.pop()
+            t2 = b_stack.pop()
             if t1 is success_marker:
                 record_success()
                 continue
             if env.stats_enabled:
                 env.stats["unify_calls"] += 1
-            t1 = self.dereference(t1, current_env)
-            t2 = self.dereference(t2, current_env)
+            t1 = deref(t1, current_env)
+            t2 = deref(t2, current_env)
             if _DEBUG:
                 logger.debug(
                     "UNIFY: %r (%s) with %r (%s)",
@@ -285,24 +290,24 @@ class LogicInterpreter:
 
             if isinstance(t1, Variable):
                 if (
-                    self.runtime.occurs_check_enabled
+                    occurs_enabled
                     and isinstance(t2, (Term, ListTerm))
                     and self._occurs_check(t1, t2, current_env)
                 ):
                     record_fail()
                     return False, env
-                current_env.bind(t1.name, t2)
+                bind(t1.name, t2)
                 record_success()
                 continue
             if isinstance(t2, Variable):
                 if (
-                    self.runtime.occurs_check_enabled
+                    occurs_enabled
                     and isinstance(t1, (Term, ListTerm))
                     and self._occurs_check(t2, t1, current_env)
                 ):
                     record_fail()
                     return False, env
-                current_env.bind(t2.name, t1)
+                bind(t2.name, t1)
                 record_success()
                 continue
 
@@ -320,9 +325,11 @@ class LogicInterpreter:
                 if t1.functor != t2.functor or len(t1.args) != len(t2.args):
                     record_fail()
                     return False, env
-                stack.append((success_marker, None))
+                a_stack.append(success_marker)
+                b_stack.append(success_marker)
                 for i in range(len(t1.args) - 1, -1, -1):
-                    stack.append((t1.args[i], t2.args[i]))
+                    a_stack.append(t1.args[i])
+                    b_stack.append(t2.args[i])
                 continue
 
             record_fail()
