@@ -1,5 +1,5 @@
 # pyprolog/runtime/interpreter.py
-from pyprolog.core.types import Term, Variable, Number, Rule, Fact, Atom
+from pyprolog.core.types import Term, Variable, Number, Rule, Fact, Atom, PrologType
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.parser.scanner import Scanner
 from pyprolog.parser.parser import Parser
@@ -220,6 +220,56 @@ class Runtime:
 
         return evaluator
 
+    def _is_conjunction_term(self, goal: PrologType) -> bool:
+        return (
+            isinstance(goal, Term)
+            and isinstance(goal.functor, Atom)
+            and goal.functor.name == ","
+            and len(goal.args) == 2
+        )
+
+    def _flatten_conjunction(self, goal: PrologType) -> List[PrologType]:
+        flattened: List[PrologType] = []
+        stack: List[PrologType] = [goal]
+
+        while stack:
+            current = stack.pop()
+            if self._is_conjunction_term(current):
+                left_goal, right_goal = current.args
+                stack.append(right_goal)
+                stack.append(left_goal)
+            else:
+                flattened.append(current)
+
+        return flattened
+
+    def _execute_goal_sequence(
+        self, goals: List[PrologType], env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        if not goals:
+            yield env
+            return
+
+        stack: List[Tuple[int, Iterator[BindingEnvironment]]] = [
+            (0, self.execute(goals[0], env))
+        ]
+
+        while stack:
+            index, iterator = stack[-1]
+            try:
+                next_env = next(iterator)
+            except StopIteration:
+                stack.pop()
+                continue
+            except CutException:
+                raise
+
+            if index == len(goals) - 1:
+                yield next_env
+                continue
+
+            stack.append((index + 1, self.execute(goals[index + 1], next_env)))
+
     def _create_logical_evaluator(self, op_info: OperatorInfo) -> Callable:
         def evaluator(
             args: List, env: BindingEnvironment
@@ -228,33 +278,10 @@ class Runtime:
                 if len(args) != 2:
                     raise PrologError("Conjunction ,/2 requires exactly 2 arguments")
                 left_goal, right_goal = args[0], args[1]
-                try:
-                    for left_env in self.execute(left_goal, env):
-                        logger.debug(
-                            "LOGICAL_EVAL ,: left_env for %s is %s",
-                            left_goal,
-                            left_env.bindings,
-                        )
-                        try:
-                            for right_env_solution in self.execute(
-                                right_goal, left_env
-                            ):
-                                logger.debug(
-                                    "LOGICAL_EVAL ,: right_env_solution for %s is %s",
-                                    right_goal,
-                                    right_env_solution.bindings,
-                                )
-                                yield right_env_solution
-                        except CutException:
-                            logger.debug(
-                                "CutException from right_goal of conjunction, re-raising."
-                            )
-                            raise
-                except CutException:
-                    logger.debug(
-                        "CutException from left_goal of conjunction. Re-raising."
-                    )
-                    raise
+                goals = self._flatten_conjunction(
+                    Term(Atom(","), [left_goal, right_goal])
+                )
+                yield from self._execute_goal_sequence(goals, env)
             elif op_info.symbol == ";":  # Disjunction
                 if len(args) != 2:
                     raise PrologError("Disjunction ;/2 requires exactly 2 arguments")
