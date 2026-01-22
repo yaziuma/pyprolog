@@ -22,7 +22,7 @@ def runtime():
     """Runtimeインスタンスを作成するフィクスチャ"""
     return Runtime()
 
-
+@pytest.mark.info_log
 def test_crypt(benchmark, runtime):
     """crypt.pl (SEND+MORE=MONEY) のベンチマーク"""
     sys.stderr.write("\n[Benchmark] Starting crypt (SEND+MORE=MONEY)...\n")
@@ -37,7 +37,7 @@ def test_crypt(benchmark, runtime):
     result = benchmark(run_crypt)
     assert len(result) >= 1
 
-
+@pytest.mark.info_log
 def test_nrev(benchmark, runtime):
     """nrev.pl (Naive Reverse) のベンチマーク"""
     sys.stderr.write("\n[Benchmark] Starting nrev (Naive Reverse list=30)...")
@@ -52,7 +52,7 @@ def test_nrev(benchmark, runtime):
     result = benchmark(run_nrev)
     assert len(result) >= 1
 
-
+@pytest.mark.info_log
 def test_primes(benchmark, runtime):
     """primes.pl (素数生成) のベンチマーク"""
     sys.stderr.write("\n[Benchmark] Starting primes (Sieve limit=100)...")
@@ -67,7 +67,7 @@ def test_primes(benchmark, runtime):
     result = benchmark(run_primes)
     assert len(result) >= 1
 
-
+@pytest.mark.info_log
 def test_queens(benchmark, runtime):
     """queens.pl (N-Queens) のベンチマーク"""
     sys.stderr.write("\n[Benchmark] Starting queens (8-Queens)...")
@@ -83,7 +83,7 @@ def test_queens(benchmark, runtime):
     result = benchmark(run_queens)
     assert len(result) >= 1
 
-
+@pytest.mark.info_log
 def test_tak(benchmark, runtime):
     """tak.pl (竹内関数) のベンチマーク"""
     sys.stderr.write("\n[Benchmark] Starting tak (Tak function 18,12,6)...")
