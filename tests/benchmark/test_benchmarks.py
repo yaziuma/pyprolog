@@ -121,6 +121,18 @@ def test_queens_light(benchmark, runtime):
 
 @pytest.mark.info_log
 @pytest.mark.bench_light
+def test_mini_crypt_light(benchmark, runtime):
+    """mini_crypt.pl (I + BB = ILL)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "mini_crypt (I + BB = ILL)",
+        "mini_crypt.pl",
+        "solve(I, B, L).",
+    )
+
+@pytest.mark.info_log
+@pytest.mark.bench_light
 def test_nrev_light(benchmark, runtime):
     """nrev.pl (Naive Reverse light)"""
     _run_benchmark(
