@@ -104,6 +104,62 @@ def test_primes_heavy(benchmark, runtime):
 
 
 # -----------------------
+# Medium benchmarks
+# -----------------------
+
+@pytest.mark.info_log
+@pytest.mark.bench_medium
+def test_queens_medium(benchmark, runtime):
+    """queens.pl (N-Queens medium)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "queens (10-Queens)",
+        "queens.pl",
+        "solve_queens(10, Solution).",
+    )
+
+
+@pytest.mark.info_log
+@pytest.mark.bench_medium
+def test_nrev_medium(benchmark, runtime):
+    """nrev.pl (Naive Reverse medium)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "nrev (list=150)",
+        "nrev.pl",
+        "benchmark(150).",
+    )
+
+
+@pytest.mark.info_log
+@pytest.mark.bench_medium
+def test_primes_medium(benchmark, runtime):
+    """primes.pl (Sieve medium)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "primes (limit=1000)",
+        "primes.pl",
+        "benchmark(1000).",
+    )
+
+
+@pytest.mark.info_log
+@pytest.mark.bench_medium
+def test_tak_medium(benchmark, runtime):
+    """tak.pl (Takeuchi function medium)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "tak (18,12,6)",
+        "tak.pl",
+        "tak(18, 12, 6, R).",
+    )
+
+
+# -----------------------
 # Light benchmarks
 # -----------------------
 
