@@ -4,5 +4,12 @@
       "Bash(uv run pytest:*)",
       "Bash(git checkout:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "gemini-cli",
+    "prolog_mcp",
+    "codex",
+    "serena"
+  ],
+  "enableAllProjectMcpServers": true
 }

@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "mgrep@Mixedbread-Grep": true,
+    "hookify@claude-plugins-official": true
+  }
+}
