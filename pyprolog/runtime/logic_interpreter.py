@@ -195,27 +195,31 @@ class LogicInterpreter:
         self._unique_var_counter += 1
         mapping: Dict[str, Variable] = {}
 
-        def rename_var(current_term: Variable) -> Variable:
-            if current_term.name not in mapping:
-                new_name = f"_V{self._unique_var_counter}_{current_term.name}"
-                mapping[current_term.name] = Variable(new_name)
-            return mapping[current_term.name]
+        def rename_var(v: Variable) -> Variable:
+            # 現行仕様維持：同名Varは同じ新Varへ
+            if v.name not in mapping:
+                new_name = f"_V{self._unique_var_counter}_{v.name}"
+                mapping[v.name] = Variable(new_name)
+            return mapping[v.name]
 
         def rename_iter(root: PrologType) -> PrologType:
+            # post-order 再構築（子→親）を明示スタックでやる
             out: Dict[int, PrologType] = {}
             stack: list[tuple[PrologType, bool]] = [(root, False)]
 
             while stack:
                 node, expanded = stack.pop()
-                node_id = id(node)
+                nid = id(node)
 
-                if node_id in out:
+                if nid in out:
                     continue
 
+                # Variable
                 if isinstance(node, Variable):
-                    out[node_id] = rename_var(node)
+                    out[nid] = rename_var(node)
                     continue
 
+                # Term
                 if isinstance(node, Term):
                     if not expanded:
                         stack.append((node, True))
@@ -226,23 +230,22 @@ class LogicInterpreter:
                         if env.stats_enabled:
                             env.stats["term_allocs"] += 1
                             env.stats["term_allocs_rename"] += 1
-                        out[node_id] = Term(node.functor, new_args)
+                        out[nid] = Term(node.functor, new_args)
                     continue
 
+                # ListTerm
                 if isinstance(node, ListTerm):
                     if not expanded:
                         stack.append((node, True))
                         if node.tail is not None:
                             stack.append((node.tail, False))
-                        for element in reversed(node.elements):
-                            stack.append((element, False))
+                        for el in reversed(node.elements):
+                            stack.append((el, False))
                     else:
-                        new_elements = [out[id(element)] for element in node.elements]
-                        if node.tail is None:
-                            renamed_tail_val = None
-                        else:
-                            renamed_tail_val = out[id(node.tail)]
+                        new_elements = [out[id(el)] for el in node.elements]
+                        renamed_tail_val = out[id(node.tail)] if node.tail is not None else None
 
+                        # 現行の型制約維持
                         if not (
                             isinstance(renamed_tail_val, (Variable, Atom, ListTerm))
                             or renamed_tail_val is None
@@ -252,29 +255,33 @@ class LogicInterpreter:
                                 f"{type(renamed_tail_val)}"
                             )
 
-                        out[node_id] = ListTerm(new_elements, renamed_tail_val)
+                        out[nid] = ListTerm(new_elements, renamed_tail_val)
                     continue
 
-                out[node_id] = node
+                # Atom/Number/String などはそのまま
+                out[nid] = node
 
             return out[id(root)]
 
         if isinstance(term_or_rule, Rule):
             renamed_head = rename_iter(term_or_rule.head)
             renamed_body = rename_iter(term_or_rule.body)
+
             if not isinstance(renamed_head, Term):
                 raise PrologError("Internal error: Renamed head of Rule is not a Term.")
-            # Allow body to be a Term, Atom, or Variable
             if not isinstance(renamed_body, (Term, Atom, Variable)):
                 raise PrologError(
-                    f"Internal error: Renamed body of Rule is not a Term, Atom, or Variable, got {type(renamed_body)}."
+                    "Internal error: Renamed body of Rule is not a Term, Atom, or Variable, "
+                    f"got {type(renamed_body)}."
                 )
             return Rule(renamed_head, renamed_body)
+
         elif isinstance(term_or_rule, Fact):
             renamed_head = rename_iter(term_or_rule.head)
             if not isinstance(renamed_head, Term):
                 raise PrologError("Internal error: Renamed head of Fact is not a Term.")
             return Fact(renamed_head)
+
         else:
             return rename_iter(term_or_rule)
 
