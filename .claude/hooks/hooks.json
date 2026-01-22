@@ -1,91 +1,27 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"(uv run uvicorn|uv run fastapi dev|python -m uvicorn|fastapi dev)\"",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "#!/bin/bash\ninput=$(cat)\ncmd=$(echo \"$input\" | jq -r '.tool_input.command // \"\"')\n\n# Block dev servers that aren't run in tmux\necho '[Hook] BLOCKED: Dev server must run in tmux for log access' >&2\necho '[Hook] Use this command instead:' >&2\necho \"[Hook] tmux new-session -d -s dev 'uv run fastapi dev app/main.py'\" >&2\necho '[Hook] Then: tmux attach -t dev' >&2\nexit 1"
-          }
-        ],
-        "description": "tmux外での開発サーバー起動をブロック (Linux)"
-      },
-      {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"(uv sync|uv add|pip install|poetry install|pytest|alembic|docker|playwright)\"",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "#!/bin/bash\ninput=$(cat)\nif [ -z \"$TMUX\" ]; then\n  echo '[Hook] Consider running in tmux for session persistence' >&2\n  echo '[Hook] tmux new -s dev  |  tmux attach -t dev' >&2\nfi\necho \"$input\""
-          }
-        ],
-        "description": "長時間コマンドでのtmux推奨リマインダー (Linux)"
-      },
-      {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"git push\"",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "#!/bin/bash\n# Open editor for review before pushing\necho '[Hook] Review changes before push...' >&2\necho '[Hook] Press Enter to continue with push or Ctrl+C to abort...' >&2\nread -r"
-          }
-        ],
-        "description": "git push前の確認"
-      },
-      {
-        "matcher": "tool == \"Write\" && tool_input.file_path matches \"\\.(md|txt)$\" && !(tool_input.file_path matches \"(README|CLAUDE|AGENTS|CONTRIBUTING)\\.md$\")",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "#!/bin/bash\n# Block creation of unnecessary documentation files\ninput=$(cat)\nfile_path=$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"')\n\nif [[ \"$file_path\" =~ \\.(md|txt)$ ]] && [[ ! \"$file_path\" =~ (README|CLAUDE|AGENTS|CONTRIBUTING)\\.md$ ]]; then\n  echo \"[Hook] BLOCKED: Unnecessary documentation file creation\" >&2\n  echo \"[Hook] File: $file_path\" >&2\n  echo \"[Hook] Use README.md for documentation instead\" >&2\n  exit 1\nfi\n\necho \"$input\""
-          }
-        ],
-        "description": "不要なドキュメント作成のブロック"
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "tool == \"Bash\"",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "#!/bin/bash\n# Auto-detect PR creation\ninput=$(cat)\ncmd=$(echo \"$input\" | jq -r '.tool_input.command')\n\nif echo \"$cmd\" | grep -qE 'gh pr create'; then\n  output=$(echo \"$input\" | jq -r '.tool_output.output // \"\"')\n  pr_url=$(echo \"$output\" | grep -oE 'https://github.com/[^/]+/[^/]+/pull/[0-9]+')\n  if [ -n \"$pr_url\" ]; then\n    echo \"[Hook] PR created: $pr_url\" >&2\n  fi\nfi\necho \"$input\""
-          }
-        ],
-        "description": "PR作成後のURL検出"
-      },
-      {
-        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\.py$\"",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "#!/bin/bash\n# Auto-format and check with Ruff\ninput=$(cat)\nfile_path=$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"')\nif [ -n \"$file_path\" ] && [ -f \"$file_path\" ]; then\n  uv run ruff format \"$file_path\" 2>&1 | head -5 >&2\n  uv run ruff check --fix \"$file_path\" 2>&1 | head -5 >&2\nfi\necho \"$input\""
-          }
-        ],
-        "description": "Python編集後のRuff実行"
-      },
-      {
-        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\.py$\"",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "#!/bin/bash\n# Run mypy\ninput=$(cat)\nfile_path=$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"')\nif [ -n \"$file_path\" ] && [ -f \"$file_path\" ]; then\n  uv run mypy \"$file_path\" --no-error-summary 2>&1 | grep -E \"(error|warning)\" | head -10 >&2 || true\nfi\necho \"$input\""
-          }
-        ],
-        "description": "Python編集後のmypy実行"
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "#!/bin/bash\n# Final check for print statements\ninput=$(cat)\nif git rev-parse --git-dir > /dev/null 2>&1; then\n  modified_files=$(git diff --name-only HEAD 2>/dev/null | grep -E '\\.py$' || true)\n  if [ -n \"$modified_files\" ]; then\n    while IFS= read -r file; do\n      if [ -f \"$file\" ] && grep -q \"^[^#]*\\bprint(\" \"$file\" 2>/dev/null; then\n        echo \"[Hook] WARNING: print() found in $file\" >&2\n      fi\n    done <<< \"$modified_files\"\n  fi\nfi\necho \"$input\""
-          }
-        ],
-        "description": "終了時のprint文監査"
-      }
-    ]
-  }
+	"$schema": "https://json.schemastore.org/claude-code-settings.json",
+	"hooks": {
+		"PostToolUse": [
+			{
+				"matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\.py$\"",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "powershell -NoProfile -Command \"$json = Get-Content -Raw | ConvertFrom-Json; $file = $json.tool_input.file_path; if (Test-Path $file) { uv run ruff format $file; uv run ruff check --fix $file }; Write-Output (Get-Content -Raw)\""
+					}
+				],
+				"description": "Python編集後Ruff (Windows)"
+			},
+			{
+				"matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\.py$\"",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "powershell -NoProfile -Command \"$jsonText = Get-Content -Raw; $json = $jsonText | ConvertFrom-Json; $file = $json.tool_input.file_path; if ($file -and (Test-Path $file)) { Write-Host '[Hook] Running mypy...' 1>&2; uv run mypy $file --no-error-summary 2>&1 | Select-String '(error|warning)' | Select-Object -First 10 | ForEach-Object { Write-Host $_ 1>&2 } }; Write-Output $jsonText\""
+					}
+				],
+				"description": "Python編集後のmypy実行 (Windows)"
+			}
+		]
+	}
 }
