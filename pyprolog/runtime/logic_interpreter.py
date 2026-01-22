@@ -244,21 +244,11 @@ class LogicInterpreter:
     def unify(
         self, term1: PrologType, term2: PrologType, env: BindingEnvironment
     ) -> Tuple[bool, BindingEnvironment]:
-        if env.stats_enabled:
-            env.stats["unify_calls"] += 1
         current_env = env.copy()
-        t1 = self.dereference(term1, current_env)
-        t2 = self.dereference(term2, current_env)
-        if _DEBUG:
-            logger.debug(
-                "UNIFY: %r (%s) with %r (%s)",
-                t1,
-                type(t1).__name__,
-                t2,
-                type(t2).__name__,
-            )
+        stack = [(term1, term2)]
+        success_marker = object()
 
-        if t1 == t2:
+        def record_success() -> None:
             if env.stats_enabled:
                 env.stats["unify_success_total"] += 1
                 current_goal_key = env.stats.get("current_goal_key")
@@ -266,80 +256,79 @@ class LogicInterpreter:
                     env.stats["unify_success_by_pred"][current_goal_key] = (
                         env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
                     )
-            return True, current_env
 
-        if isinstance(t1, Variable):
-            if (
-                self.runtime.occurs_check_enabled
-                and isinstance(t2, (Term, ListTerm))
-                and self._occurs_check(t1, t2, current_env)
-            ):
-                if env.stats_enabled:
-                    env.stats["unify_fail_total"] += 1
-                return False, env
-            current_env.bind(t1.name, t2)
+        def record_fail() -> None:
             if env.stats_enabled:
-                env.stats["unify_success_total"] += 1
-                current_goal_key = env.stats.get("current_goal_key")
-                if current_goal_key:
-                    env.stats["unify_success_by_pred"][current_goal_key] = (
-                        env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
-                    )
-            return True, current_env
-        if isinstance(t2, Variable):
-            if (
-                self.runtime.occurs_check_enabled
-                and isinstance(t1, (Term, ListTerm))
-                and self._occurs_check(t2, t1, current_env)
-            ):
-                if env.stats_enabled:
-                    env.stats["unify_fail_total"] += 1
-                return False, env
-            current_env.bind(t2.name, t1)
+                env.stats["unify_fail_total"] += 1
+
+        while stack:
+            t1, t2 = stack.pop()
+            if t1 is success_marker:
+                record_success()
+                continue
             if env.stats_enabled:
-                env.stats["unify_success_total"] += 1
-                current_goal_key = env.stats.get("current_goal_key")
-                if current_goal_key:
-                    env.stats["unify_success_by_pred"][current_goal_key] = (
-                        env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
-                    )
-            return True, current_env
+                env.stats["unify_calls"] += 1
+            t1 = self.dereference(t1, current_env)
+            t2 = self.dereference(t2, current_env)
+            if _DEBUG:
+                logger.debug(
+                    "UNIFY: %r (%s) with %r (%s)",
+                    t1,
+                    type(t1).__name__,
+                    t2,
+                    type(t2).__name__,
+                )
 
-        if isinstance(t1, Atom) and isinstance(t2, Atom):
-            return t1.name == t2.name, current_env
-        if isinstance(t1, Number) and isinstance(t2, Number):
-            return t1.value == t2.value, current_env
-        if isinstance(t1, String) and isinstance(t2, String):
-            return t1.value == t2.value, current_env
+            if t1 is t2 or t1 == t2:
+                record_success()
+                continue
 
-        if isinstance(t1, Term) and isinstance(t2, Term):
-            if t1.functor == t2.functor and len(t1.args) == len(t2.args):
-                temp_env = current_env.copy()
-                for i in range(len(t1.args)):
-                    unified, temp_env = self.unify(t1.args[i], t2.args[i], temp_env)
-                    if not unified:
-                        if env.stats_enabled:
-                            env.stats["unify_fail_total"] += 1
-                        return False, env
-                if env.stats_enabled:
-                    env.stats["unify_success_total"] += 1
-                    current_goal_key = env.stats.get("current_goal_key")
-                    if current_goal_key:
-                        env.stats["unify_success_by_pred"][current_goal_key] = (
-                            env.stats["unify_success_by_pred"].get(
-                                current_goal_key, 0
-                            )
-                            + 1
-                        )
-                return True, temp_env
-            else:
-                if env.stats_enabled:
-                    env.stats["unify_fail_total"] += 1
+            if isinstance(t1, Variable):
+                if (
+                    self.runtime.occurs_check_enabled
+                    and isinstance(t2, (Term, ListTerm))
+                    and self._occurs_check(t1, t2, current_env)
+                ):
+                    record_fail()
+                    return False, env
+                current_env.bind(t1.name, t2)
+                record_success()
+                continue
+            if isinstance(t2, Variable):
+                if (
+                    self.runtime.occurs_check_enabled
+                    and isinstance(t1, (Term, ListTerm))
+                    and self._occurs_check(t2, t1, current_env)
+                ):
+                    record_fail()
+                    return False, env
+                current_env.bind(t2.name, t1)
+                record_success()
+                continue
+
+            if isinstance(t1, Atom) and isinstance(t2, Atom):
+                record_fail()
+                return False, env
+            if isinstance(t1, Number) and isinstance(t2, Number):
+                record_fail()
+                return False, env
+            if isinstance(t1, String) and isinstance(t2, String):
+                record_fail()
                 return False, env
 
-        if env.stats_enabled:
-            env.stats["unify_fail_total"] += 1
-        return False, env
+            if isinstance(t1, Term) and isinstance(t2, Term):
+                if t1.functor != t2.functor or len(t1.args) != len(t2.args):
+                    record_fail()
+                    return False, env
+                stack.append((success_marker, None))
+                for i in range(len(t1.args) - 1, -1, -1):
+                    stack.append((t1.args[i], t2.args[i]))
+                continue
+
+            record_fail()
+            return False, env
+
+        return True, current_env
 
     def _occurs_check(
         self, var: Variable, term: PrologType, env: BindingEnvironment
