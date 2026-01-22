@@ -1,6 +1,8 @@
-import pytest
+import logging
 import os
 import sys
+
+import pytest
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.core.types import Variable
 
@@ -11,6 +13,22 @@ def get_benchmark_path(filename):
 
 def run_query(runtime, query):
     return list(runtime.query(query))
+
+
+def _run_benchmark(benchmark, runtime, label, filename, query):
+    """共通ベンチマーク実行"""
+    message_start = f"[Benchmark] Starting {label}"
+    sys.stderr.write(f"\n{message_start}...")
+    sys.stderr.flush()
+    logging.getLogger("prolog").info(message_start)
+    runtime.consult(get_benchmark_path(filename))
+    result = benchmark(lambda: run_query(runtime, query))
+    assert len(result) >= 1
+    message_done = f"[Benchmark] Finished {label}"
+    sys.stderr.write(f"\n{message_done}")
+    sys.stderr.flush()
+    logging.getLogger("prolog").info(message_done)
+    return result
 
 @pytest.fixture
 def runtime():
@@ -24,47 +42,66 @@ def runtime():
 @pytest.mark.bench_heavy
 def test_crypt(benchmark, runtime):
     """crypt.pl (SEND+MORE=MONEY)"""
-    sys.stderr.write("\n[Benchmark] Starting crypt (SEND+MORE=MONEY)...\n")
-    sys.stderr.flush()
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "crypt (SEND+MORE=MONEY)",
+        "crypt.pl",
+        "solve(S, E, N, D, M, O, R, Y).",
+    )
 
-    runtime.consult(get_benchmark_path("crypt.pl"))
-
-    def run_crypt():
-        return run_query(runtime, "solve(S, E, N, D, M, O, R, Y).")
-
-    result = benchmark(run_crypt)
-    assert len(result) >= 1
 
 @pytest.mark.info_log
 @pytest.mark.bench_heavy
-def test_queens(benchmark, runtime):
-    """queens.pl (N-Queens)"""
-    sys.stderr.write("\n[Benchmark] Starting queens (8-Queens)...")
-    sys.stderr.flush()
+def test_queens_heavy(benchmark, runtime):
+    """queens.pl (N-Queens heavy)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "queens (12-Queens)",
+        "queens.pl",
+        "solve_queens(12, Solution).",
+    )
 
-    runtime.consult(get_benchmark_path("queens.pl"))
-
-    def run_queens():
-        return run_query(runtime, "solve_queens(8, Solution).")
-
-    result = benchmark(run_queens)
-    assert len(result) >= 1
 
 @pytest.mark.info_log
 @pytest.mark.bench_heavy
-def test_tak(benchmark, runtime):
-    """tak.pl (Takeuchi function)"""
-    sys.stderr.write("\n[Benchmark] Starting tak (Tak function 18,12,6)...")
-    sys.stderr.flush()
+def test_tak_heavy(benchmark, runtime):
+    """tak.pl (Takeuchi function heavy)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "tak (21,12,6)",
+        "tak.pl",
+        "tak(21, 12, 6, R).",
+    )
 
-    runtime.consult(get_benchmark_path("tak.pl"))
 
-    def run_tak():
-        return run_query(runtime, "tak(18, 12, 6, R).")
+@pytest.mark.info_log
+@pytest.mark.bench_heavy
+def test_nrev_heavy(benchmark, runtime):
+    """nrev.pl (Naive Reverse heavy)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "nrev (list=300)",
+        "nrev.pl",
+        "benchmark(300).",
+    )
 
-    result = benchmark(run_tak)
-    assert len(result) >= 1
-    assert result[0][Variable("R")].value == 7
+
+@pytest.mark.info_log
+@pytest.mark.bench_heavy
+def test_primes_heavy(benchmark, runtime):
+    """primes.pl (Sieve heavy)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "primes (limit=10000)",
+        "primes.pl",
+        "benchmark(10000).",
+    )
+
 
 # -----------------------
 # Light benchmarks
@@ -72,30 +109,50 @@ def test_tak(benchmark, runtime):
 
 @pytest.mark.info_log
 @pytest.mark.bench_light
-def test_nrev(benchmark, runtime):
-    """nrev.pl (Naive Reverse)"""
-    sys.stderr.write("\n[Benchmark] Starting nrev (Naive Reverse list=30)...")
-    sys.stderr.flush()
-
-    runtime.consult(get_benchmark_path("nrev.pl"))
-
-    def run_nrev():
-        return run_query(runtime, "benchmark(30).")
-
-    result = benchmark(run_nrev)
-    assert len(result) >= 1
+def test_queens_light(benchmark, runtime):
+    """queens.pl (N-Queens light)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "queens (8-Queens)",
+        "queens.pl",
+        "solve_queens(8, Solution).",
+    )
 
 @pytest.mark.info_log
 @pytest.mark.bench_light
-def test_primes(benchmark, runtime):
-    """primes.pl (Sieve)"""
-    sys.stderr.write("\n[Benchmark] Starting primes (Sieve limit=100)...")
-    sys.stderr.flush()
+def test_nrev_light(benchmark, runtime):
+    """nrev.pl (Naive Reverse light)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "nrev (list=30)",
+        "nrev.pl",
+        "benchmark(30).",
+    )
 
-    runtime.consult(get_benchmark_path("primes.pl"))
 
-    def run_primes():
-        return run_query(runtime, "benchmark(100).")
+@pytest.mark.info_log
+@pytest.mark.bench_light
+def test_primes_light(benchmark, runtime):
+    """primes.pl (Sieve light)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "primes (limit=100)",
+        "primes.pl",
+        "benchmark(100).",
+    )
 
-    result = benchmark(run_primes)
-    assert len(result) >= 1
+@pytest.mark.info_log
+@pytest.mark.bench_light
+def test_tak_light(benchmark, runtime):
+    """tak.pl (Takeuchi function light)"""
+    result = _run_benchmark(
+        benchmark,
+        runtime,
+        "tak (14,12,6)",
+        "tak.pl",
+        "tak(14, 12, 6, R).",
+    )
+    assert result[0][Variable("R")].value == 7
