@@ -388,29 +388,24 @@ class LogicInterpreter:
         env: BindingEnvironment,
         seen: Optional[Set[int]] = None,
     ) -> bool:
-        if env.stats_enabled:
-            env.stats["occurs_calls"] += 1
         if seen is None:
             seen = set()
+
         term_deref = self.dereference(term, env)
-        key = id(term_deref)
+
+        key = (id(var), id(term_deref))
         if key in seen:
-            return False
+            return False   # 既に検査済み → 打ち切り
         seen.add(key)
-        if var == term_deref:
-            return True
-        if isinstance(term_deref, Term):
+
+        if isinstance(term_deref, Variable):
+            return var == term_deref
+
+        if isinstance(term_deref, (Term, ListTerm)):
             for arg in term_deref.args:
                 if self._occurs_check(var, arg, env, seen):
                     return True
-        if isinstance(term_deref, ListTerm):
-            for element in term_deref.elements:
-                if self._occurs_check(var, element, env, seen):
-                    return True
-            if term_deref.tail is not None and self._occurs_check(
-                var, term_deref.tail, env, seen
-            ):
-                return True
+
         return False
 
     def dereference(self, term: PrologType, env: BindingEnvironment) -> PrologType:
