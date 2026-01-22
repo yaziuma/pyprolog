@@ -10,7 +10,7 @@ Prologインタープリターの論理的推論エンジンの
 import unittest
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.errors import PrologError
-from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact
+from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact, ListTerm
 from typing import Iterator
 
 
@@ -90,6 +90,13 @@ class TestLogicInterpreter:
         term_fx = Term(Atom("f"), [var_x])
         success, env = self.logic_interpreter.unify(var_x, term_fx, self.env)
         assert not success  # 発生チェックにより失敗
+
+    def test_occurs_check_list_cycle(self):
+        """リスト循環の発生チェック"""
+        var_x = Variable("X")
+        cyclic_list = ListTerm([Number(1)], var_x)
+        success, _ = self.logic_interpreter.unify(var_x, cyclic_list, self.env)
+        assert not success  # X = [1 | X] は発生チェックで失敗
 
     def test_occurs_check_complex(self):
         """複雑な発生チェックのテスト: X = f(Y), Y = g(X)"""
