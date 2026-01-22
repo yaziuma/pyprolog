@@ -288,7 +288,12 @@ class DynamicAssertAPredicate(BuiltinPredicate):
             yield env
             logger.debug('ASSERTA: Successfully yielded environment for: %r', clause_val_as_term)
         except Exception as e:
-            logger.error(f'ASSERTA: Unexpected Python exception during assertion of {clause_val}: {e}', exc_info=True)
+            logger.error(
+                "ASSERTA: Unexpected Python exception during assertion of %r: %s",
+                clause_val,
+                e,
+                exc_info=True,
+            )
             return
 
 class DynamicAssertZPredicate(BuiltinPredicate):
@@ -524,7 +529,7 @@ class AtEndOfStreamPredicate(BuiltinPredicate):
                 logger.warning('at_end_of_stream stream operation failed: %s', e)
                 return
             else:
-                logger.error(f'Unexpected error in at_end_of_stream: {e}', exc_info=True)
+                logger.error("Unexpected error in at_end_of_stream: %s", e, exc_info=True)
                 raise PrologError(f'at_end_of_stream execution failed: {e}') from e
 
     def _get_target_stream(self, runtime: 'Runtime', env: BindingEnvironment):
