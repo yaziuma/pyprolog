@@ -25,6 +25,21 @@ class BindingEnvironment:
             "occurs_calls": 0,
             "unify_calls": 0,
             "term_allocs": 0,
+            "term_allocs_rename": 0,
+            "term_allocs_deep_deref": 0,
+            "term_allocs_other": 0,
+            "solve_calls_total": 0,
+            "solve_calls_by_pred": {},
+            "candidate_entries_scanned_total": 0,
+            "candidate_entries_scanned_by_pred": {},
+            "unify_success_total": 0,
+            "unify_fail_total": 0,
+            "unify_success_by_pred": {},
+            "builtin_calls_by_name": {},
+            "index_hit_total": 0,
+            "index_miss_total": 0,
+            "avg_candidates_per_goal": 0.0,
+            "current_goal_key": None,
         }
 
     def bind(self, var_name: str, value: "PrologType"):

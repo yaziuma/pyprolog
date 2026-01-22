@@ -130,6 +130,7 @@ class LogicInterpreter:
             elif isinstance(current_term, Term):
                 new_args = [rename_recursive(arg) for arg in current_term.args]
                 env.stats["term_allocs"] += 1
+                env.stats["term_allocs_rename"] += 1
                 return Term(current_term.functor, new_args)
             elif isinstance(current_term, ListTerm):
                 new_elements = [rename_recursive(el) for el in current_term.elements]
@@ -195,15 +196,26 @@ class LogicInterpreter:
                 t1,
                 current_env.bindings,
             )
+            env.stats["unify_success_total"] += 1
+            current_goal_key = env.stats.get("current_goal_key")
+            if current_goal_key:
+                env.stats["unify_success_by_pred"][current_goal_key] = (
+                    env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
+                )
             return True, current_env
 
         if isinstance(t1, Variable):
-            if self._occurs_check(t1, t2, current_env):
+            if (
+                self.runtime.occurs_check_enabled
+                and isinstance(t2, (Term, ListTerm))
+                and self._occurs_check(t1, t2, current_env)
+            ):
                 logger.debug(
                     "LOGIC_INTERP_UNIFY: Occurs check failed for var %s in term %s, returning False",
                     t1,
                     t2,
                 )
+                env.stats["unify_fail_total"] += 1
                 return False, env
             current_env.bind(t1.name, t2)
             logger.debug(
@@ -212,14 +224,25 @@ class LogicInterpreter:
                 t2,
                 current_env.bindings,
             )
+            env.stats["unify_success_total"] += 1
+            current_goal_key = env.stats.get("current_goal_key")
+            if current_goal_key:
+                env.stats["unify_success_by_pred"][current_goal_key] = (
+                    env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
+                )
             return True, current_env
         if isinstance(t2, Variable):
-            if self._occurs_check(t2, t1, current_env):
+            if (
+                self.runtime.occurs_check_enabled
+                and isinstance(t1, (Term, ListTerm))
+                and self._occurs_check(t2, t1, current_env)
+            ):
                 logger.debug(
                     "LOGIC_INTERP_UNIFY: Occurs check failed for var %s in term %s, returning False",
                     t2,
                     t1,
                 )
+                env.stats["unify_fail_total"] += 1
                 return False, env
             current_env.bind(t2.name, t1)
             logger.debug(
@@ -228,6 +251,12 @@ class LogicInterpreter:
                 t1,
                 current_env.bindings,
             )
+            env.stats["unify_success_total"] += 1
+            current_goal_key = env.stats.get("current_goal_key")
+            if current_goal_key:
+                env.stats["unify_success_by_pred"][current_goal_key] = (
+                    env.stats["unify_success_by_pred"].get(current_goal_key, 0) + 1
+                )
             return True, current_env
 
         if isinstance(t1, Atom) and isinstance(t2, Atom):
@@ -290,6 +319,13 @@ class LogicInterpreter:
                         len(t1.args),
                         temp_env.bindings,
                     )
+                    env.stats["unify_success_total"] += 1
+                    current_goal_key = env.stats.get("current_goal_key")
+                    if current_goal_key:
+                        env.stats["unify_success_by_pred"][current_goal_key] = (
+                            env.stats["unify_success_by_pred"].get(current_goal_key, 0)
+                            + 1
+                        )
                     return True, temp_env
                 else:
                     logger.debug(
@@ -298,6 +334,7 @@ class LogicInterpreter:
                         len(t1.args),
                         env.bindings,
                     )
+                    env.stats["unify_fail_total"] += 1
                     return False, env
             else:
                 logger.debug(
@@ -307,6 +344,7 @@ class LogicInterpreter:
                     t2.functor,
                     len(t2.args),
                 )
+                env.stats["unify_fail_total"] += 1
                 return False, env
 
         logger.debug(
@@ -314,6 +352,7 @@ class LogicInterpreter:
             type(t1),
             type(t2),
         )
+        env.stats["unify_fail_total"] += 1
         return False, env
 
     def _occurs_check(
@@ -379,6 +418,7 @@ class LogicInterpreter:
             # Functor itself could theoretically be a variable if we allowed higher-order, but not currently.
             # Assuming functor is Atom or similar, not needing dereferencing here.
             env.stats["term_allocs"] += 1
+            env.stats["term_allocs_deep_deref"] += 1
             return Term(current_term.functor, new_args)
         elif isinstance(current_term, ListTerm):
             # This type is not fully used/fleshed out in the current codebase snippets,
@@ -396,6 +436,7 @@ class LogicInterpreter:
     def solve_goal(
         self, goal: PrologType, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
+        env.stats["solve_calls_total"] += 1
         logger.debug(
             "LOGIC_INTERP: solve_goal called with goal: %s, rules count: %d",
             goal,
@@ -423,179 +464,220 @@ class LogicInterpreter:
             env.bindings,
         )
 
-        self._refresh_index_if_needed()
-
-        # 未定義述語は existence_error を返す（builtin/演算子は execute 側で処理済み）
-        if isinstance(actual_goal.functor, Atom) and actual_goal.functor.name not in (
-            "true",
-            "fail",
-        ):
-            key = (actual_goal.functor.name, len(actual_goal.args))
-            if key not in self.rules_index:
-                raise PrologError(
-                    f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
-                )
-
-        # トレース: ゴール呼び出し記録
-        if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
-            self.runtime.tracer.record_call(actual_goal, env)
-
-        if actual_goal.functor.name == "true" and not actual_goal.args:
-            logger.debug("Goal %s is true, yielding current env.", actual_goal)
-            # トレース: 成功記録
-            if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
-                self.runtime.tracer.record_exit(actual_goal, env, Fact(actual_goal))
-            yield env
-            return
-        elif actual_goal.functor.name == "fail" and not actual_goal.args:
-            logger.debug("Goal %s is fail, returning.", actual_goal)
-            # トレース: 失敗記録
-            if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
-                self.runtime.tracer.record_fail(actual_goal)
-            return
-
-        # カットの特別扱いは Runtime.execute で行うので、ここでは不要
-        # if actual_goal.functor.name == "!" and not actual_goal.args:
-        #     logger.debug(f"Goal {actual_goal} is CUT (handled by Runtime), yielding current env.")
-        #     yield env
-        #     return
-
-        candidate_entries: List[Union[Rule, Fact]]
+        current_goal_key: Optional[Tuple[str, int]] = None
         if isinstance(actual_goal.functor, Atom):
-            key = (actual_goal.functor.name, len(actual_goal.args))
-            candidate_entries = list(self.rules_index.get(key, []))
-        else:
-            candidate_entries = list(self.rules)
-
-        for db_entry_idx, db_entry in enumerate(candidate_entries):
-            logger.debug(
-                "LOGIC_INTERP: Trying rule/fact #%d: %s", db_entry_idx, db_entry
-            )
-            renamed_entry = self._rename_variables(db_entry, env)
-            logger.debug("LOGIC_INTERP: Renamed entry: %s", renamed_entry)
-
-            current_head: Term
-            if isinstance(renamed_entry, Rule):
-                current_head = renamed_entry.head
-            elif isinstance(renamed_entry, Fact):
-                current_head = renamed_entry.head
-            else:
-                raise PrologError(
-                    "Internal error: Renamed DB entry is not Rule or Fact."
-                )
-            logger.debug(
-                "LOGIC_INTERP: Current head to unify against from db_entry: %s",
-                current_head,
+            current_goal_key = (actual_goal.functor.name, len(actual_goal.args))
+        previous_goal_key = env.stats.get("current_goal_key")
+        env.stats["current_goal_key"] = current_goal_key
+        if current_goal_key:
+            env.stats["solve_calls_by_pred"][current_goal_key] = (
+                env.stats["solve_calls_by_pred"].get(current_goal_key, 0) + 1
             )
 
-            # PATCH for potential parser issue where a rule H:-B might be stored as Fact(Term(':-', [H,B]))
-            # In such a case, current_head (from renamed_entry.head) would be Term(':-', [H,B])
-            effective_head = current_head
-            is_rule_from_fact_structure = False
-            rule_body_from_fact_structure = None
+        try:
+            self._refresh_index_if_needed()
 
-            if (
-                isinstance(renamed_entry, Fact)
-                and isinstance(current_head, Term)
-                and current_head.functor.name == ":-"
-                and len(current_head.args) == 2
+            # 未定義述語は existence_error を返す（builtin/演算子は execute 側で処理済み）
+            if isinstance(actual_goal.functor, Atom) and actual_goal.functor.name not in (
+                "true",
+                "fail",
             ):
-                logger.warning(
-                    "LOGIC_INTERP (PATCH DETECTED): Fact's head is a ':-' term: %s. Treating as rule.",
+                key = (actual_goal.functor.name, len(actual_goal.args))
+                if key not in self.rules_index:
+                    raise PrologError(
+                        f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
+                    )
+
+            # トレース: ゴール呼び出し記録
+            if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                self.runtime.tracer.record_call(actual_goal, env)
+
+            if actual_goal.functor.name == "true" and not actual_goal.args:
+                logger.debug("Goal %s is true, yielding current env.", actual_goal)
+                # トレース: 成功記録
+                if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                    self.runtime.tracer.record_exit(actual_goal, env, Fact(actual_goal))
+                yield env
+                return
+            elif actual_goal.functor.name == "fail" and not actual_goal.args:
+                logger.debug("Goal %s is fail, returning.", actual_goal)
+                # トレース: 失敗記録
+                if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                    self.runtime.tracer.record_fail(actual_goal)
+                return
+
+            # カットの特別扱いは Runtime.execute で行うので、ここでは不要
+            # if actual_goal.functor.name == "!" and not actual_goal.args:
+            #     logger.debug(f"Goal {actual_goal} is CUT (handled by Runtime), yielding current env.")
+            #     yield env
+            #     return
+
+            candidate_entries: List[Union[Rule, Fact]]
+            if isinstance(actual_goal.functor, Atom):
+                key = (actual_goal.functor.name, len(actual_goal.args))
+                candidate_entries = list(self.rules_index.get(key, []))
+                if key in self.rules_index:
+                    env.stats["index_hit_total"] += 1
+                else:
+                    env.stats["index_miss_total"] += 1
+            else:
+                candidate_entries = list(self.rules)
+
+            env.stats["candidate_entries_scanned_total"] += len(candidate_entries)
+            if current_goal_key:
+                env.stats["candidate_entries_scanned_by_pred"][current_goal_key] = (
+                    env.stats["candidate_entries_scanned_by_pred"].get(
+                        current_goal_key, 0
+                    )
+                    + len(candidate_entries)
+                )
+            if env.stats["solve_calls_total"]:
+                env.stats["avg_candidates_per_goal"] = (
+                    env.stats["candidate_entries_scanned_total"]
+                    / env.stats["solve_calls_total"]
+                )
+
+            for db_entry_idx, db_entry in enumerate(candidate_entries):
+                logger.debug(
+                    "LOGIC_INTERP: Trying rule/fact #%d: %s", db_entry_idx, db_entry
+                )
+                renamed_entry = self._rename_variables(db_entry, env)
+                logger.debug("LOGIC_INTERP: Renamed entry: %s", renamed_entry)
+
+                current_head: Term
+                if isinstance(renamed_entry, Rule):
+                    current_head = renamed_entry.head
+                elif isinstance(renamed_entry, Fact):
+                    current_head = renamed_entry.head
+                else:
+                    raise PrologError(
+                        "Internal error: Renamed DB entry is not Rule or Fact."
+                    )
+                logger.debug(
+                    "LOGIC_INTERP: Current head to unify against from db_entry: %s",
                     current_head,
                 )
-                effective_head = current_head.args[0]  # The actual head H
-                rule_body_from_fact_structure = current_head.args[
-                    1
-                ]  # The actual body B
-                is_rule_from_fact_structure = True
 
-            unified, new_env_after_unify = self.unify(actual_goal, effective_head, env)
+                # PATCH for potential parser issue where a rule H:-B might be stored as Fact(Term(':-', [H,B]))
+                # In such a case, current_head (from renamed_entry.head) would be Term(':-', [H,B])
+                effective_head = current_head
+                is_rule_from_fact_structure = False
+                rule_body_from_fact_structure = None
 
-            if unified:
-                if is_rule_from_fact_structure:
-                    logger.debug(
-                        "LOGIC_INTERP (PATCH USED): Unified %s with %s (from Fact). Solving body: %s",
-                        actual_goal,
-                        effective_head,
-                        rule_body_from_fact_structure,
+                if (
+                    isinstance(renamed_entry, Fact)
+                    and isinstance(current_head, Term)
+                    and current_head.functor.name == ":-"
+                    and len(current_head.args) == 2
+                ):
+                    logger.warning(
+                        "LOGIC_INTERP (PATCH DETECTED): Fact's head is a ':-' term: %s. Treating as rule.",
+                        current_head,
                     )
-                    try:
-                        yield from self.runtime.execute(
-                            rule_body_from_fact_structure, new_env_after_unify
-                        )
-                    except CutException:
+                    effective_head = current_head.args[0]  # The actual head H
+                    rule_body_from_fact_structure = current_head.args[
+                        1
+                    ]  # The actual body B
+                    is_rule_from_fact_structure = True
+
+                unified, new_env_after_unify = self.unify(
+                    actual_goal, effective_head, env
+                )
+
+                if unified:
+                    if is_rule_from_fact_structure:
                         logger.debug(
-                            "CutException propagated from patched rule body: %s. Re-raising.",
+                            "LOGIC_INTERP (PATCH USED): Unified %s with %s (from Fact). Solving body: %s",
+                            actual_goal,
+                            effective_head,
                             rule_body_from_fact_structure,
                         )
-                        raise
-                    except Exception as e:
-                        # IOManager例外などの重要な例外は伝播
-                        if "Input required" in str(e) or hasattr(e, "input_type"):
+                        try:
+                            yield from self.runtime.execute(
+                                rule_body_from_fact_structure, new_env_after_unify
+                            )
+                        except CutException:
                             logger.debug(
-                                "Critical exception propagated from patched rule body: %s",
-                                e,
+                                "CutException propagated from patched rule body: %s. Re-raising.",
+                                rule_body_from_fact_structure,
                             )
                             raise
-                        # その他の例外もログ出力して伝播
-                        logger.debug("Exception in patched rule body execution: %s", e)
-                        raise
-                elif isinstance(renamed_entry, Fact):  # Genuine Fact
-                    logger.debug(
-                        "LOGIC_INTERP: Unified Fact %s with %s. Yielding env: %s",
-                        actual_goal,
-                        effective_head,
-                        new_env_after_unify.bindings,
-                    )
-                    # トレース: 事実による成功記録
-                    if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
-                        self.runtime.tracer.record_exit(
-                            actual_goal, new_env_after_unify, renamed_entry
-                        )
-                    yield new_env_after_unify
-                elif isinstance(renamed_entry, Rule):  # Properly parsed Rule
-                    logger.debug(
-                        "LOGIC_INTERP: Unified Rule Head %s with %s. Solving body: %s with env: %s",
-                        actual_goal,
-                        effective_head,
-                        renamed_entry.body,
-                        new_env_after_unify.bindings,
-                    )
-                    try:
-                        yield from self.runtime.execute(
-                            renamed_entry.body, new_env_after_unify
-                        )
-                    except CutException:
+                        except Exception as e:
+                            # IOManager例外などの重要な例外は伝播
+                            if "Input required" in str(e) or hasattr(e, "input_type"):
+                                logger.debug(
+                                    "Critical exception propagated from patched rule body: %s",
+                                    e,
+                                )
+                                raise
+                            # その他の例外もログ出力して伝播
+                            logger.debug(
+                                "Exception in patched rule body execution: %s", e
+                            )
+                            raise
+                    elif isinstance(renamed_entry, Fact):  # Genuine Fact
                         logger.debug(
-                            "CutException propagated from rule body: %s. Re-raising.",
-                            renamed_entry.body,
+                            "LOGIC_INTERP: Unified Fact %s with %s. Yielding env: %s",
+                            actual_goal,
+                            effective_head,
+                            new_env_after_unify.bindings,
                         )
-                        raise
-                    except Exception as e:
-                        # IOManager例外などの重要な例外は伝播
-                        if "Input required" in str(e) or hasattr(e, "input_type"):
+                        # トレース: 事実による成功記録
+                        if (
+                            hasattr(self.runtime, "tracer")
+                            and self.runtime.tracer.enabled
+                        ):
+                            self.runtime.tracer.record_exit(
+                                actual_goal, new_env_after_unify, renamed_entry
+                            )
+                        yield new_env_after_unify
+                    elif isinstance(renamed_entry, Rule):  # Properly parsed Rule
+                        logger.debug(
+                            "LOGIC_INTERP: Unified Rule Head %s with %s. Solving body: %s with env: %s",
+                            actual_goal,
+                            effective_head,
+                            renamed_entry.body,
+                            new_env_after_unify.bindings,
+                        )
+                        try:
+                            yield from self.runtime.execute(
+                                renamed_entry.body, new_env_after_unify
+                            )
+                        except CutException:
                             logger.debug(
-                                "Critical exception propagated from rule body: %s", e
+                                "CutException propagated from rule body: %s. Re-raising.",
+                                renamed_entry.body,
                             )
                             raise
-                        # その他の例外もログ出力して伝播
-                        logger.debug("Exception in rule body execution: %s", e)
-                        raise
+                        except Exception as e:
+                            # IOManager例外などの重要な例外は伝播
+                            if "Input required" in str(e) or hasattr(e, "input_type"):
+                                logger.debug(
+                                    "Critical exception propagated from rule body: %s",
+                                    e,
+                                )
+                                raise
+                            # その他の例外もログ出力して伝播
+                            logger.debug(
+                                "Exception in rule body execution: %s", e
+                            )
+                            raise
 
-        # If we've iterated through all rules and no solution was yielded by this path,
-        # it means this specific goal (actual_goal) could not be proven with the current database.
-        # Standard Prolog would raise an existence_error if there are NO clauses for the predicate.
-        # This check is simplified: if this solve_goal attempt yields nothing, and it's not 'true' or 'fail',
-        # it implies the predicate is undefined or fails.
-        # トレース: 最終的に失敗した場合の記録
-        if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
-            self.runtime.tracer.record_fail(actual_goal)
+            # If we've iterated through all rules and no solution was yielded by this path,
+            # it means this specific goal (actual_goal) could not be proven with the current database.
+            # Standard Prolog would raise an existence_error if there are NO clauses for the predicate.
+            # This check is simplified: if this solve_goal attempt yields nothing, and it's not 'true' or 'fail',
+            # it implies the predicate is undefined or fails.
+            # トレース: 最終的に失敗した場合の記録
+            if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                self.runtime.tracer.record_fail(actual_goal)
 
-        logger.debug(
-            "LOGIC_INTERP: Finished iterating DB for goal %s. No more (or no) solutions found from this path.",
-            actual_goal,
-        )
+            logger.debug(
+                "LOGIC_INTERP: Finished iterating DB for goal %s. No more (or no) solutions found from this path.",
+                actual_goal,
+            )
+        finally:
+            env.stats["current_goal_key"] = previous_goal_key
 
     def instantiate_term(self, term: PrologType, env: BindingEnvironment) -> PrologType:
         """
