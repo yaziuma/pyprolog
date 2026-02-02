@@ -2,14 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(uv run pytest:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "mcp__serena__find_symbol"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "gemini-cli",
     "prolog_mcp",
     "codex",
     "serena"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
