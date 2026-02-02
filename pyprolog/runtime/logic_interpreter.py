@@ -436,36 +436,67 @@ class LogicInterpreter:
         env: BindingEnvironment,
         seen: Optional[Set[int]] = None,
     ) -> bool:
+        """
+        Iterative occurs check using explicit stack (DFS).
+
+        This method checks if a variable occurs in a term, which prevents
+        infinite unification loops (e.g., X = f(X)).
+
+        CRITICAL: Correct order to avoid missing bound variables:
+        1. Dereference first (resolve variable bindings)
+        2. Check if target variable (early return)
+        3. Check seen AFTER deref (identity-based: id() only)
+        4. Expand children to stack
+
+        Args:
+            var: Target variable to search for
+            term: Term to search in
+            env: Binding environment
+            seen: Set of already-visited term IDs (identity-based)
+
+        Returns:
+            True if var occurs in term, False otherwise
+        """
         if seen is None:
             seen = set()
 
-        term_deref = self.dereference(term, env)
+        stack: list[PrologType] = [term]
+        deref = self.dereference  # Local binding optimization
 
-        if isinstance(term_deref, Variable):
-            return var == term_deref
+        while stack:
+            # Step 1: Dereference FIRST (resolve any variable bindings)
+            current = deref(stack.pop(), env)
 
-        if isinstance(term_deref, Term):
-            term_id = id(term_deref)
-            if term_id in seen:
-                return False  # 既に検査済み → 打ち切り
-            seen.add(term_id)
-
-            for arg in term_deref.args:
-                if self._occurs_check(var, arg, env, seen):
+            # Step 2: Check if target variable (early return for efficiency)
+            if isinstance(current, Variable):
+                if current == var:
                     return True
-            return False
+                continue
 
-        if isinstance(term_deref, ListTerm):
-            term_id = id(term_deref)
-            if term_id in seen:
-                return False  # 既に検査済み → 打ち切り
-            seen.add(term_id)
+            # Step 3 & 4: Check seen AFTER deref, then expand children
+            if isinstance(current, Term):
+                term_id = id(current)  # Identity-based (not structural equality)
+                if term_id in seen:
+                    continue  # Already visited, skip
+                seen.add(term_id)
+                # Push args in reverse order to maintain DFS order (same as recursion)
+                for i in range(len(current.args) - 1, -1, -1):
+                    stack.append(current.args[i])
+                continue
 
-            for element in term_deref.elements:
-                if self._occurs_check(var, element, env, seen):
-                    return True
-            if term_deref.tail is not None:
-                return self._occurs_check(var, term_deref.tail, env, seen)
+            if isinstance(current, ListTerm):
+                term_id = id(current)  # Identity-based (not structural equality)
+                if term_id in seen:
+                    continue  # Already visited, skip
+                seen.add(term_id)
+                # Push tail first (processed last), then elements in reverse
+                # IMPORTANT: Always push tail to handle edge cases
+                # (variables, improper lists, circular references)
+                if current.tail is not None:
+                    stack.append(current.tail)
+                for i in range(len(current.elements) - 1, -1, -1):
+                    stack.append(current.elements[i])
+                continue
 
         return False
 
