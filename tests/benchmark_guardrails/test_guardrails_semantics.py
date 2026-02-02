@@ -99,6 +99,8 @@ def test_guardrail_conjunction_solution_order_preserved(runtime):
 #   仕様確定後に強化でOK。まずは“消えること”を太く守る。
 # ------------------------------------------------------------
 def test_guardrail_retract_deletes_all_no_ghosts(runtime):
+    from pyprolog.core.errors import PrologError
+
     _exec(runtime, "assertz(p(1)).")
     _exec(runtime, "assertz(p(2)).")
     _exec(runtime, "assertz(p(3)).")
@@ -109,9 +111,109 @@ def test_guardrail_retract_deletes_all_no_ghosts(runtime):
 
     # 残りを消し切る（最大回数で安全に）
     for _ in range(5):
-        rem = runtime.query("p(_).")
-        if rem == []:
+        try:
+            rem = runtime.query("p(_).")
+            if rem == []:
+                break
+        except PrologError:
+            # All clauses deleted, existence_error expected (undeclared predicate)
             break
         _exec(runtime, "retract(p(_)).")
 
-    assert runtime.query("p(_).") == []
+    # After deleting all clauses without dynamic declaration, should raise existence_error
+    with pytest.raises(PrologError) as exc_info:
+        runtime.query("p(_).")
+    assert "existence_error" in str(exc_info.value).lower()
+
+
+# ------------------------------------------------------------
+# Guardrail 4: Dynamic Directive - Undefined predicate raises existence_error
+# ------------------------------------------------------------
+def test_guardrail_undefined_predicate_raises_existence_error(runtime):
+    """GR-4: Undefined predicate should raise existence_error"""
+    from pyprolog.core.errors import PrologError
+
+    with pytest.raises(PrologError) as exc_info:
+        runtime.query("undefined_predicate(X).")
+    assert "existence_error" in str(exc_info.value).lower()
+    assert "undefined_predicate/1" in str(exc_info.value)
+
+
+# ------------------------------------------------------------
+# Guardrail 5: Dynamic Directive - Declared predicate with no clauses fails
+# ------------------------------------------------------------
+def test_guardrail_dynamic_predicate_with_no_clauses_fails(runtime):
+    """GR-5: Dynamic predicate with no clauses should fail, not error"""
+    import tempfile
+    import os
+
+    # Create temp file with dynamic directive
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.prolog', delete=False, encoding='utf-8') as f:
+        f.write(":- dynamic(p/1).\n")
+        temp_file = f.name
+
+    try:
+        # Consult file with dynamic directive
+        assert runtime.consult(temp_file)
+
+        # Query should fail (not raise exception)
+        solutions = runtime.query("p(X).")
+        assert solutions == []
+
+        # After assert and retract, should still fail
+        _exec(runtime, "assertz(p(1)).")
+        assert len(runtime.query("p(X).")) == 1
+
+        _exec(runtime, "retract(p(1)).")
+        solutions = runtime.query("p(X).")
+        assert solutions == []  # Still fail, not error
+    finally:
+        os.unlink(temp_file)
+
+
+# ------------------------------------------------------------
+# Guardrail 6: Dynamic Directive - Undeclared predicate after retract raises error
+# ------------------------------------------------------------
+def test_guardrail_undeclared_predicate_after_retract_raises_error(runtime):
+    """GR-6: Undeclared predicate after retract should raise existence_error"""
+    from pyprolog.core.errors import PrologError
+
+    # Assert without dynamic declaration
+    _exec(runtime, "assertz(r(1)).")
+    assert len(runtime.query("r(X).")) == 1
+
+    # Retract all clauses
+    _exec(runtime, "retract(r(1)).")
+
+    # Query should raise existence_error (not fail)
+    with pytest.raises(PrologError) as exc_info:
+        runtime.query("r(X).")
+    assert "existence_error" in str(exc_info.value).lower()
+    assert "r/1" in str(exc_info.value)
+
+
+# ------------------------------------------------------------
+# Guardrail 7: Dynamic Directive - Index integrity after retract
+# ------------------------------------------------------------
+def test_guardrail_index_integrity_after_retract(runtime):
+    """GR-7: After retract, no ghost clauses should remain in index"""
+    _exec(runtime, "assertz(p(1)).")
+    _exec(runtime, "assertz(p(2)).")
+
+    # Retract all
+    _exec(runtime, "retract(p(1)).")
+    _exec(runtime, "retract(p(2)).")
+
+    # Index should be clean (no ghost clauses)
+    key = ("p", 1)
+    # After retracting all clauses, the key should not be in rules_by_pred
+    # or should be empty
+    rules_by_pred = runtime.logic_interpreter.rules_by_pred
+    if key in rules_by_pred:
+        assert rules_by_pred[key] == []
+
+    # Query should raise existence_error (undeclared predicate)
+    from pyprolog.core.errors import PrologError
+    with pytest.raises(PrologError) as exc_info:
+        runtime.query("p(X).")
+    assert "existence_error" in str(exc_info.value).lower()

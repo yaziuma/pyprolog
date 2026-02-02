@@ -3,7 +3,7 @@ from pyprolog.parser.token import Token
 from pyprolog.parser.token_type import TokenType
 from pyprolog.core.types import Term, Variable, Atom, Number, String, Rule, Fact
 from pyprolog.core.operators import operator_registry, Associativity
-from typing import List, Optional, Callable, Union  # Added Optional
+from typing import List, Optional, Callable, Union, Tuple  # Added Optional, Tuple
 from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
 from pyprolog.util.functor_mapper import FunctorMapper  # Added FunctorMapper
 import logging
@@ -32,6 +32,7 @@ class Parser:
             variable_mapper if variable_mapper is not None else VariableMapper()
         )  # Initialize variable_mapper
         self._functor_mapper = functor_mapper  # Store functor_mapper
+        self.directives: List[Tuple[str, str, int]] = []  # Store parsed directives
         logger.debug("Parser initialized with %d tokens", len(tokens))
 
     def parse(self) -> List[Union[Rule, Fact]]:
@@ -56,6 +57,13 @@ class Parser:
 
     def _parse_rule(self) -> Optional[Union[Rule, Fact]]:
         """ルール解析（統合設計対応版）"""
+        # Check for directive first: :- Body.
+        # If COLONMINUS is at the start, it's a directive, not a rule
+        if self._check(TokenType.COLONMINUS):
+            self._advance()  # consume :-
+            self._parse_directive()
+            return None  # Directives don't produce Rule/Fact objects
+
         # Parse the head term with a precedence just below that of ':-' (1200)
         # This ensures that ':-' is not consumed as part of the head term itself.
         head_term = self._parse_expression_with_precedence(1199)
@@ -105,6 +113,98 @@ class Parser:
             return Rule(head_term, body)
         else:
             return Fact(head_term)
+
+    def _parse_directive(self) -> None:
+        """Parse directive: :- dynamic(p/1)."""
+        directive_term = self._parse_term()
+
+        # Validate: must be a term
+        if not isinstance(directive_term, Term):
+            self._error(self._previous(), "Directive must be a term")
+            return None
+
+        # Check functor is "dynamic"
+        if not isinstance(directive_term.functor, Atom) or directive_term.functor.name != "dynamic":
+            self._error(
+                self._previous(),
+                f"Unsupported directive: {directive_term.functor}. Only 'dynamic' is supported."
+            )
+            return None
+
+        # Validate arity (should be 1 argument)
+        if len(directive_term.args) != 1:
+            self._error(
+                self._previous(),
+                f"dynamic directive expects 1 argument, got {len(directive_term.args)}"
+            )
+            return None
+
+        # Parse predicate indicator: p/1 format
+        indicator = directive_term.args[0]
+        pred_name, arity = self._parse_predicate_indicator(indicator)
+
+        if pred_name is None or arity is None:
+            return None
+
+        # Store directive
+        self.directives.append(("dynamic", pred_name, arity))
+        logger.info("Parsed dynamic directive: %s/%d", pred_name, arity)
+        return None
+
+    def _parse_predicate_indicator(self, indicator) -> Tuple[Optional[str], Optional[int]]:
+        """Parse p/1 format, return (name, arity) or (None, None) on error"""
+        if not isinstance(indicator, Term):
+            self._error(self._previous(), "Predicate indicator must be a term (name/arity)")
+            return None, None
+
+        # Must be / operator
+        if not isinstance(indicator.functor, Atom) or indicator.functor.name != "/":
+            self._error(
+                self._previous(),
+                f"Predicate indicator must use '/' operator, got: {indicator.functor}"
+            )
+            return None, None
+
+        # Must have exactly 2 args
+        if len(indicator.args) != 2:
+            self._error(
+                self._previous(),
+                f"Predicate indicator must have 2 arguments (name/arity), got {len(indicator.args)}"
+            )
+            return None, None
+
+        # Extract name (must be Atom)
+        name_arg = indicator.args[0]
+        if not isinstance(name_arg, Atom):
+            self._error(
+                self._previous(),
+                f"Predicate name must be an atom, got: {type(name_arg).__name__}"
+            )
+            return None, None
+
+        # Extract arity (must be Number, must be integer >= 0)
+        arity_arg = indicator.args[1]
+        if not isinstance(arity_arg, Number):
+            self._error(
+                self._previous(),
+                f"Predicate arity must be a number, got: {type(arity_arg).__name__}"
+            )
+            return None, None
+
+        arity_value = arity_arg.value
+        if not isinstance(arity_value, (int, float)) or (isinstance(arity_value, float) and arity_value != int(arity_value)):
+            self._error(
+                self._previous(),
+                f"Predicate arity must be an integer, got: {arity_value}"
+            )
+            return None, None
+
+        arity = int(arity_value)
+        if arity < 0:
+            self._error(self._previous(), f"Predicate arity cannot be negative: {arity}")
+            return None, None
+
+        return name_arg.name, arity
 
     def _build_conjunction(self, terms: List) -> Union[Term, Atom]:
         """項リストからコンジャンクションを構築（統合設計版）"""

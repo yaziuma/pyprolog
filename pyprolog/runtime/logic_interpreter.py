@@ -33,7 +33,21 @@ class LogicInterpreter:
         self.rules_index: Dict[Tuple[str, int], List[Union[Rule, Fact]]] = {}
         self._rules_len = 0
         self.empty_list: List[Union[Rule, Fact]] = []
+        # Dynamic directive support: two-registry approach
+        self.dynamic_registry: Set[Tuple[str, int]] = set()  # Declared predicates (persistent)
+        self.defined_registry: Set[Tuple[str, int]] = set()  # Currently defined predicates (removed on retract)
         self._build_index()
+
+    def apply_dynamic(self, name: str, arity: int) -> None:
+        """Apply dynamic directive: mark predicate as declared.
+
+        Args:
+            name: Predicate name
+            arity: Predicate arity
+        """
+        key = (name, arity)
+        self.dynamic_registry.add(key)
+        logger.debug("Applied dynamic directive: %s/%d", name, arity)
 
     def _build_index(self) -> None:
         self.rules_by_pred = {}
@@ -164,6 +178,15 @@ class LogicInterpreter:
         return primary_candidates, False
 
     def add_rule(self, entry: Union[Rule, Fact], position: str = "last") -> None:
+        # Update defined_registry before adding rule
+        head = entry.head
+        if isinstance(head, Term) and isinstance(head.functor, Atom):
+            key = (head.functor.name, len(head.args))
+            self.defined_registry.add(key)
+        elif isinstance(head, Atom):
+            key = (head.name, 0)
+            self.defined_registry.add(key)
+
         if position == "first":
             self.rules.insert(0, entry)
         else:
@@ -172,11 +195,26 @@ class LogicInterpreter:
         self._rules_len = len(self.rules)
 
     def remove_rule(self, entry: Union[Rule, Fact]) -> bool:
+        # Extract predicate key before removal
+        head = entry.head
+        key = None
+        if isinstance(head, Term) and isinstance(head.functor, Atom):
+            key = (head.functor.name, len(head.args))
+        elif isinstance(head, Atom):
+            key = (head.name, 0)
+
         for i, item in enumerate(self.rules):
             if item is entry:
                 del self.rules[i]
                 self._remove_from_index(entry)
                 self._rules_len = len(self.rules)
+
+                # Check if this was the last clause for this predicate
+                if key and key not in self.rules_by_pred:
+                    # No clauses remain, remove from defined_registry
+                    self.defined_registry.discard(key)
+                    logger.debug("Removed %s/%d from defined_registry (no clauses remain)", key[0], key[1])
+
                 return True
         return False
 
@@ -518,7 +556,9 @@ class LogicInterpreter:
         try:
             self._refresh_index_if_needed()
 
-            # 未定義述語は existence_error を返す（builtin/演算子は execute 側で処理済み）
+            # Existence check: 2-registry approach
+            # Step 1: true/fail special case (handled below)
+            # Step 2 & 3: Check if predicate exists in either registry
             if isinstance(
                 actual_goal.functor, Atom
             ) and actual_goal.functor.name not in (
@@ -526,10 +566,19 @@ class LogicInterpreter:
                 "fail",
             ):
                 key = (actual_goal.functor.name, len(actual_goal.args))
-                if key not in self.rules_by_pred:
+
+                # Step 2: Check registries (declared or has clauses)
+                if key not in self.defined_registry and key not in self.dynamic_registry:
                     raise PrologError(
                         f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
                     )
+
+                # Step 3: Check clause count
+                if key not in self.rules_by_pred or not self.rules_by_pred[key]:
+                    # Predicate exists (in registry) but has no clauses → fail
+                    if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                        self.runtime.tracer.record_fail(actual_goal)
+                    return  # Fail silently (no solutions)
 
             # トレース: ゴール呼び出し記録
             if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
