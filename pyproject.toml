@@ -65,6 +65,7 @@ include = ["pyprolog*"]
 [dependency-groups]
 dev = [
     "monkeytype>=23.3.0",
+    "poethepoet>=0.40.0",
     "pytest>=8.4.1",
     "pytest-benchmark>=5.2.3",
     "pytest-cov>=6.2.1",
@@ -75,6 +76,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+pythonpath = ["src"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "--ignore=tests/benchmark"
@@ -85,3 +87,51 @@ markers = [
     "bench_heavy: Heavy benchmarks (slow, for nightly/manual runs)",
     "timeout: per-test timeout (pytest-timeout)",
 ]
+
+# ============================================================
+# ruff
+# ============================================================
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "UP",     # pyupgrade
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ============================================================
+# mypy
+# ============================================================
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+
+# ============================================================
+# poethepoet
+# ============================================================
+[tool.poe.tasks]
+lint = "ruff check . --fix"
+format = "ruff format ."
+typecheck = "mypy src/"
+test = "pytest"
+all = ["lint", "format", "typecheck", "test"]
