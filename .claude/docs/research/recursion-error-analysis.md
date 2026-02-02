@@ -82,6 +82,27 @@ def _occurs_check(
 - Minimal memory overhead
 - Preserves existing logic
 
+## ⚠️ Critical Implementation Concerns (Codex Review)
+
+### 1. 🚨 CRITICAL: `seen` Set Implementation
+- **Problem**: Using structural equality (`__eq__`/`__hash__`) will cause cycle detection to **fail or trigger recursion**
+- **Solution**: Use **identity-based** only: `id(term)`
+- **Current code**: ✅ Already uses `id(term)` (lines 36, 47)
+
+### 2. ⚠️ HIGH: `seen` Check Timing
+- **Problem**: Must check `seen` **after dereferencing**, not before
+- **Reason**: Bound variables → compound/list transitions are missed otherwise
+- **Correct order**:
+  1. Dereference first
+  2. Check if target variable
+  3. Check `seen` (after deref)
+  4. Expand children
+
+### 3. ⚠️ MEDIUM: `ListTerm.tail` Edge Cases
+- **Problem**: Tail can be variable, improper list, or circular reference
+- **Solution**: Always push tail to stack (even if variable)
+- **Current code**: Line 125-126 already handles this ✅
+
 **Implementation Strategy** (from Codex consultation):
 
 ```python
@@ -92,6 +113,15 @@ def _occurs_check(
     env: BindingEnvironment,
     seen: Optional[Set[int]] = None,
 ) -> bool:
+    """
+    Iterative occurs check using explicit stack (DFS).
+
+    CRITICAL: Correct order is:
+    1. Dereference first
+    2. Check if target variable
+    3. Check seen (AFTER deref)
+    4. Expand children
+    """
     if seen is None:
         seen = set()
 
@@ -99,15 +129,18 @@ def _occurs_check(
     deref = self.dereference  # Local binding optimization
 
     while stack:
+        # Step 1: Dereference FIRST
         current = deref(stack.pop(), env)
 
+        # Step 2: Check if target variable (early return)
         if isinstance(current, Variable):
             if current == var:
                 return True
             continue
 
+        # Step 3 & 4: Check seen AFTER deref, then expand
         if isinstance(current, Term):
-            term_id = id(current)
+            term_id = id(current)  # Identity-based (not structural equality)
             if term_id in seen:
                 continue
             seen.add(term_id)
@@ -117,11 +150,12 @@ def _occurs_check(
             continue
 
         if isinstance(current, ListTerm):
-            term_id = id(current)
+            term_id = id(current)  # Identity-based (not structural equality)
             if term_id in seen:
                 continue
             seen.add(term_id)
             # Push tail first (processed last), then elements in reverse
+            # IMPORTANT: Always push tail, even if None (handles edge cases)
             if current.tail is not None:
                 stack.append(current.tail)
             for i in range(len(current.elements) - 1, -1, -1):
@@ -157,17 +191,25 @@ def _occurs_check(
 
 ## Implementation Plan
 
-### Phase 1: Core Fix
+### Phase 1: Core Fix (30 min)
 - [ ] Replace `_occurs_check()` with iterative version
+- [ ] Verify correct order: deref → target check → seen check → expand
+- [ ] Ensure `seen` uses `id()` only (identity-based)
 - [ ] Run existing test suite to verify correctness
 - [ ] Specifically test `benchmark(1000)` to confirm fix
 
-### Phase 2: Validation
-- [ ] Test with deeper structures (benchmark(2000), benchmark(5000))
+### Phase 2: Edge Case Testing (15-30 min)
+- [ ] Add circular structure test: `X = f(X)` must fail occurs check
+- [ ] Test improper lists: `[1, 2 | 3]`
+- [ ] Test deeply nested structures: `f(f(f(...)))`
 - [ ] Verify performance is equivalent or better
-- [ ] Check memory usage doesn't increase significantly
 
-### Phase 3: Documentation
+### Phase 3: Deep Structure Validation (15-30 min)
+- [ ] Test with deeper structures (benchmark(2000), benchmark(5000))
+- [ ] Check memory usage doesn't increase significantly
+- [ ] Confirm no RecursionError in any scenario
+
+### Phase 4: Documentation (Optional)
 - [ ] Add comments explaining iterative approach
 - [ ] Document why recursion was removed
 - [ ] Update any related documentation
@@ -186,7 +228,8 @@ def _occurs_check(
 
 ## References
 
-- **Codex Consultation**: 2026-02-02 (task be98233)
+- **Gemini Research**: 2026-02-02 (task ab5dea1) - Initial root cause analysis and solution proposal
+- **Codex Review**: 2026-02-02 (task ae680f5) - Critical concerns identification and implementation guidance
 - **Related Files**:
   - `pyprolog/runtime/logic_interpreter.py` (main file)
   - `pyprolog/core/types.py` (ListTerm definition)
@@ -195,14 +238,41 @@ def _occurs_check(
 
 ## Next Steps
 
-1. Implement iterative `_occurs_check()` in `logic_interpreter.py`
-2. Run `pytest tests/benchmark/test_benchmarks.py::test_benchmark_1000` to verify
-3. Run full test suite: `pytest --cov=pyprolog tests`
-4. Document changes in commit message
-5. Consider adding benchmark(2000) test to prevent regression
+### Before Implementation
+1. ✅ Verify current code uses `id()` for `seen` set (already correct)
+2. ✅ Confirm dereference-first order in new implementation (documented above)
+
+### Implementation
+3. Implement iterative `_occurs_check()` in `logic_interpreter.py:432-470`
+4. Follow strict order: deref → target check → seen check → expand
+5. Add docstring explaining the critical ordering
+
+### Testing
+6. Run `pytest tests/benchmark/test_benchmarks.py::test_primes_medium` to verify fix
+7. Add circular structure test: `X = f(X)` (should fail occurs check)
+8. Test improper lists: `[1, 2 | 3]`
+9. Run full test suite: `pytest --cov=pyprolog tests`
+
+### Validation
+10. Test with deeper structures: benchmark(2000), benchmark(5000)
+11. Verify no RecursionError in any scenario
+12. Check performance hasn't degraded
+
+### Documentation
+13. Document changes in commit message
+14. Consider adding benchmark(2000) test to prevent regression
 
 ---
 
-**Status**: Ready for implementation
-**Estimated effort**: 30 minutes (implementation + testing)
-**Risk**: Low (well-understood transformation, existing tests validate correctness)
+## Time Estimate (Codex Review)
+
+| Phase | Time | Note |
+|-------|------|------|
+| Code transformation only | 30 min | ✓ Realistic |
+| + Edge case testing | +15-30 min | Circular structures, improper lists |
+| + Deep structure validation | +15-30 min | benchmark(2000), benchmark(5000) |
+| **Total (realistic)** | **45-90 min** | With proper testing |
+
+**Status**: Ready for implementation (with critical concerns addressed)
+**Estimated effort**: 45-90 minutes (implementation + comprehensive testing)
+**Risk**: Low (well-understood transformation, but requires careful attention to deref-first order and identity-based `seen`)
