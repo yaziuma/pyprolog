@@ -52,8 +52,18 @@ class LogicInterpreter:
     def _build_index(self) -> None:
         self.rules_by_pred = {}
         self.rules_by_pred_arg0 = {}
+        # Also rebuild defined_registry from current rules
+        self.defined_registry.clear()
         for rule in self.rules:
             self._add_to_index(rule)
+            # Update defined_registry
+            head = rule.head
+            if isinstance(head, Term) and isinstance(head.functor, Atom):
+                key = (head.functor.name, len(head.args))
+                self.defined_registry.add(key)
+            elif isinstance(head, Atom):
+                key = (head.name, 0)
+                self.defined_registry.add(key)
         self.rules_index = self.rules_by_pred
         self._rules_len = len(self.rules)
 
