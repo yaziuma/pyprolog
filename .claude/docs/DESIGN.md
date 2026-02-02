@@ -62,6 +62,7 @@ Data Flow:
 | Two-registry approach (dynamic_registry + defined_registry) | Separates declaration from definition. Enables clear semantics: declared predicates fail when empty, undeclared predicates error when empty. Prevents semantic ambiguity where non-declared predicates would persist after retract. | Single persistent registry (rejected: semantic ambiguity) | 2026-02-02 |
 | Existence check: `if key not in (defined ∪ dynamic)` | Guards against undefined predicates while allowing declared-but-empty predicates to fail gracefully. | Registry-only check (rejected: doesn't handle undeclared predicates correctly) | 2026-02-02 |
 | defined_registry removed on retract (last clause) | Reflects actual state: predicate has no clauses. Without removal, retracted undeclared predicates would incorrectly fail instead of error. | Never remove from defined_registry (rejected: breaks undeclared semantics) | 2026-02-02 |
+| Replace mutual recursion with explicit execution stack (GoalFrame/GoalSeqFrame/ChoicePoint) while preserving generator semantics | Eliminates deep Python recursion and makes backtracking/cut control explicit without changing public APIs. | Keep mutual recursion (rejected: control flow complexity and recursion depth risk) | 2026-02-02 |
 
 ## TODO
 
@@ -80,4 +81,5 @@ Data Flow:
 | Date | Changes |
 |------|---------|
 | 2026-02-02 | Added Dynamic Directive v2 design: two-registry approach, parenthesized syntax `:- dynamic(p/1).`, clear existence semantics |
+| 2026-02-02 | Added explicit execution stack design decision for goal evaluation (frames + choice points) |
 | | Initial |

@@ -3,7 +3,11 @@
     "allow": [
       "Bash(uv run pytest:*)",
       "Bash(git checkout:*)",
-      "mcp__serena__find_symbol"
+      "mcp__serena__find_symbol",
+      "Bash(do if [ -s /tmp/claude-1000/-home-yuichi-projects-prolog-mcp-group-pyprolog/tasks/bcc8ec5.output ])",
+      "Bash(then cat /tmp/claude-1000/-home-yuichi-projects-prolog-mcp-group-pyprolog/tasks/bcc8ec5.output)",
+      "Bash(break)",
+      "Bash(timeout 60 bash:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
