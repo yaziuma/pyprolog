@@ -946,11 +946,21 @@ class Runtime:
                 variable_mapper=self.variable_mapper,
                 functor_mapper=self.functor_mapper,
             ).scan_tokens()
-            new_rules_or_terms = Parser(
+            parser = Parser(
                 tokens,
                 variable_mapper=self.variable_mapper,
                 functor_mapper=self.functor_mapper,
-            ).parse()
+            )
+            new_rules_or_terms = parser.parse()
+
+            # Apply directives FIRST
+            directives = parser.directives
+            for directive_type, pred_name, arity in directives:
+                if directive_type == "dynamic":
+                    self.logic_interpreter.apply_dynamic(pred_name, arity)
+                    logger.info("Applied dynamic directive: %s/%d from %s", pred_name, arity, filename)
+
+            # Then add rules
             added_count = 0
             for item in new_rules_or_terms:
                 if isinstance(item, (Rule, Fact)):
@@ -958,10 +968,14 @@ class Runtime:
                     added_count += 1
                 else:
                     logger.warning("Skipping non-rule/fact during consult: %s", item)
-            if added_count > 0:
-                logger.info("Consulted %d rules/facts from %s", added_count, filename)
+
+            if added_count > 0 or directives:
+                logger.info(
+                    "Consulted %d directive(s) and %d rule(s)/fact(s) from %s",
+                    len(directives), added_count, filename
+                )
             else:
-                logger.info("No rules or facts consulted from %s", filename)
+                logger.info("No directives, rules or facts consulted from %s", filename)
             return True
         except Exception as e:
             logger.error("Failed to consult %s: %s", filename, e, exc_info=True)
