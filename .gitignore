@@ -153,3 +153,5 @@ CLAUDE.md
 /*.sqlite3
 /.serena
 *.Identifier
+
+.claude/logs/

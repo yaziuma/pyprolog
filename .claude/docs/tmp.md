@@ -1,0 +1,6 @@
+docs/dynamic_directive/dynamic_directive_spec_and_plan.md
+docs/dynamic_directive/implementation_task_breakdown.md
+docs/dynamic_directive/pyprolog_縮小版仕様.md
+docs/pyprolog_実装済み機能・述語リスト.md
+
+現状の仕様は上記を参照
