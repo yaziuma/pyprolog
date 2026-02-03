@@ -1156,34 +1156,56 @@ class Runtime:
             frame = state.stack[-1]
 
             try:
+                # Special handling for GoalSeqFrame
+                if isinstance(frame, GoalSeqFrame):
+                    result = frame.step(self)
+
+                    if result is None:
+                        # Need to push next goal in sequence
+                        if frame.current_index < len(frame.goals):
+                            next_goal = frame.goals[frame.current_index]
+                            state.push_goal(next_goal, frame.env)
+                        else:
+                            # Should not happen (step() should return env)
+                            state.stack.pop()
+                        continue
+
+                    # result is not None: sequence complete
+                    yield result
+                    state.stack.pop()
+                    continue
+
+                # Regular frame processing
                 result = frame.step(self)
 
                 if result is None:
-                    # Frame exhausted or needs to be popped
+                    # Frame exhausted, pop and continue
                     state.stack.pop()
                     continue
 
                 # Frame produced a result
-                if isinstance(frame, GoalSeqFrame):
-                    # Goal in sequence succeeded, advance
-                    frame.advance(result)
-                    # Push next goal if not done
-                    if frame.current_index < len(frame.goals):
-                        next_goal = frame.goals[frame.current_index]
-                        state.push_goal(next_goal, result)
+                if isinstance(frame, GoalFrame):
+                    # Check if this is part of a sequence
+                    parent_frame = (
+                        state.stack[-2] if len(state.stack) >= 2 else None
+                    )
+
+                    if isinstance(parent_frame, GoalSeqFrame):
+                        # Goal in sequence succeeded, advance parent
+                        parent_frame.advance(result)
+                        state.stack.pop()  # Pop current GoalFrame
+
+                        # Check if sequence is complete
+                        if parent_frame.current_index >= len(parent_frame.goals):
+                            # Sequence complete, will be yielded in next iteration
+                            pass
+                        # else: next goal will be pushed in next iteration
                     else:
-                        # Sequence complete
+                        # Standalone goal succeeded
                         yield result
-                        state.stack.pop()
-
-                elif isinstance(frame, GoalFrame):
-                    # Single goal succeeded
-                    yield result
-                    # Continue to try next solution from this frame
-                    # (frame.step() will be called again in next loop iteration)
-
+                        # Continue to try next solution from this frame
                 else:
-                    # Operator or other frame
+                    # Other frame types
                     yield result
                     state.stack.pop()
 

@@ -266,13 +266,63 @@ class ExecutionState:
     cut_barrier: Optional[int] = None  # Stack depth at cut
 
     def push_goal(self, goal: PrologType, env: BindingEnvironment) -> None:
-        """Push a new goal frame.
+        """Push a new goal frame with logical operator detection.
+
+        Routes goals to appropriate frame types:
+        - Conjunction (,/2): GoalSeqFrame for sequential execution
+        - Disjunction (;/2): OperatorFrame (handled by operator evaluator)
+        - Negation (\+/1): OperatorFrame (handled by operator evaluator)
+        - Atomic goals: GoalFrame (executed by _execute_single_goal)
 
         Args:
             goal: The goal to execute
             env: The binding environment
         """
+        from pyprolog.core.types import Term, Atom
+
+        # Detect logical operators
+        if isinstance(goal, Term) and isinstance(goal.functor, Atom):
+            functor_name = goal.functor.name
+
+            # Conjunction: expand to GoalSeqFrame
+            if functor_name == "," and len(goal.args) == 2:
+                # Flatten conjunction into sequence
+                goals = []
+                self._flatten_conjunction(goal, goals)
+                self.stack.append(GoalSeqFrame(env=env, goals=goals))
+                return
+
+            # Disjunction and Negation: use OperatorFrame
+            # (These will be handled by operator evaluators in execute())
+            if functor_name in (";", "\\+"):
+                # For now, create GoalFrame and let it fail with assertion
+                # Phase 4 will properly route these through execute()
+                self.stack.append(GoalFrame(env=env, goal=goal))
+                return
+
+        # Default: atomic goal
         self.stack.append(GoalFrame(env=env, goal=goal))
+
+    def _flatten_conjunction(
+        self, goal: PrologType, result: list[PrologType]
+    ) -> None:
+        """Flatten nested conjunction into a flat list.
+
+        Args:
+            goal: Goal to flatten
+            result: List to append flattened goals to
+        """
+        from pyprolog.core.types import Term, Atom
+
+        if isinstance(goal, Term) and isinstance(goal.functor, Atom):
+            if goal.functor.name == "," and len(goal.args) == 2:
+                # Recursively flatten left and right
+                self._flatten_conjunction(goal.args[0], result)
+                self._flatten_conjunction(goal.args[1], result)
+                return
+
+        # Base case: not a conjunction, add as-is
+        result.append(goal)
 
     def push_goal_sequence(
         self, goals: List[PrologType], env: BindingEnvironment
