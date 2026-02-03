@@ -1,18 +1,20 @@
+import logging
+from collections.abc import Iterator
+from typing import TYPE_CHECKING
+
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.errors import CutException, PrologError
 from pyprolog.core.types import (
+    Atom,
+    Fact,
+    ListTerm,
+    Number,
+    PrologType,
+    Rule,
+    String,
     Term,
     Variable,
-    Atom,
-    Number,
-    Rule,
-    Fact,
-    PrologType,
-    ListTerm,
-    String,
 )
-from pyprolog.core.binding_environment import BindingEnvironment
-from pyprolog.core.errors import PrologError, CutException
-from typing import TYPE_CHECKING, Tuple, Iterator, List, Union, Dict, Optional, Set
-import logging
 
 if TYPE_CHECKING:
     from pyprolog.runtime.interpreter import Runtime
@@ -22,20 +24,20 @@ _DEBUG = logger.isEnabledFor(logging.DEBUG)
 
 
 class LogicInterpreter:
-    def __init__(self, rules: List[Union[Rule, Fact]], runtime: "Runtime"):
-        self.rules: List[Union[Rule, Fact]] = rules
-        self.runtime: "Runtime" = runtime
+    def __init__(self, rules: list[Rule | Fact], runtime: "Runtime"):
+        self.rules: list[Rule | Fact] = rules
+        self.runtime: Runtime = runtime
         self._unique_var_counter = 0
-        self.rules_by_pred: Dict[Tuple[str, int], List[Union[Rule, Fact]]] = {}
-        self.rules_by_pred_arg0: Dict[
-            Tuple[str, int, int, Union[str, int, float]], List[Union[Rule, Fact]]
+        self.rules_by_pred: dict[tuple[str, int], list[Rule | Fact]] = {}
+        self.rules_by_pred_arg0: dict[
+            tuple[str, int, int, str | int | float], list[Rule | Fact]
         ] = {}
-        self.rules_index: Dict[Tuple[str, int], List[Union[Rule, Fact]]] = {}
+        self.rules_index: dict[tuple[str, int], list[Rule | Fact]] = {}
         self._rules_len = 0
-        self.empty_list: List[Union[Rule, Fact]] = []
+        self.empty_list: list[Rule | Fact] = []
         # Dynamic directive support: two-registry approach
-        self.dynamic_registry: Set[Tuple[str, int]] = set()  # Declared predicates (persistent)
-        self.defined_registry: Set[Tuple[str, int]] = set()  # Currently defined predicates (removed on retract)
+        self.dynamic_registry: set[tuple[str, int]] = set()  # Declared predicates (persistent)
+        self.defined_registry: set[tuple[str, int]] = set()  # Currently defined predicates (removed on retract)
         self._build_index()
 
     def apply_dynamic(self, name: str, arity: int) -> None:
@@ -71,7 +73,7 @@ class LogicInterpreter:
         if len(self.rules) != self._rules_len:
             self._build_index()
 
-    def _effective_head_for_index(self, entry: Union[Rule, Fact]) -> Optional[Term]:
+    def _effective_head_for_index(self, entry: Rule | Fact) -> Term | None:
         head = entry.head
 
         if (
@@ -91,7 +93,7 @@ class LogicInterpreter:
             return effective_head
         return None
 
-    def _index_key_from_head(self, head: Optional[Term]) -> Optional[Tuple[str, int]]:
+    def _index_key_from_head(self, head: Term | None) -> tuple[str, int] | None:
         if head is None:
             return None
         if not isinstance(head.functor, Atom):
@@ -99,8 +101,8 @@ class LogicInterpreter:
         return (head.functor.name, len(head.args))
 
     def _arg0_index_key_from_head(
-        self, head: Optional[Term]
-    ) -> Optional[Tuple[str, int, int, Union[str, int, float]]]:
+        self, head: Term | None
+    ) -> tuple[str, int, int, str | int | float] | None:
         if head is None or not isinstance(head.functor, Atom):
             return None
         if not head.args:
@@ -114,7 +116,7 @@ class LogicInterpreter:
             return (head.functor.name, len(head.args), 3, arg0.value)
         return None
 
-    def _add_to_index(self, entry: Union[Rule, Fact], position: str = "last") -> None:
+    def _add_to_index(self, entry: Rule | Fact, position: str = "last") -> None:
         effective_head = self._effective_head_for_index(entry)
         key = self._index_key_from_head(effective_head)
         if key is None:
@@ -132,7 +134,7 @@ class LogicInterpreter:
             else:
                 arg0_bucket.append(entry)
 
-    def _remove_from_index(self, entry: Union[Rule, Fact]) -> None:
+    def _remove_from_index(self, entry: Rule | Fact) -> None:
         effective_head = self._effective_head_for_index(entry)
         key = self._index_key_from_head(effective_head)
         if key is None:
@@ -161,7 +163,7 @@ class LogicInterpreter:
 
     def get_candidate_clauses(
         self, goal: Term, env: BindingEnvironment
-    ) -> Tuple[List[Union[Rule, Fact]], bool]:
+    ) -> tuple[list[Rule | Fact], bool]:
         if not isinstance(goal.functor, Atom):
             return self.rules, False
         pred = goal.functor.name
@@ -187,7 +189,7 @@ class LogicInterpreter:
                 return secondary_candidates, True
         return primary_candidates, False
 
-    def add_rule(self, entry: Union[Rule, Fact], position: str = "last") -> None:
+    def add_rule(self, entry: Rule | Fact, position: str = "last") -> None:
         # Update defined_registry before adding rule
         head = entry.head
         if isinstance(head, Term) and isinstance(head.functor, Atom):
@@ -204,7 +206,7 @@ class LogicInterpreter:
         self._add_to_index(entry, position=position)
         self._rules_len = len(self.rules)
 
-    def remove_rule(self, entry: Union[Rule, Fact]) -> bool:
+    def remove_rule(self, entry: Rule | Fact) -> bool:
         # Extract predicate key before removal
         head = entry.head
         key = None
@@ -228,20 +230,20 @@ class LogicInterpreter:
                 return True
         return False
 
-    def replace_rules(self, rules: List[Union[Rule, Fact]]) -> None:
+    def replace_rules(self, rules: list[Rule | Fact]) -> None:
         self.rules = rules
         self._build_index()
 
     def _rename_variables(
         self,
-        term_or_rule: Union[PrologType, Rule, Fact],
-        env: Optional[BindingEnvironment] = None,
-    ) -> Union[PrologType, Rule, Fact]:
+        term_or_rule: PrologType | Rule | Fact,
+        env: BindingEnvironment | None = None,
+    ) -> PrologType | Rule | Fact:
         if env is None:
             env = BindingEnvironment()
 
         self._unique_var_counter += 1
-        mapping: Dict[str, Variable] = {}
+        mapping: dict[str, Variable] = {}
 
         def rename_var(v: Variable) -> Variable:
             # 現行仕様維持：同名Varは同じ新Varへ
@@ -252,7 +254,7 @@ class LogicInterpreter:
 
         def rename_iter(root: PrologType) -> PrologType:
             # post-order 再構築（子→親）を明示スタックでやる
-            out: Dict[int, PrologType] = {}
+            out: dict[int, PrologType] = {}
             stack: list[tuple[PrologType, bool]] = [(root, False)]
 
             while stack:
@@ -335,7 +337,7 @@ class LogicInterpreter:
 
     def unify(
         self, term1: PrologType, term2: PrologType, env: BindingEnvironment
-    ) -> Tuple[bool, BindingEnvironment]:
+    ) -> tuple[bool, BindingEnvironment]:
         current_env = env.copy()
         deref = self.dereference
         occurs_enabled = self.runtime.occurs_check_enabled
@@ -434,7 +436,7 @@ class LogicInterpreter:
         var: Variable,
         term: PrologType,
         env: BindingEnvironment,
-        seen: Optional[Set[int]] = None,
+        seen: set[int] | None = None,
     ) -> bool:
         """
         Iterative occurs check using explicit stack (DFS).
@@ -506,9 +508,9 @@ class LogicInterpreter:
         if env.stats_enabled:
             env.stats["deref_calls"] += 1
         current: PrologType = term
-        visited: List[str] = []
+        visited: list[str] = []
         visited_set = set()
-        trail: List[str] = []
+        trail: list[str] = []
         while isinstance(current, Variable):
             var_name = current.name
             if var_name in visited_set:
@@ -581,7 +583,7 @@ class LogicInterpreter:
         else:
             return
 
-        current_goal_key: Optional[Tuple[str, int]] = None
+        current_goal_key: tuple[str, int] | None = None
         if isinstance(actual_goal.functor, Atom):
             current_goal_key = (actual_goal.functor.name, len(actual_goal.args))
         if env.stats_enabled:
@@ -643,7 +645,7 @@ class LogicInterpreter:
             #     yield env
             #     return
 
-            candidate_entries: List[Union[Rule, Fact]]
+            candidate_entries: list[Rule | Fact]
             if isinstance(actual_goal.functor, Atom):
                 candidate_entries, used_secondary_index = self.get_candidate_clauses(
                     actual_goal, env
@@ -757,6 +759,266 @@ class LogicInterpreter:
         finally:
             if env.stats_enabled:
                 env.stats["current_goal_key"] = previous_goal_key
+
+    def solve_goal_direct(
+        self, goal: PrologType, env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """Solve goal without calling runtime.execute() for rule bodies.
+
+        This method is used by _execute_single_goal() to avoid recursion:
+        _execute_single_goal → solve_goal → execute → execute_iterative → 
+          _execute_single_goal → ...
+
+        Instead, it handles logical operators manually and delegates atomic
+        goals to _execute_single_goal().
+
+        Args:
+            goal: Goal to solve
+            env: Binding environment
+
+        Yields:
+            Binding environments for each solution
+
+        Raises:
+            CutException: When cut is encountered
+            PrologError: On predicate errors
+        """
+        if env.stats_enabled:
+            env.stats["solve_calls_total"] += 1
+
+        actual_goal: Term
+        if isinstance(goal, Atom):
+            actual_goal = Term(goal, [])
+        elif isinstance(goal, Term):
+            actual_goal = goal
+        else:
+            return
+
+        current_goal_key: tuple[str, int] | None = None
+        if isinstance(actual_goal.functor, Atom):
+            current_goal_key = (actual_goal.functor.name, len(actual_goal.args))
+
+        if env.stats_enabled:
+            previous_goal_key = env.stats.get("current_goal_key")
+            env.stats["current_goal_key"] = current_goal_key
+            if current_goal_key:
+                env.stats["solve_calls_by_pred"][current_goal_key] = (
+                    env.stats["solve_calls_by_pred"].get(current_goal_key, 0) + 1
+                )
+        else:
+            previous_goal_key = None
+
+        try:
+            self._refresh_index_if_needed()
+
+            # Existence check
+            if isinstance(actual_goal.functor, Atom) and actual_goal.functor.name not in (
+                "true",
+                "fail",
+            ):
+                key = (actual_goal.functor.name, len(actual_goal.args))
+
+                if key not in self.defined_registry and key not in self.dynamic_registry:
+                    raise PrologError(
+                        f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
+                    )
+
+                if key not in self.rules_by_pred or not self.rules_by_pred[key]:
+                    if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                        self.runtime.tracer.record_fail(actual_goal)
+                    return
+
+            # Tracer: call
+            if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                self.runtime.tracer.record_call(actual_goal, env)
+
+            # Special predicates
+            if actual_goal.functor.name == "true" and not actual_goal.args:
+                if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                    self.runtime.tracer.record_exit(actual_goal, env, Fact(actual_goal))
+                yield env
+                return
+            elif actual_goal.functor.name == "fail" and not actual_goal.args:
+                if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                    self.runtime.tracer.record_fail(actual_goal)
+                return
+
+            # Get candidate clauses
+            candidate_entries: list[Rule | Fact]
+            if isinstance(actual_goal.functor, Atom):
+                candidate_entries, used_secondary_index = self.get_candidate_clauses(
+                    actual_goal, env
+                )
+                if env.stats_enabled:
+                    if used_secondary_index:
+                        env.stats["index2_hit"] += 1
+                    else:
+                        env.stats["index2_miss_or_fallback"] += 1
+            else:
+                candidate_entries = self.rules
+
+            if env.stats_enabled:
+                env.stats["candidate_entries_scanned_total"] += len(candidate_entries)
+                if current_goal_key:
+                    env.stats["candidate_entries_scanned_by_pred"][current_goal_key] = (
+                        env.stats["candidate_entries_scanned_by_pred"].get(
+                            current_goal_key, 0
+                        )
+                        + len(candidate_entries)
+                    )
+                if env.stats["solve_calls_total"]:
+                    env.stats["avg_candidates_per_goal"] = (
+                        env.stats["candidate_entries_scanned_total"]
+                        / env.stats["solve_calls_total"]
+                    )
+
+            # Try each candidate clause
+            for db_entry in candidate_entries:
+                renamed_entry = self._rename_variables(db_entry, env)
+
+                current_head: Term
+                if isinstance(renamed_entry, Rule):
+                    current_head = renamed_entry.head
+                elif isinstance(renamed_entry, Fact):
+                    current_head = renamed_entry.head
+                else:
+                    raise PrologError(
+                        "Internal error: Renamed DB entry is not Rule or Fact."
+                    )
+
+                # Handle potential parser issue
+                effective_head = current_head
+                is_rule_from_fact_structure = False
+                rule_body_from_fact_structure = None
+
+                if (
+                    isinstance(renamed_entry, Fact)
+                    and isinstance(current_head, Term)
+                    and current_head.functor.name == ":-"
+                    and len(current_head.args) == 2
+                ):
+                    logger.warning(
+                        "LOGIC_INTERP (PATCH DETECTED): Fact's head is a ':-' term: %s. Treating as rule.",
+                        current_head,
+                    )
+                    effective_head = current_head.args[0]
+                    rule_body_from_fact_structure = current_head.args[1]
+                    is_rule_from_fact_structure = True
+
+                unified, new_env_after_unify = self.unify(
+                    actual_goal, effective_head, env
+                )
+
+                if unified:
+                    if is_rule_from_fact_structure:
+                        # Execute body directly without runtime.execute()
+                        try:
+                            yield from self._execute_body_direct(
+                                rule_body_from_fact_structure, new_env_after_unify
+                            )
+                        except CutException:
+                            raise
+                        except Exception as e:
+                            if "Input required" in str(e) or hasattr(e, "input_type"):
+                                raise
+                            raise
+                    elif isinstance(renamed_entry, Fact):
+                        # Genuine Fact
+                        if (
+                            hasattr(self.runtime, "tracer")
+                            and self.runtime.tracer.enabled
+                        ):
+                            self.runtime.tracer.record_exit(
+                                actual_goal, new_env_after_unify, renamed_entry
+                            )
+                        yield new_env_after_unify
+                    elif isinstance(renamed_entry, Rule):
+                        # Execute body directly without runtime.execute()
+                        try:
+                            yield from self._execute_body_direct(
+                                renamed_entry.body, new_env_after_unify
+                            )
+                        except CutException:
+                            raise
+                        except Exception as e:
+                            if "Input required" in str(e) or hasattr(e, "input_type"):
+                                raise
+                            raise
+
+            # Tracer: fail
+            if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                self.runtime.tracer.record_fail(actual_goal)
+        finally:
+            if env.stats_enabled:
+                env.stats["current_goal_key"] = previous_goal_key
+
+    def _execute_body_direct(
+        self, body: PrologType, env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """Execute rule body without calling runtime.execute().
+
+        Handles logical operators manually and delegates atomic goals to
+        _execute_single_goal().
+
+        Args:
+            body: Rule body to execute
+            env: Binding environment
+
+        Yields:
+            Binding environments for each solution
+
+        Raises:
+            CutException: When cut is encountered
+        """
+        from pyprolog.core.types import Atom, Term
+
+        # Detect logical operators
+        if isinstance(body, Term) and isinstance(body.functor, Atom):
+            functor_name = body.functor.name
+
+            # Conjunction (,/2): execute left then right
+            if functor_name == "," and len(body.args) == 2:
+                left_goal, right_goal = body.args[0], body.args[1]
+                try:
+                    for left_env in self._execute_body_direct(left_goal, env):
+                        yield from self._execute_body_direct(right_goal, left_env)
+                except CutException:
+                    raise
+                return
+
+            # Disjunction (;/2): try left, then right
+            if functor_name == ";" and len(body.args) == 2:
+                left_goal, right_goal = body.args[0], body.args[1]
+                # Try left alternative
+                try:
+                    yield from self._execute_body_direct(left_goal, env)
+                except CutException:
+                    # Cut in left branch prevents right branch
+                    raise
+                # Try right alternative
+                yield from self._execute_body_direct(right_goal, env)
+                return
+
+            # Negation (\+/1): negation as failure
+            if functor_name == "\\+" and len(body.args) == 1:
+                inner_goal = body.args[0]
+                # Try to prove inner goal
+                solution_found = False
+                try:
+                    for _ in self._execute_body_direct(inner_goal, env):
+                        solution_found = True
+                        break  # One solution is enough
+                except CutException:
+                    # Cut within negation doesn't escape
+                    solution_found = True
+
+                # Negation succeeds if inner goal failed
+                if not solution_found:
+                    yield env
+                return
+
+        # Atomic goal: delegate to _execute_single_goal()
+        yield from self.runtime._execute_single_goal(body, env)
 
     def instantiate_term(self, term: PrologType, env: BindingEnvironment) -> PrologType:
         """

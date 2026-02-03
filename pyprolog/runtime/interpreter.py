@@ -852,21 +852,21 @@ class Runtime:
                     raise
                 return
 
-            # Normal predicate via solve_goal
+            # Normal predicate via solve_goal_direct
             logger.debug(
-                "_execute_single_goal Atom: Attempting Normal Predicate solve_goal for Atom: %s",
+                "_execute_single_goal Atom: Attempting Normal Predicate solve_goal_direct for Atom: %s",
                 goal,
             )
             try:
-                for item in self.logic_interpreter.solve_goal(goal, env):
+                for item in self.logic_interpreter.solve_goal_direct(goal, env):
                     logger.debug(
-                        "_execute_single_goal Atom (solve_goal): Yielding: %s",
+                        "_execute_single_goal Atom (solve_goal_direct): Yielding: %s",
                         item.bindings if item else "None",
                     )
                     yield item
             except CutException:
                 logger.debug(
-                    "CutException propagated from solve_goal for Atom: %s. Re-raising.",
+                    "CutException propagated from solve_goal_direct for Atom: %s. Re-raising.",
                     goal,
                 )
                 raise
@@ -1112,21 +1112,21 @@ class Runtime:
                 yield item
             return
 
-        # === Fallback: User-defined predicates via solve_goal ===
+        # === Fallback: User-defined predicates via solve_goal_direct ===
         logger.debug(
-            "_execute_single_goal Term: Attempting Normal Predicate solve_goal for: %s",
+            "_execute_single_goal Term: Attempting Normal Predicate solve_goal_direct for: %s",
             processed_goal,
         )
         try:
-            for item in self.logic_interpreter.solve_goal(processed_goal, env):
+            for item in self.logic_interpreter.solve_goal_direct(processed_goal, env):
                 logger.debug(
-                    "_execute_single_goal Term (solve_goal): Yielding: %s",
+                    "_execute_single_goal Term (solve_goal_direct): Yielding: %s",
                     item.bindings if item else "None",
                 )
                 yield item
         except CutException:
             logger.debug(
-                "CutException propagated from solve_goal for Term: %s. Re-raising.",
+                "CutException propagated from solve_goal_direct for Term: %s. Re-raising.",
                 processed_goal,
             )
             raise
