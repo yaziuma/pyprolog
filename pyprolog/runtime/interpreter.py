@@ -1,57 +1,51 @@
 # pyprolog/runtime/interpreter.py
-from pyprolog.core.types import Term, Variable, Number, Rule, Fact, Atom, PrologType
+import logging
+from collections.abc import Callable, Iterator  # Optional was already here
+from typing import (
+    Any,
+)
+
 from pyprolog.core.binding_environment import BindingEnvironment
-from pyprolog.parser.scanner import Scanner
+from pyprolog.core.errors import CutException, PrologError
+from pyprolog.core.operators import OperatorInfo, OperatorType, operator_registry
+from pyprolog.core.types import Atom, Fact, Number, PrologType, Rule, Term, Variable
 from pyprolog.parser.parser import Parser
-from pyprolog.util.variable_mapper import VariableMapper  # Added
-from pyprolog.util.functor_mapper import FunctorMapper  # Added FunctorMapper
-from pyprolog.runtime.math_interpreter import MathInterpreter
-from pyprolog.runtime.logic_interpreter import LogicInterpreter
-from pyprolog.core.operators import operator_registry, OperatorType, OperatorInfo
-from pyprolog.core.errors import PrologError, CutException
+from pyprolog.parser.scanner import Scanner
+from pyprolog.runtime.builtins import (
+    AppendPredicate,
+    ArgPredicate,
+    AtEndOfStreamPredicate,
+    AtomNumberPredicate,
+    AtomPredicate,
+    DynamicAssertAPredicate,
+    DynamicAssertZPredicate,
+    DynamicRetractPredicate,
+    ExportFactsPredicate,
+    FindallPredicate,
+    FunctorPredicate,
+    ListingPredicate,
+    ListingWithPredicatePredicate,
+    MemberPredicate,
+    NumberPredicate,
+    UnivPredicate,
+    VarPredicate,
+    # 統一入力システム対応版ファクトリ関数
+    create_get_char_predicate,
+    create_peek_char_predicate,
+    create_read_line_predicate,
+)
 from pyprolog.runtime.execution_frames import (
     ExecutionState,
     GoalFrame,
     GoalSeqFrame,
-    OperatorFrame,
-    FrameType,
 )
-from pyprolog.runtime.builtins import (
-    VarPredicate,
-    AtomPredicate,
-    NumberPredicate,
-    AtomNumberPredicate,
-    FunctorPredicate,
-    ArgPredicate,
-    UnivPredicate,
-    DynamicAssertAPredicate,
-    DynamicAssertZPredicate,
-    DynamicRetractPredicate,
-    MemberPredicate,
-    AppendPredicate,
-    FindallPredicate,
-    AtEndOfStreamPredicate,
-    ListingPredicate,
-    ListingWithPredicatePredicate,
-    ExportFactsPredicate,
-    # 統一入力システム対応版ファクトリ関数
-    create_get_char_predicate,
-    create_read_line_predicate,
-    create_peek_char_predicate,
-)
+from pyprolog.runtime.logic_interpreter import LogicInterpreter
+from pyprolog.runtime.math_interpreter import MathInterpreter
+from pyprolog.util.functor_mapper import FunctorMapper  # Added FunctorMapper
+from pyprolog.util.variable_mapper import VariableMapper  # Added
+
 from .io_manager import IOManager
 from .tracer import Tracer
-from typing import (
-    List,
-    Iterator,
-    Dict,
-    Any,
-    Union,
-    Optional,
-    Callable,
-    Tuple,
-)  # Optional was already here
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +53,12 @@ logger = logging.getLogger(__name__)
 class Runtime:
     def __init__(
         self,
-        rules: Optional[List[Union[Rule, Fact]]] = None,
-        variable_mapper: Optional[VariableMapper] = None,
-        functor_mapper: Optional[FunctorMapper] = None,
+        rules: list[Rule | Fact] | None = None,
+        variable_mapper: VariableMapper | None = None,
+        functor_mapper: FunctorMapper | None = None,
         occurs_check_enabled: bool = True,
     ):
-        self.rules: List[Union[Rule, Fact]] = rules if rules is not None else []
+        self.rules: list[Rule | Fact] = rules if rules is not None else []
         self.variable_mapper = (
             variable_mapper if variable_mapper is not None else VariableMapper()
         )
@@ -109,7 +103,7 @@ class Runtime:
 
         return functors
 
-    def _extract_functors_from_term(self, term: Union[Term, Variable]) -> set:
+    def _extract_functors_from_term(self, term: Term | Variable) -> set:
         """項から再帰的にファンクター名を抽出"""
         functors = set()
 
@@ -130,8 +124,8 @@ class Runtime:
 
         return functors
 
-    def _build_unified_evaluator_system(self) -> Dict[str, Callable]:
-        evaluators: Dict[str, Callable] = {}
+    def _build_unified_evaluator_system(self) -> dict[str, Callable]:
+        evaluators: dict[str, Callable] = {}
         arithmetic_ops = operator_registry.get_operators_by_type(
             OperatorType.ARITHMETIC
         )
@@ -161,7 +155,7 @@ class Runtime:
         return evaluators
 
     def _create_arithmetic_evaluator(self, op_info: OperatorInfo) -> Callable:
-        def evaluator(args: List, env: BindingEnvironment) -> bool:
+        def evaluator(args: list, env: BindingEnvironment) -> bool:
             if len(args) != op_info.arity:
                 raise PrologError(
                     f"Operator {op_info.symbol} expects {op_info.arity} arguments, got {len(args)}"
@@ -180,7 +174,7 @@ class Runtime:
         return evaluator
 
     def _create_comparison_evaluator(self, op_info: OperatorInfo) -> Callable:
-        def evaluator(args: List, env: BindingEnvironment) -> bool:
+        def evaluator(args: list, env: BindingEnvironment) -> bool:
             if len(args) != 2:
                 raise PrologError(
                     f"Comparison operator {op_info.symbol} requires 2 arguments"
@@ -198,7 +192,7 @@ class Runtime:
 
     def _create_is_evaluator(self) -> Callable:
         def evaluator(
-            args: List, env: BindingEnvironment
+            args: list, env: BindingEnvironment
         ) -> Iterator[BindingEnvironment]:
             if len(args) != 2:
                 raise PrologError("'is' operator requires exactly 2 arguments")
@@ -218,7 +212,7 @@ class Runtime:
 
     def _create_unification_evaluator(self) -> Callable:
         def evaluator(
-            args: List, env: BindingEnvironment
+            args: list, env: BindingEnvironment
         ) -> Iterator[BindingEnvironment]:
             if len(args) != 2:
                 raise PrologError("Unification operator = requires exactly 2 arguments")
@@ -236,9 +230,9 @@ class Runtime:
             and len(goal.args) == 2
         )
 
-    def _flatten_conjunction(self, goal: PrologType) -> List[PrologType]:
-        flattened: List[PrologType] = []
-        stack: List[PrologType] = [goal]
+    def _flatten_conjunction(self, goal: PrologType) -> list[PrologType]:
+        flattened: list[PrologType] = []
+        stack: list[PrologType] = [goal]
 
         while stack:
             current = stack.pop()
@@ -252,13 +246,13 @@ class Runtime:
         return flattened
 
     def _execute_goal_sequence(
-        self, goals: List[PrologType], env: BindingEnvironment
+        self, goals: list[PrologType], env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
         if not goals:
             yield env
             return
 
-        stack: List[Tuple[int, Iterator[BindingEnvironment]]] = [
+        stack: list[tuple[int, Iterator[BindingEnvironment]]] = [
             (0, self.execute(goals[0], env))
         ]
 
@@ -280,7 +274,7 @@ class Runtime:
 
     def _create_logical_evaluator(self, op_info: OperatorInfo) -> Callable:
         def evaluator(
-            args: List, env: BindingEnvironment
+            args: list, env: BindingEnvironment
         ) -> Iterator[BindingEnvironment]:
             if op_info.symbol == ",":  # Conjunction
                 if len(args) != 2:
@@ -380,7 +374,7 @@ class Runtime:
 
     def _create_control_evaluator(self, op_info: OperatorInfo) -> Callable:
         def evaluator(
-            args: List, env: BindingEnvironment
+            args: list, env: BindingEnvironment
         ) -> Iterator[BindingEnvironment]:
             if op_info.symbol == "!":
                 if args:
@@ -425,7 +419,7 @@ class Runtime:
 
     def _create_io_evaluator(self, op_info: OperatorInfo) -> Callable:
         def evaluator(
-            args: List, env: BindingEnvironment
+            args: list, env: BindingEnvironment
         ) -> Iterator[BindingEnvironment]:
             if op_info.symbol == "write":
                 if len(args) != 1:
@@ -782,33 +776,360 @@ class Runtime:
     def _execute_single_goal(
         self, goal: PrologType, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
-        """Execute a single atomic goal (non-logical-operator).
+        r"""Execute a single atomic goal (non-logical-operator).
 
-        This is a helper method for execute_iterative(). It handles:
-        - Built-in predicates (var, atom, number, etc.)
-        - Normal predicates via solve_goal
-        - All operators except logical operators (,/2, ;/2, \\+/1)
+        Handles:
+        - Cut (!) - raises CutException
+        - Operators (=, is, <, etc.) via _operator_evaluators
+        - Built-in predicates (var, atom, functor, etc.)
+        - User-defined predicates via solve_goal
 
-        Logical operators are handled by frames in execute_iterative().
+        Does NOT handle logical operators (,/2, ;/2, \+/1) - caller must handle.
 
         Args:
-            goal: The goal to execute
-            env: The binding environment
+            goal: Atomic goal (Atom or Term, not logical operator)
+            env: Binding environment
 
         Yields:
             Binding environments for each solution
 
         Raises:
             CutException: When cut (!) is executed
+            PrologError: On predicate errors
+
+        Note:
+            This method does NOT call execute() to avoid recursion.
         """
-        # Temporarily disable iterative execution to avoid infinite loop
-        # execute() → execute_iterative() → _execute_single_goal() → execute()
-        saved_flag = self.use_iterative_execution
-        self.use_iterative_execution = False
+        logger.debug(
+            "_execute_single_goal: Called with goal: %s (type: %s)",
+            goal,
+            type(goal).__name__,
+        )
+
+        # Architectural enforcement: reject logical operators
+        if isinstance(goal, Term) and isinstance(goal.functor, Atom):
+            assert goal.functor.name not in (",", ";", "\\+"), (
+                f"Logical operator {goal.functor.name} must be handled by execute(), "
+                "not _execute_single_goal()"
+            )
+
+        # Helper for statistics
+        def _record_builtin_call(name: str) -> None:
+            if env.stats_enabled:
+                env.stats["builtin_calls_by_name"][name] = (
+                    env.stats["builtin_calls_by_name"].get(name, 0) + 1
+                )
+                env.stats["builtin_calls_total"] += 1
+
+        # === Goal Preprocessing ===
+        processed_goal: Term
+        if (
+            isinstance(goal, Atom)
+            and goal.name == "!"
+            and "!" in self._operator_evaluators
+        ):
+            logger.debug("_execute_single_goal: Atom('!') detected, routing to operator.")
+            processed_goal = Term(goal, [])
+        elif isinstance(goal, Term):
+            processed_goal = goal
+        elif isinstance(goal, Atom):
+            # IO operators as Atoms (nl, tab, etc.)
+            if goal.name in self._operator_evaluators:
+                logger.debug("_execute_single_goal Atom IO Operator: %s", goal.name)
+                processed_goal = Term(goal, [])
+                evaluator = self._operator_evaluators[goal.name]
+                _record_builtin_call(goal.name)
+                try:
+                    for item in evaluator(processed_goal.args, env):
+                        logger.debug(
+                            "_execute_single_goal Atom IO op %s: Yielding: %s",
+                            goal.name,
+                            item.bindings if item else "None",
+                        )
+                        yield item
+                except Exception as e:
+                    logger.debug("Exception in Atom IO operator %s: %s", goal.name, e)
+                    raise
+                return
+
+            # Normal predicate via solve_goal
+            logger.debug(
+                "_execute_single_goal Atom: Attempting Normal Predicate solve_goal for Atom: %s",
+                goal,
+            )
+            try:
+                for item in self.logic_interpreter.solve_goal(goal, env):
+                    logger.debug(
+                        "_execute_single_goal Atom (solve_goal): Yielding: %s",
+                        item.bindings if item else "None",
+                    )
+                    yield item
+            except CutException:
+                logger.debug(
+                    "CutException propagated from solve_goal for Atom: %s. Re-raising.",
+                    goal,
+                )
+                raise
+            return
+        else:
+            logger.debug(
+                "Goal %s (type %s) is not directly executable by _execute_single_goal, failing.",
+                goal,
+                type(goal),
+            )
+            return
+
+        functor_name = (
+            processed_goal.functor.name
+            if hasattr(processed_goal.functor, "name")
+            else str(processed_goal.functor)
+        )
+        op_info = operator_registry.get_operator(functor_name)
+
+        # === Operator Evaluation ===
+        if op_info and functor_name in self._operator_evaluators:
+            evaluator = self._operator_evaluators[functor_name]
+            _record_builtin_call(functor_name)
+            try:
+                if (
+                    op_info.operator_type == OperatorType.ARITHMETIC
+                    and functor_name != "is"
+                ):
+                    if evaluator(processed_goal.args, env):
+                        logger.debug(
+                            "_execute_single_goal op %s: Yielding env (bool success): %s",
+                            functor_name,
+                            env.bindings,
+                        )
+                        yield env
+                elif op_info.operator_type == OperatorType.COMPARISON:
+                    if evaluator(processed_goal.args, env):
+                        logger.debug(
+                            "_execute_single_goal op %s: Yielding env (bool success): %s",
+                            functor_name,
+                            env.bindings,
+                        )
+                        yield env
+                else:
+                    for item in evaluator(processed_goal.args, env):
+                        logger.debug(
+                            "_execute_single_goal op %s: Yielding item from evaluator: %s",
+                            functor_name,
+                            item.bindings if item else "None",
+                        )
+                        yield item
+            except CutException:
+                logger.debug(
+                    "CutException caught while evaluating operator %s. Re-raising.",
+                    functor_name,
+                )
+                raise
+            except Exception as e:
+                # IO exceptions and PrologErrors should propagate
+                if "Input required" in str(e) or hasattr(e, "input_type"):
+                    logger.debug(
+                        "Critical exception in operator %s: %s", functor_name, e
+                    )
+                    raise
+                if isinstance(e, PrologError):
+                    raise
+                logger.error(
+                    "Error evaluating operator %s: %s", functor_name, e, exc_info=True
+                )
+                return
+            return
+
+        # === Built-in Predicates ===
+        if functor_name == "var" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
+            dereferenced_arg = self.logic_interpreter.dereference(
+                processed_goal.args[0], env
+            )
+            var_pred = VarPredicate(dereferenced_arg)
+            for item in var_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "atom" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
+            dereferenced_arg = self.logic_interpreter.dereference(
+                processed_goal.args[0], env
+            )
+            atom_pred = AtomPredicate(dereferenced_arg)
+            for item in atom_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "number" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
+            dereferenced_arg = self.logic_interpreter.dereference(
+                processed_goal.args[0], env
+            )
+            num_pred = NumberPredicate(dereferenced_arg)
+            for item in num_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "atom_number" and len(processed_goal.args) == 2:
+            _record_builtin_call(functor_name)
+            atom_number_pred = AtomNumberPredicate(
+                processed_goal.args[0], processed_goal.args[1]
+            )
+            for item in atom_number_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "functor" and len(processed_goal.args) == 3:
+            _record_builtin_call(functor_name)
+            functor_pred = FunctorPredicate(
+                processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
+            )
+            try:
+                for item in functor_pred.execute(self, env):
+                    yield item
+            except CutException:
+                logger.debug("CutException from functor/3. Re-raising.")
+                raise
+            return
+        elif functor_name == "arg" and len(processed_goal.args) == 3:
+            _record_builtin_call(functor_name)
+            arg_pred = ArgPredicate(
+                processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
+            )
+            try:
+                for item in arg_pred.execute(self, env):
+                    yield item
+            except CutException:
+                logger.debug("CutException from arg/3. Re-raising.")
+                raise
+            return
+        elif functor_name == "=.." and len(processed_goal.args) == 2:
+            _record_builtin_call(functor_name)
+            univ_pred = UnivPredicate(processed_goal.args[0], processed_goal.args[1])
+            try:
+                for item in univ_pred.execute(self, env):
+                    yield item
+            except CutException:
+                logger.debug("CutException from =../2. Re-raising.")
+                raise
+            return
+        elif functor_name == "asserta" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
+            asserta_pred = DynamicAssertAPredicate(processed_goal.args[0])
+            for item in asserta_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "assertz" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
+            assertz_pred = DynamicAssertZPredicate(processed_goal.args[0])
+            for item in assertz_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "member" and len(processed_goal.args) == 2:
+            _record_builtin_call(functor_name)
+            member_pred = MemberPredicate(
+                processed_goal.args[0], processed_goal.args[1]
+            )
+            try:
+                for item in member_pred.execute(self, env):
+                    yield item
+            except CutException:
+                logger.debug("CutException from member/2. Re-raising.")
+                raise
+            return
+        elif functor_name == "append" and len(processed_goal.args) == 3:
+            _record_builtin_call(functor_name)
+            append_pred = AppendPredicate(
+                processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
+            )
+            try:
+                for item in append_pred.execute(self, env):
+                    yield item
+            except CutException:
+                logger.debug("CutException from append/3. Re-raising.")
+                raise
+            return
+        elif functor_name == "findall" and len(processed_goal.args) == 3:
+            _record_builtin_call(functor_name)
+            findall_pred = FindallPredicate(
+                processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
+            )
+            for item in findall_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "get_char" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
+            get_char_pred = create_get_char_predicate(processed_goal.args[0])
+            try:
+                for item in get_char_pred.execute(self, env):
+                    yield item
+            except Exception as e:
+                logger.debug("Exception in %s: %s", functor_name, e)
+                raise
+            return
+        elif functor_name == "read_line" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
+            read_line_pred = create_read_line_predicate(processed_goal.args[0])
+            try:
+                for item in read_line_pred.execute(self, env):
+                    yield item
+            except Exception as e:
+                logger.debug("Exception in %s: %s", functor_name, e)
+                raise
+            return
+        elif functor_name == "peek_char" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
+            peek_char_pred = create_peek_char_predicate(processed_goal.args[0])
+            for item in peek_char_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "at_end_of_stream" and len(processed_goal.args) == 0:
+            _record_builtin_call(functor_name)
+            at_end_pred = AtEndOfStreamPredicate()
+            for item in at_end_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "retract" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
+            retract_pred = DynamicRetractPredicate(processed_goal.args[0])
+            for item in retract_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "listing" and len(processed_goal.args) == 0:
+            _record_builtin_call(functor_name)
+            listing_pred = ListingPredicate()
+            for item in listing_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "listing" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
+            listing_pred = ListingWithPredicatePredicate(processed_goal.args[0])
+            for item in listing_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "export_facts" and len(processed_goal.args) == 2:
+            _record_builtin_call(functor_name)
+            export_pred = ExportFactsPredicate(
+                processed_goal.args[0], processed_goal.args[1]
+            )
+            for item in export_pred.execute(self, env):
+                yield item
+            return
+
+        # === Fallback: User-defined predicates via solve_goal ===
+        logger.debug(
+            "_execute_single_goal Term: Attempting Normal Predicate solve_goal for: %s",
+            processed_goal,
+        )
         try:
-            yield from self.execute(goal, env)
-        finally:
-            self.use_iterative_execution = saved_flag
+            for item in self.logic_interpreter.solve_goal(processed_goal, env):
+                logger.debug(
+                    "_execute_single_goal Term (solve_goal): Yielding: %s",
+                    item.bindings if item else "None",
+                )
+                yield item
+        except CutException:
+            logger.debug(
+                "CutException propagated from solve_goal for Term: %s. Re-raising.",
+                processed_goal,
+            )
+            raise
 
     def execute_iterative(
         self, goal: PrologType, env: BindingEnvironment
@@ -876,7 +1197,7 @@ class Runtime:
                 if not state.backtrack():
                     state.stack.pop()
 
-    def query(self, query_string: str) -> List[Dict[Variable, Any]]:
+    def query(self, query_string: str) -> list[dict[Variable, Any]]:
         logger.debug("QUERY: Executing query: %s", query_string)
         solutions = []
         try:
@@ -896,7 +1217,7 @@ class Runtime:
             if not parsed_structures:
                 logger.warning("Query parsing failed")
                 return []
-            query_goal: Optional[Any] = None
+            query_goal: Any | None = None
             if isinstance(parsed_structures[0], Fact):
                 query_goal = parsed_structures[0].head
             elif isinstance(parsed_structures[0], Rule):
@@ -984,8 +1305,8 @@ class Runtime:
             raise e
 
     def query_with_trace(
-        self, query_string: str, max_depth: Optional[int] = None
-    ) -> Tuple[List[Dict[Variable, Any]], List]:
+        self, query_string: str, max_depth: int | None = None
+    ) -> tuple[list[dict[Variable, Any]], list]:
         """トレース付きでクエリを実行"""
 
         logger.debug("TRACE QUERY: Executing query with trace: %s", query_string)
@@ -1001,7 +1322,7 @@ class Runtime:
         finally:
             self.tracer.stop_trace()
 
-    def _extract_variables_names(self, term: Term) -> List[str]:
+    def _extract_variables_names(self, term: Term) -> list[str]:
         variables = set()
         queue = [term]
         while queue:
@@ -1049,7 +1370,7 @@ class Runtime:
 
     def consult(self, filename: str) -> bool:
         try:
-            with open(filename, "r", encoding="utf-8") as f:
+            with open(filename, encoding="utf-8") as f:
                 source = f.read()
             tokens = Scanner(
                 source,
