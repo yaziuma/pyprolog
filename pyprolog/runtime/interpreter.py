@@ -9,6 +9,13 @@ from pyprolog.runtime.math_interpreter import MathInterpreter
 from pyprolog.runtime.logic_interpreter import LogicInterpreter
 from pyprolog.core.operators import operator_registry, OperatorType, OperatorInfo
 from pyprolog.core.errors import PrologError, CutException
+from pyprolog.runtime.execution_frames import (
+    ExecutionState,
+    GoalFrame,
+    GoalSeqFrame,
+    OperatorFrame,
+    FrameType,
+)
 from pyprolog.runtime.builtins import (
     VarPredicate,
     AtomPredicate,
@@ -765,6 +772,99 @@ class Runtime:
                     processed_goal,
                 )
                 raise
+
+    def _execute_single_goal(
+        self, goal: PrologType, env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """Execute a single atomic goal (non-logical-operator).
+
+        This is a helper method for execute_iterative(). It handles:
+        - Built-in predicates (var, atom, number, etc.)
+        - Normal predicates via solve_goal
+        - All operators except logical operators (,/2, ;/2, \\+/1)
+
+        Logical operators are handled by frames in execute_iterative().
+
+        Args:
+            goal: The goal to execute
+            env: The binding environment
+
+        Yields:
+            Binding environments for each solution
+
+        Raises:
+            CutException: When cut (!) is executed
+        """
+        # For now, delegate to existing execute() method
+        # This is a temporary implementation; we'll refactor later
+        # to avoid recursion through execute()
+        yield from self.execute(goal, env)
+
+    def execute_iterative(
+        self, goal: PrologType, env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """Iterative goal execution using explicit stack.
+
+        Replaces mutual recursion between execute/evaluator/_execute_goal_sequence
+        with an explicit frame-based stack approach.
+
+        Args:
+            goal: The goal to execute
+            env: The binding environment
+
+        Yields:
+            Binding environments for each solution
+
+        Raises:
+            CutException: When cut (!) is executed
+        """
+        state = ExecutionState(stack=[], choice_points=[])
+        state.push_goal(goal, env)
+
+        while state.stack:
+            frame = state.stack[-1]
+
+            try:
+                result = frame.step(self)
+
+                if result is None:
+                    # Frame exhausted or needs to be popped
+                    state.stack.pop()
+                    continue
+
+                # Frame produced a result
+                if isinstance(frame, GoalSeqFrame):
+                    # Goal in sequence succeeded, advance
+                    frame.advance(result)
+                    # Push next goal if not done
+                    if frame.current_index < len(frame.goals):
+                        next_goal = frame.goals[frame.current_index]
+                        state.push_goal(next_goal, result)
+                    else:
+                        # Sequence complete
+                        yield result
+                        state.stack.pop()
+
+                elif isinstance(frame, GoalFrame):
+                    # Single goal succeeded
+                    yield result
+                    # Continue to try next solution from this frame
+                    # (frame.step() will be called again in next loop iteration)
+
+                else:
+                    # Operator or other frame
+                    yield result
+                    state.stack.pop()
+
+            except CutException:
+                # Handle cut: remove choice points
+                state.apply_cut()
+                raise
+
+            except StopIteration:
+                # Frame exhausted, try backtracking
+                if not state.backtrack():
+                    state.stack.pop()
 
     def query(self, query_string: str) -> List[Dict[Variable, Any]]:
         logger.debug("QUERY: Executing query: %s", query_string)
