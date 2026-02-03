@@ -458,11 +458,25 @@ class Runtime:
     def execute(
         self, goal: Any, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
+        """Execute a goal (thin orchestrator).
+
+        Routes logical operators to evaluators, delegates atomic goals to
+        _execute_single_goal().
+
+        Args:
+            goal: Goal to execute
+            env: Binding environment
+
+        Yields:
+            Binding environments for each solution
+
+        Raises:
+            CutException: Propagated from cut execution
+        """
         logger.debug(
-            "EXECUTE: Called with goal: %s (type: %s) in env: %s",
+            "EXECUTE: Called with goal: %s (type: %s)",
             goal,
-            type(goal),
-            env.bindings,
+            type(goal).__name__,
         )
 
         # Feature flag: Use iterative execution if enabled
@@ -470,308 +484,40 @@ class Runtime:
             yield from self.execute_iterative(goal, env)
             return
 
-        def _record_builtin_call(name: str) -> None:
-            if env.stats_enabled:
-                env.stats["builtin_calls_by_name"][name] = (
-                    env.stats["builtin_calls_by_name"].get(name, 0) + 1
-                )
+        # Check if logical operator (for legacy recursive path)
+        if isinstance(goal, Term) and isinstance(goal.functor, Atom):
+            functor_name = goal.functor.name
 
-        processed_goal: Term
-        if (
-            isinstance(goal, Atom)
-            and goal.name == "!"
-            and "!" in self._operator_evaluators
-        ):
-            logger.debug("EXECUTE: Atom('!') detected, routing to operator.")
-            processed_goal = Term(
-                goal, []
-            )  # Convert to Term to be handled by operator logic
-        elif isinstance(goal, Term):
-            processed_goal = goal
-        elif isinstance(goal, Atom):
-            # IOオペレータの特別処理を追加
-            if goal.name in self._operator_evaluators:
-                logger.debug("EXECUTE Atom IO Operator: %s", goal.name)
-                # AtomをTermに変換してIOオペレータとして処理
-                processed_goal = Term(goal, [])
-                evaluator = self._operator_evaluators[goal.name]
-                _record_builtin_call(goal.name)
-                try:
-                    for item in evaluator(processed_goal.args, env):
-                        logger.debug(
-                            "EXECUTE Atom IO op %s: Yielding: %s",
-                            goal.name,
-                            item.bindings if item else "None",
-                        )
-                        yield item
-                except Exception as e:
-                    logger.debug("Exception in Atom IO operator %s: %s", goal.name, e)
-                    raise
-                return
+            # Logical operators: handle via existing evaluators
+            if functor_name == ",":
+                evaluator = self._operator_evaluators.get(",")
+                if evaluator:
+                    try:
+                        yield from evaluator(goal.args, env)
+                    except CutException:
+                        raise
+                    return
 
-            # 既存の通常述語処理
-            logger.debug(
-                "EXECUTE Atom: Attempting Normal Predicate solve_goal for Atom: %s",
-                goal,
-            )
-            try:
-                for item in self.logic_interpreter.solve_goal(goal, env):
-                    logger.debug(
-                        "EXECUTE Atom (solve_goal): Yielding: %s",
-                        item.bindings if item else "None",
-                    )
-                    yield item
-            except CutException:
-                logger.debug(
-                    "CutException propagated from solve_goal for Atom: %s. Re-raising.",
-                    goal,
-                )
-                raise
-            return
-        else:
-            logger.debug(
-                "Goal %s (type %s) is not directly executable by Runtime.execute, failing.",
-                goal,
-                type(goal),
-            )
-            return
+            elif functor_name == ";":
+                evaluator = self._operator_evaluators.get(";")
+                if evaluator:
+                    try:
+                        yield from evaluator(goal.args, env)
+                    except CutException:
+                        raise
+                    return
 
-        functor_name = (
-            processed_goal.functor.name
-            if hasattr(processed_goal.functor, "name")
-            else str(processed_goal.functor)
-        )
-        op_info = operator_registry.get_operator(functor_name)
+            elif functor_name == "\\+":
+                evaluator = self._operator_evaluators.get("\\+")
+                if evaluator:
+                    try:
+                        yield from evaluator(goal.args, env)
+                    except CutException:
+                        raise
+                    return
 
-        if op_info and functor_name in self._operator_evaluators:
-            evaluator = self._operator_evaluators[functor_name]
-            _record_builtin_call(functor_name)
-            try:
-                if (
-                    op_info.operator_type == OperatorType.ARITHMETIC
-                    and functor_name != "is"
-                ):
-                    if evaluator(processed_goal.args, env):
-                        logger.debug(
-                            "EXECUTE op %s: Yielding env (bool success): %s",
-                            functor_name,
-                            env.bindings,
-                        )
-                        yield env
-                elif op_info.operator_type == OperatorType.COMPARISON:
-                    if evaluator(processed_goal.args, env):
-                        logger.debug(
-                            "EXECUTE op %s: Yielding env (bool success): %s",
-                            functor_name,
-                            env.bindings,
-                        )
-                        yield env
-                else:
-                    for item in evaluator(processed_goal.args, env):
-                        logger.debug(
-                            "EXECUTE op %s: Yielding item from evaluator: %s",
-                            functor_name,
-                            item.bindings if item else "None",
-                        )
-                        yield item
-            except CutException:
-                logger.debug(
-                    "CutException caught while evaluating operator %s. Re-raising.",
-                    functor_name,
-                )
-                raise
-            except Exception as e:
-                # IOManager例外などの重要な例外は伝播
-                if "Input required" in str(e) or hasattr(e, "input_type"):
-                    logger.debug(
-                        "Critical exception in operator %s: %s", functor_name, e
-                    )
-                    raise
-                if isinstance(e, PrologError):
-                    raise
-                logger.error(
-                    "Error evaluating operator %s: %s", functor_name, e, exc_info=True
-                )
-                return
-        elif functor_name == "var" and len(processed_goal.args) == 1:
-            _record_builtin_call(functor_name)
-            dereferenced_arg = self.logic_interpreter.dereference(
-                processed_goal.args[0], env
-            )
-            var_pred = VarPredicate(dereferenced_arg)
-            for item in var_pred.execute(self, env):
-                yield item
-        elif functor_name == "atom" and len(processed_goal.args) == 1:
-            _record_builtin_call(functor_name)
-            dereferenced_arg = self.logic_interpreter.dereference(
-                processed_goal.args[0], env
-            )
-            atom_pred = AtomPredicate(dereferenced_arg)
-            for item in atom_pred.execute(self, env):
-                yield item
-        elif functor_name == "number" and len(processed_goal.args) == 1:
-            _record_builtin_call(functor_name)
-            dereferenced_arg = self.logic_interpreter.dereference(
-                processed_goal.args[0], env
-            )
-            num_pred = NumberPredicate(dereferenced_arg)
-            for item in num_pred.execute(self, env):
-                yield item
-        elif functor_name == "atom_number" and len(processed_goal.args) == 2:
-            _record_builtin_call(functor_name)
-            atom_number_pred = AtomNumberPredicate(
-                processed_goal.args[0], processed_goal.args[1]
-            )
-            for item in atom_number_pred.execute(self, env):
-                yield item
-        elif functor_name == "functor" and len(processed_goal.args) == 3:
-            _record_builtin_call(functor_name)
-            functor_pred = FunctorPredicate(
-                processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
-            )
-            try:
-                for item in functor_pred.execute(self, env):
-                    yield item
-            except CutException:
-                logger.debug("CutException from functor/3. Re-raising.")
-                raise
-        elif functor_name == "arg" and len(processed_goal.args) == 3:
-            _record_builtin_call(functor_name)
-            arg_pred = ArgPredicate(
-                processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
-            )
-            try:
-                for item in arg_pred.execute(self, env):
-                    yield item
-            except CutException:
-                logger.debug("CutException from arg/3. Re-raising.")
-                raise
-        elif functor_name == "=.." and len(processed_goal.args) == 2:
-            _record_builtin_call(functor_name)
-            univ_pred = UnivPredicate(processed_goal.args[0], processed_goal.args[1])
-            try:
-                for item in univ_pred.execute(self, env):
-                    yield item
-            except CutException:
-                logger.debug("CutException from =../2. Re-raising.")
-                raise
-        elif functor_name == "asserta" and len(processed_goal.args) == 1:
-            _record_builtin_call(functor_name)
-            asserta_pred = DynamicAssertAPredicate(processed_goal.args[0])
-            for item in asserta_pred.execute(self, env):
-                yield item
-        elif functor_name == "assertz" and len(processed_goal.args) == 1:
-            _record_builtin_call(functor_name)
-            assertz_pred = DynamicAssertZPredicate(processed_goal.args[0])
-            for item in assertz_pred.execute(self, env):
-                yield item
-        elif functor_name == "member" and len(processed_goal.args) == 2:
-            # Note: MemberPredicate's execute method handles dereferencing its arguments as needed.
-            _record_builtin_call(functor_name)
-            member_pred = MemberPredicate(
-                processed_goal.args[0], processed_goal.args[1]
-            )
-            try:
-                for item in member_pred.execute(self, env):
-                    yield item
-            except CutException:  # Should member/2 propagate CutException? Typically not, but being consistent.
-                logger.debug("CutException from member/2. Re-raising.")
-                raise
-        elif functor_name == "append" and len(processed_goal.args) == 3:
-            # AppendPredicate handles dereferencing its arguments internally as needed.
-            _record_builtin_call(functor_name)
-            append_pred = AppendPredicate(
-                processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
-            )
-            try:
-                for item in append_pred.execute(self, env):
-                    yield item
-            except (
-                CutException
-            ):  # append/3 is not typically a source of CutException by itself
-                logger.debug(
-                    "CutException from append/3. Re-raising."
-                )  # Though unlikely
-                raise
-        elif functor_name == "findall" and len(processed_goal.args) == 3:
-            _record_builtin_call(functor_name)
-            findall_pred = FindallPredicate(
-                processed_goal.args[0], processed_goal.args[1], processed_goal.args[2]
-            )
-            # FindallPredicate's execute method handles internal exceptions and re-throws PrologErrors
-            # It also handles CutException internally as per standard behavior (cut affects Goal, not findall itself)
-            for item in findall_pred.execute(self, env):
-                yield item
-        elif functor_name == "get_char" and len(processed_goal.args) == 1:
-            _record_builtin_call(functor_name)
-            get_char_pred = create_get_char_predicate(processed_goal.args[0])
-            try:
-                for item in get_char_pred.execute(self, env):
-                    yield item
-            except Exception as e:
-                # IOManager例外などをそのまま伝播
-                logger.debug("Exception in %s: %s", functor_name, e)
-                raise
-        elif functor_name == "read_line" and len(processed_goal.args) == 1:
-            _record_builtin_call(functor_name)
-            read_line_pred = create_read_line_predicate(processed_goal.args[0])
-            try:
-                for item in read_line_pred.execute(self, env):
-                    yield item
-            except Exception as e:
-                # IOManager例外などをそのまま伝播
-                logger.debug("Exception in %s: %s", functor_name, e)
-                raise
-        elif functor_name == "peek_char" and len(processed_goal.args) == 1:
-            _record_builtin_call(functor_name)
-            peek_char_pred = create_peek_char_predicate(processed_goal.args[0])
-            for item in peek_char_pred.execute(self, env):
-                yield item
-        elif functor_name == "at_end_of_stream" and len(processed_goal.args) == 0:
-            _record_builtin_call(functor_name)
-            at_end_pred = AtEndOfStreamPredicate()
-            for item in at_end_pred.execute(self, env):
-                yield item
-        elif functor_name == "retract" and len(processed_goal.args) == 1:
-            _record_builtin_call(functor_name)
-            retract_pred = DynamicRetractPredicate(processed_goal.args[0])
-            for item in retract_pred.execute(self, env):  # self is runtime
-                yield item
-        elif functor_name == "listing" and len(processed_goal.args) == 0:
-            _record_builtin_call(functor_name)
-            listing_pred = ListingPredicate()
-            for item in listing_pred.execute(self, env):
-                yield item
-        elif functor_name == "listing" and len(processed_goal.args) == 1:
-            _record_builtin_call(functor_name)
-            listing_pred = ListingWithPredicatePredicate(processed_goal.args[0])
-            for item in listing_pred.execute(self, env):
-                yield item
-        elif functor_name == "export_facts" and len(processed_goal.args) == 2:
-            _record_builtin_call(functor_name)
-            export_pred = ExportFactsPredicate(
-                processed_goal.args[0], processed_goal.args[1]
-            )
-            for item in export_pred.execute(self, env):
-                yield item
-        else:
-            logger.debug(
-                "EXECUTE Term: Attempting Normal Predicate solve_goal for: %s",
-                processed_goal,
-            )
-            try:
-                for item in self.logic_interpreter.solve_goal(processed_goal, env):
-                    logger.debug(
-                        "EXECUTE Term (solve_goal): Yielding: %s",
-                        item.bindings if item else "None",
-                    )
-                    yield item
-            except CutException:
-                logger.debug(
-                    "CutException propagated from solve_goal for Term: %s. Re-raising.",
-                    processed_goal,
-                )
-                raise
+        # All other goals: delegate to _execute_single_goal
+        yield from self._execute_single_goal(goal, env)
 
     def _execute_single_goal(
         self, goal: PrologType, env: BindingEnvironment
