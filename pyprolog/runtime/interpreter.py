@@ -85,6 +85,7 @@ class Runtime:
         self.io_manager = IOManager()  # Initialize IOManager
         self.tracer = Tracer()  # Initialize Tracer
         self.occurs_check_enabled = occurs_check_enabled
+        self.use_iterative_execution = False  # Feature flag for iterative execution
         self.logic_interpreter = LogicInterpreter(
             self.rules, self
         )  # Pass self (Runtime) to LogicInterpreter
@@ -470,6 +471,11 @@ class Runtime:
             env.bindings,
         )
 
+        # Feature flag: Use iterative execution if enabled
+        if self.use_iterative_execution:
+            yield from self.execute_iterative(goal, env)
+            return
+
         def _record_builtin_call(name: str) -> None:
             if env.stats_enabled:
                 env.stats["builtin_calls_by_name"][name] = (
@@ -795,10 +801,14 @@ class Runtime:
         Raises:
             CutException: When cut (!) is executed
         """
-        # For now, delegate to existing execute() method
-        # This is a temporary implementation; we'll refactor later
-        # to avoid recursion through execute()
-        yield from self.execute(goal, env)
+        # Temporarily disable iterative execution to avoid infinite loop
+        # execute() → execute_iterative() → _execute_single_goal() → execute()
+        saved_flag = self.use_iterative_execution
+        self.use_iterative_execution = False
+        try:
+            yield from self.execute(goal, env)
+        finally:
+            self.use_iterative_execution = saved_flag
 
     def execute_iterative(
         self, goal: PrologType, env: BindingEnvironment

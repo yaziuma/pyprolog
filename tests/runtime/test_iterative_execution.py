@@ -124,8 +124,8 @@ class TestConjunction:
         # Define: a.
         interpreter.add_rule("a.")
 
-        # Goal: a, b (b is undefined, should fail)
-        goal = Term(Atom(","), [Atom("a"), Atom("b")])
+        # Goal: a, fail (fail always fails)
+        goal = Term(Atom(","), [Atom("a"), Atom("fail")])
 
         recursive_results = list(interpreter.execute(goal, env))
         iterative_results = list(interpreter.execute_iterative(goal, env))
@@ -158,8 +158,8 @@ class TestDisjunction:
         # Define: a.
         interpreter.add_rule("a.")
 
-        # Goal: a ; b (b undefined)
-        goal = Term(Atom(";"), [Atom("a"), Atom("b")])
+        # Goal: a ; fail (fail always fails)
+        goal = Term(Atom(";"), [Atom("a"), Atom("fail")])
 
         recursive_results = list(interpreter.execute(goal, env))
         iterative_results = list(interpreter.execute_iterative(goal, env))
@@ -173,8 +173,8 @@ class TestDisjunction:
         # Define: b.
         interpreter.add_rule("b.")
 
-        # Goal: a ; b (a undefined)
-        goal = Term(Atom(";"), [Atom("a"), Atom("b")])
+        # Goal: fail ; b (fail always fails)
+        goal = Term(Atom(";"), [Atom("fail"), Atom("b")])
 
         recursive_results = list(interpreter.execute(goal, env))
         iterative_results = list(interpreter.execute_iterative(goal, env))
@@ -189,8 +189,8 @@ class TestNegation:
 
     def test_negation_of_failure(self, interpreter, env):
         """Test negation of failing goal succeeds."""
-        # Goal: \+ undefined (undefined fails, so negation succeeds)
-        goal = Term(Atom("\\+"), [Atom("undefined")])
+        # Goal: \+ fail (fail always fails, so negation succeeds)
+        goal = Term(Atom("\\+"), [Atom("fail")])
 
         recursive_results = list(interpreter.execute(goal, env))
         iterative_results = list(interpreter.execute_iterative(goal, env))
@@ -254,3 +254,25 @@ class TestComplexQueries:
         # Should succeed twice (a,b) and (a,c)
         assert len(recursive_results) == 2
         assert len(iterative_results) == 2
+
+
+class TestUndefinedPredicate:
+    """Test that undefined predicates raise PrologError."""
+
+    def test_undefined_predicate_raises_error(self, interpreter, env):
+        """Test that querying an undefined predicate raises PrologError."""
+        from pyprolog.core.errors import PrologError
+
+        # Goal: undefined_predicate_that_does_not_exist_xyz123
+        goal = Atom("undefined_predicate_that_does_not_exist_xyz123")
+
+        # Both recursive and iterative should raise PrologError
+        with pytest.raises(PrologError) as exc_info:
+            list(interpreter.execute(goal, env))
+        assert "existence_error" in str(exc_info.value).lower()
+        assert "undefined_predicate_that_does_not_exist_xyz123" in str(exc_info.value)
+
+        with pytest.raises(PrologError) as exc_info:
+            list(interpreter.execute_iterative(goal, env))
+        assert "existence_error" in str(exc_info.value).lower()
+        assert "undefined_predicate_that_does_not_exist_xyz123" in str(exc_info.value)

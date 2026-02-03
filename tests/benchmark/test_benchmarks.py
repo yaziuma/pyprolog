@@ -34,6 +34,14 @@ def _run_benchmark(benchmark, runtime, label, filename, query):
 def runtime():
     return Runtime()
 
+
+@pytest.fixture
+def runtime_iterative():
+    """Runtime with iterative execution enabled."""
+    rt = Runtime()
+    rt.use_iterative_execution = True
+    return rt
+
 # -----------------------
 # Heavy benchmarks
 # -----------------------
@@ -224,3 +232,46 @@ def test_tak_light(benchmark, runtime):
         "tak(14, 12, 6, R).",
     )
     assert result[0][Variable("R")].value == 7
+
+
+@pytest.mark.info_log
+@pytest.mark.bench_light
+def test_recursion_depth_light(benchmark, runtime):
+    """recursion_depth.pl (Simple recursion light)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "recursion_depth (N=100)",
+        "recursion_depth.pl",
+        "benchmark(100).",
+    )
+
+
+# -----------------------
+# Recursion depth tests (for iterative execution)
+# -----------------------
+
+@pytest.mark.info_log
+@pytest.mark.bench_medium
+def test_recursion_depth_medium(benchmark, runtime_iterative):
+    """recursion_depth.pl (Simple recursion medium) - Uses iterative execution"""
+    _run_benchmark(
+        benchmark,
+        runtime_iterative,
+        "recursion_depth (N=500)",
+        "recursion_depth.pl",
+        "benchmark(500).",
+    )
+
+
+@pytest.mark.info_log
+@pytest.mark.bench_heavy
+def test_recursion_depth_heavy(benchmark, runtime_iterative):
+    """recursion_depth.pl (Simple recursion heavy) - Uses iterative execution"""
+    _run_benchmark(
+        benchmark,
+        runtime_iterative,
+        "recursion_depth (N=1000)",
+        "recursion_depth.pl",
+        "benchmark(1000).",
+    )
