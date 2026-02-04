@@ -79,7 +79,7 @@ class Runtime:
         self.io_manager = IOManager()  # Initialize IOManager
         self.tracer = Tracer()  # Initialize Tracer
         self.occurs_check_enabled = occurs_check_enabled
-        self.use_iterative_execution = False  # Feature flag for iterative execution
+        self.use_iterative_execution = True  # Feature flag for iterative execution
         self.logic_interpreter = LogicInterpreter(
             self.rules, self
         )  # Pass self (Runtime) to LogicInterpreter
