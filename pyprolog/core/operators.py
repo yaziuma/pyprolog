@@ -1,8 +1,8 @@
 # pyprolog/core/operators.py
-from enum import Enum, auto
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Callable
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import Enum, auto
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class OperatorInfo:
     associativity: Associativity  # 結合性
     operator_type: OperatorType  # 演算子種別
     arity: int  # アリティ (1=単項, 2=二項)
-    evaluator: Optional[Callable]  # 評価関数
+    evaluator: Callable | None  # 評価関数
     token_type: str  # 対応するTokenType名（必須）
 
     def __post_init__(self):
@@ -64,10 +64,10 @@ class OperatorRegistry:
         if self._initialized:
             return
 
-        self._operators: Dict[str, OperatorInfo] = {}
-        self._precedence_groups: Dict[int, List[OperatorInfo]] = {}
-        self._type_groups: Dict[OperatorType, List[OperatorInfo]] = {}
-        self._token_type_map: Dict[str, str] = {}  # symbol -> token_type
+        self._operators: dict[str, OperatorInfo] = {}
+        self._precedence_groups: dict[int, list[OperatorInfo]] = {}
+        self._type_groups: dict[OperatorType, list[OperatorInfo]] = {}
+        self._token_type_map: dict[str, str] = {}  # symbol -> token_type
 
         self._initialize_builtin_operators()
         self._initialized = True
@@ -384,24 +384,24 @@ class OperatorRegistry:
             self._type_groups[operator_info.operator_type] = []
         self._type_groups[operator_info.operator_type].append(operator_info)
 
-    def get_operator_by_arity(self, symbol: str, arity: int) -> Optional[OperatorInfo]:
+    def get_operator_by_arity(self, symbol: str, arity: int) -> OperatorInfo | None:
         """指定されたarityの演算子情報を取得"""
         key = f"{symbol}_{arity}"
         return self._operators.get(key, self._operators.get(symbol))
 
     def get_operator(
-        self, symbol: str, arity: Optional[int] = None
-    ) -> Optional[OperatorInfo]:
+        self, symbol: str, arity: int | None = None
+    ) -> OperatorInfo | None:
         """演算子情報を取得（arity指定対応）"""
         if arity is not None:
             return self.get_operator_by_arity(symbol, arity)
         return self._operators.get(symbol)
 
-    def get_operators_by_type(self, op_type: OperatorType) -> List[OperatorInfo]:
+    def get_operators_by_type(self, op_type: OperatorType) -> list[OperatorInfo]:
         """指定タイプの演算子一覧を取得"""
         return self._type_groups.get(op_type, [])
 
-    def get_operators_by_precedence(self, precedence: int) -> List[OperatorInfo]:
+    def get_operators_by_precedence(self, precedence: int) -> list[OperatorInfo]:
         """指定優先度の演算子一覧を取得"""
         return self._precedence_groups.get(precedence, [])
 
@@ -409,16 +409,16 @@ class OperatorRegistry:
         """指定文字列が演算子かどうか判定"""
         return symbol in self._operators
 
-    def get_precedence(self, symbol: str) -> Optional[int]:
+    def get_precedence(self, symbol: str) -> int | None:
         """演算子の優先度を取得"""
         op = self.get_operator(symbol)
         return op.precedence if op else None
 
-    def get_token_type(self, symbol: str) -> Optional[str]:
+    def get_token_type(self, symbol: str) -> str | None:
         """演算子のトークンタイプを取得"""
         return self._token_type_map.get(symbol)
 
-    def get_all_symbols(self) -> List[str]:
+    def get_all_symbols(self) -> list[str]:
         """全演算子記号を取得（長さ順でソート）"""
         return sorted(self._operators.keys(), key=len, reverse=True)
 
@@ -429,7 +429,7 @@ class OperatorRegistry:
         associativity: Associativity,
         op_type: OperatorType,
         arity: int,
-        evaluator: Optional[Callable] = None,
+        evaluator: Callable | None = None,
     ):
         """ユーザー定義演算子を追加"""
         processed_symbol = (

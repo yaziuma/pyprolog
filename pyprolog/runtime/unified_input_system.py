@@ -5,13 +5,15 @@
 ThreadingControllerによる真の継続実行を提供する。
 """
 
+import logging
 import threading
 import time
 import uuid
-from typing import Optional, Dict, Any, Callable
-from dataclasses import dataclass
 from abc import ABC, abstractmethod
-import logging
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
+
 from pyprolog.runtime.io_streams import StringStream
 
 logger = logging.getLogger(__name__)
@@ -27,10 +29,10 @@ class InputEvent:
 
     input_type: str  # "char", "line", "peek_char" etc.
     predicate_name: str  # "get_char", "read_line" etc.
-    args: Dict[str, Any]  # 追加パラメータ
+    args: dict[str, Any]  # 追加パラメータ
     timestamp: float  # 要求時刻
     event_id: str  # 一意識別子
-    context: Optional[Dict] = None  # 実行コンテキスト情報
+    context: dict | None = None  # 実行コンテキスト情報
 
 
 @dataclass
@@ -46,7 +48,7 @@ class InputRequest:
     prompt: str
     timestamp: float
     event_id: str
-    additional_params: Dict[str, Any]
+    additional_params: dict[str, Any]
 
 
 @dataclass
@@ -57,11 +59,11 @@ class InputResponse:
     入力処理スレッドからPrologスレッドへの応答データ
     """
 
-    value: Optional[str]  # 入力値（None = EOF）
+    value: str | None  # 入力値（None = EOF）
     timestamp: float  # 応答時刻
     event_id: str  # 対応する要求のID
     success: bool = True  # 成功フラグ
-    error_message: Optional[str] = None  # エラー時のメッセージ
+    error_message: str | None = None  # エラー時のメッセージ
 
 
 class ContinuationHandle:
@@ -74,19 +76,19 @@ class ContinuationHandle:
     def __init__(
         self,
         request_id: str,
-        on_resume: Optional[Callable[[str, Optional[str]], None]] = None,
-        on_cancel: Optional[Callable[[str, str], None]] = None,
+        on_resume: Callable[[str, str | None], None] | None = None,
+        on_cancel: Callable[[str, str], None] | None = None,
     ) -> None:
         self.request_id = request_id
         self._on_resume = on_resume
         self._on_cancel = on_cancel
         self._event = threading.Event()
         self._lock = threading.Lock()
-        self._value: Optional[str] = None
-        self._error: Optional[str] = None
+        self._value: str | None = None
+        self._error: str | None = None
         self._completed = False
 
-    def resume(self, value: Optional[str]) -> None:
+    def resume(self, value: str | None) -> None:
         with self._lock:
             if self._completed:
                 raise RuntimeError(f"Continuation {self.request_id} already resumed")
@@ -106,7 +108,7 @@ class ContinuationHandle:
             self._on_cancel(self.request_id, error_message)
         self._event.set()
 
-    def wait(self, timeout: float | None = None) -> Optional[str]:
+    def wait(self, timeout: float | None = None) -> str | None:
         if not self._event.wait(timeout):
             raise TimeoutError(f"Continuation {self.request_id} wait timed out")
         if self._error:
@@ -221,12 +223,12 @@ class ThreadingController:
         self.request_lock = threading.Lock()  # 要求排他制御
 
         # データ交換
-        self.input_request: Optional[InputRequest] = None
-        self.input_response: Optional[InputResponse] = None
+        self.input_request: InputRequest | None = None
+        self.input_response: InputResponse | None = None
 
         # スレッド管理
-        self.input_thread: Optional[threading.Thread] = None
-        self.input_handler: Optional[InputHandler] = None
+        self.input_thread: threading.Thread | None = None
+        self.input_handler: InputHandler | None = None
 
         # 制御フラグ
         self.enabled = False
@@ -275,9 +277,7 @@ class ThreadingController:
             self.input_response = response
         self.response_event.set()
 
-    def _handle_continuation_resume(
-        self, request_id: str, value: Optional[str]
-    ) -> None:
+    def _handle_continuation_resume(self, request_id: str, value: str | None) -> None:
         self._set_response(
             InputResponse(
                 value=value,
@@ -300,7 +300,7 @@ class ThreadingController:
 
     def request_input(
         self, input_type: str, predicate_name: str, prompt: str, **kwargs
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         入力要求（ブロッキング）
 
@@ -419,7 +419,7 @@ class UnifiedInputSystem:
     def __init__(self):
         # コンポーネント
         self.threading_controller = ThreadingController()
-        self.input_handler: Optional[InputHandler] = None
+        self.input_handler: InputHandler | None = None
 
         # 実行モード
         self.threading_enabled = False
@@ -469,7 +469,7 @@ class UnifiedInputSystem:
 
     def request_input(
         self, input_type: str, predicate_name: str, prompt: str = "", **kwargs
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         統一入力要求（メインAPI）
 
@@ -499,7 +499,7 @@ class UnifiedInputSystem:
             logger.exception("UnifiedInputSystem threading error")
             raise
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         統計情報取得
 

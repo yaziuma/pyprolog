@@ -36,8 +36,12 @@ class LogicInterpreter:
         self._rules_len = 0
         self.empty_list: list[Rule | Fact] = []
         # Dynamic directive support: two-registry approach
-        self.dynamic_registry: set[tuple[str, int]] = set()  # Declared predicates (persistent)
-        self.defined_registry: set[tuple[str, int]] = set()  # Currently defined predicates (removed on retract)
+        self.dynamic_registry: set[tuple[str, int]] = (
+            set()
+        )  # Declared predicates (persistent)
+        self.defined_registry: set[tuple[str, int]] = (
+            set()
+        )  # Currently defined predicates (removed on retract)
         self._build_index()
 
     def apply_dynamic(self, name: str, arity: int) -> None:
@@ -225,7 +229,11 @@ class LogicInterpreter:
                 if key and key not in self.rules_by_pred:
                     # No clauses remain, remove from defined_registry
                     self.defined_registry.discard(key)
-                    logger.debug("Removed %s/%d from defined_registry (no clauses remain)", key[0], key[1])
+                    logger.debug(
+                        "Removed %s/%d from defined_registry (no clauses remain)",
+                        key[0],
+                        key[1],
+                    )
 
                 return True
         return False
@@ -293,7 +301,9 @@ class LogicInterpreter:
                             stack.append((el, False))
                     else:
                         new_elements = [out[id(el)] for el in node.elements]
-                        renamed_tail_val = out[id(node.tail)] if node.tail is not None else None
+                        renamed_tail_val = (
+                            out[id(node.tail)] if node.tail is not None else None
+                        )
 
                         # 現行の型制約維持
                         if not (
@@ -611,7 +621,10 @@ class LogicInterpreter:
                 key = (actual_goal.functor.name, len(actual_goal.args))
 
                 # Step 2: Check registries (declared or has clauses)
-                if key not in self.defined_registry and key not in self.dynamic_registry:
+                if (
+                    key not in self.defined_registry
+                    and key not in self.dynamic_registry
+                ):
                     raise PrologError(
                         f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
                     )
@@ -766,7 +779,7 @@ class LogicInterpreter:
         """Solve goal without calling runtime.execute() for rule bodies.
 
         This method is used by _execute_single_goal() to avoid recursion:
-        _execute_single_goal → solve_goal → execute → execute_iterative → 
+        _execute_single_goal → solve_goal → execute → execute_iterative →
           _execute_single_goal → ...
 
         Instead, it handles logical operators manually and delegates atomic
@@ -812,13 +825,18 @@ class LogicInterpreter:
             self._refresh_index_if_needed()
 
             # Existence check
-            if isinstance(actual_goal.functor, Atom) and actual_goal.functor.name not in (
+            if isinstance(
+                actual_goal.functor, Atom
+            ) and actual_goal.functor.name not in (
                 "true",
                 "fail",
             ):
                 key = (actual_goal.functor.name, len(actual_goal.args))
 
-                if key not in self.defined_registry and key not in self.dynamic_registry:
+                if (
+                    key not in self.defined_registry
+                    and key not in self.dynamic_registry
+                ):
                     raise PrologError(
                         f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
                     )
@@ -955,10 +973,10 @@ class LogicInterpreter:
     def _execute_body_direct(
         self, body: PrologType, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
-        """Execute rule body without calling runtime.execute().
+        """Execute rule body without calling runtime.execute() (HYBRID VERSION).
 
-        Handles logical operators manually and delegates atomic goals to
-        _execute_single_goal().
+        Uses iterative flattening for conjunction chains (reduces recursion depth),
+        but keeps recursive execution for proper Cut handling and simplicity.
 
         Args:
             body: Rule body to execute
@@ -976,14 +994,12 @@ class LogicInterpreter:
         if isinstance(body, Term) and isinstance(body.functor, Atom):
             functor_name = body.functor.name
 
-            # Conjunction (,/2): execute left then right
+            # Conjunction (,/2): flatten then execute recursively (hybrid approach)
             if functor_name == "," and len(body.args) == 2:
-                left_goal, right_goal = body.args[0], body.args[1]
-                try:
-                    for left_env in self._execute_body_direct(left_goal, env):
-                        yield from self._execute_body_direct(right_goal, left_env)
-                except CutException:
-                    raise
+                # Flatten conjunction chain to reduce recursion depth
+                goals = self._flatten_conjunction_iterative(body)
+                # Execute flattened goals recursively (simpler, correct Cut handling)
+                yield from self._execute_conjunction_recursive(goals, env)
                 return
 
             # Disjunction (;/2): try left, then right
@@ -1019,6 +1035,77 @@ class LogicInterpreter:
 
         # Atomic goal: delegate to _execute_single_goal()
         yield from self.runtime._execute_single_goal(body, env)
+
+    def _flatten_conjunction_iterative(self, body: PrologType) -> list[PrologType]:
+        """Flatten nested conjunctions into a flat list (iterative, no recursion).
+
+        Converts nested structure like (A, (B, (C, D))) into [A, B, C, D].
+        This eliminates O(n) recursion depth for conjunction chains.
+
+        Args:
+            body: Goal (possibly nested conjunctions)
+
+        Returns:
+            Flat list of goals
+        """
+        from collections import deque
+
+        from pyprolog.core.types import Atom, Term
+
+        result = []
+        stack = deque([body])
+
+        while stack:
+            current = stack.pop()
+
+            if isinstance(current, Term) and isinstance(current.functor, Atom):
+                if current.functor.name == "," and len(current.args) == 2:
+                    # Push right first (processed after left due to stack order)
+                    stack.append(current.args[1])
+                    stack.append(current.args[0])
+                    continue
+
+            # Not a conjunction - add to result
+            result.append(current)
+
+        return result
+
+    def _execute_conjunction_recursive(
+        self, goals: list[PrologType], env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """Execute flattened conjunction goals recursively (tail-optimized).
+
+        This is a simpler, more maintainable approach than full iterative execution,
+        with correct Cut handling. Recursion depth is O(k) where k = number of
+        non-conjunction goals, NOT O(n) where n = total conjunction chain length.
+
+        Args:
+            goals: Flattened list of goals from conjunction
+            env: Initial environment
+
+        Yields:
+            Binding environments for each solution
+
+        Raises:
+            CutException: When cut is encountered
+        """
+        # Base case: no more goals
+        if not goals:
+            yield env
+            return
+
+        # Recursive case: execute first goal, then remaining goals
+        first_goal = goals[0]
+        remaining_goals = goals[1:]
+
+        try:
+            for result_env in self._execute_body_direct(first_goal, env):
+                # Execute remaining goals with result environment
+                yield from self._execute_conjunction_recursive(
+                    remaining_goals, result_env
+                )
+        except CutException:
+            raise
 
     def instantiate_term(self, term: PrologType, env: BindingEnvironment) -> PrologType:
         """

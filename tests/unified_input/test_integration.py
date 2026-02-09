@@ -7,22 +7,22 @@ Runtime統合、真の継続実行をテストする。
 
 import time
 from unittest.mock import Mock
-from typing import Optional
+
+from pyprolog.runtime.io_manager import IOManager
+from pyprolog.runtime.unified_input_system import (
+    ContinuationHandle,
+    InputEvent,
+    InputHandler,
+)
 
 # テスト用のインポート
 from tests.unified_input.test_io_predicate_base import (
+    Atom,
+    BindingEnvironment,
+    Number,
     TestGetCharPredicate,
     TestReadLinePredicate,
-    BindingEnvironment,
-    Atom,
-    Number,
 )
-from pyprolog.runtime.unified_input_system import (
-    InputHandler,
-    InputEvent,
-    ContinuationHandle,
-)
-from pyprolog.runtime.io_manager import IOManager
 
 
 class MockRuntime:
@@ -63,7 +63,7 @@ class IntegrationTestInputHandler(InputHandler):
 
     def handle_input_request(
         self, event: InputEvent, continuation: ContinuationHandle
-    ) -> Optional[str]:
+    ) -> str | None:
         self.call_history.append(event)
 
         # 遅延シミュレーション
@@ -301,7 +301,7 @@ class TestErrorHandling:
         class ErrorHandler(InputHandler):
             def handle_input_request(
                 self, event: InputEvent, continuation: ContinuationHandle
-            ) -> Optional[str]:
+            ) -> str | None:
                 raise Exception("Input error")
 
         runtime.set_custom_input_handler(ErrorHandler())
@@ -353,7 +353,7 @@ class TestErrorHandling:
 
             def handle_input_request(
                 self, event: InputEvent, continuation: ContinuationHandle
-            ) -> Optional[str]:
+            ) -> str | None:
                 self.call_count += 1
                 if self.call_count == 1:
                     raise Exception("First call error")

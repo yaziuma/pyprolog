@@ -1,11 +1,10 @@
 import re
-from typing import Dict, Tuple
 
 
 class VariableMapper:
     def __init__(self):
-        self._japanese_to_english: Dict[str, str] = {}
-        self._english_to_japanese: Dict[str, str] = {}
+        self._japanese_to_english: dict[str, str] = {}
+        self._english_to_japanese: dict[str, str] = {}
         self._next_var_index = 1
 
     def _generate_english_var(self) -> str:
@@ -63,11 +62,11 @@ class VariableMapper:
         self._english_to_japanese.clear()
         self._next_var_index = 1
 
-    def get_all_mappings(self) -> Tuple[Dict[str, str], Dict[str, str]]:
+    def get_all_mappings(self) -> tuple[dict[str, str], dict[str, str]]:
         return self._japanese_to_english.copy(), self._english_to_japanese.copy()
 
-    def get_japanese_to_english_map(self) -> Dict[str, str]:
+    def get_japanese_to_english_map(self) -> dict[str, str]:
         return self._japanese_to_english.copy()
 
-    def get_english_to_japanese_map(self) -> Dict[str, str]:
+    def get_english_to_japanese_map(self) -> dict[str, str]:
         return self._english_to_japanese.copy()

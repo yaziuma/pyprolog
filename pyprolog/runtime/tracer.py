@@ -6,9 +6,9 @@ Prologクエリの実行過程を記録・可視化するためのトレース�
 
 import time
 from dataclasses import dataclass
-from typing import List, Optional, Union
-from pyprolog.core.types import Term, Rule, Fact
+
 from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.types import Fact, Rule, Term
 from pyprolog.util.logger import get_logger
 
 logger = get_logger(__name__)
@@ -23,14 +23,14 @@ class TraceEvent:
     depth: int
     bindings: BindingEnvironment
     timestamp: float
-    rule_ref: Optional[Union[Rule, Fact]] = None
+    rule_ref: Rule | Fact | None = None
 
 
 class Tracer:
     """クエリ実行のトレース機能を提供するクラス"""
 
-    def __init__(self, max_depth: Optional[int] = None, max_events: int = 10000):
-        self.events: List[TraceEvent] = []
+    def __init__(self, max_depth: int | None = None, max_events: int = 10000):
+        self.events: list[TraceEvent] = []
         self.max_depth = max_depth
         self.max_events = max_events
         self.current_depth = 0
@@ -71,7 +71,7 @@ class Tracer:
             logger.warning("Failed to record call event: %s", e)
 
     def record_exit(
-        self, goal: Term, bindings: BindingEnvironment, rule: Union[Rule, Fact]
+        self, goal: Term, bindings: BindingEnvironment, rule: Rule | Fact
     ) -> None:
         """ゴール成功を記録します"""
         if not self.enabled:
@@ -134,7 +134,7 @@ class Tracer:
         except Exception as e:
             logger.warning("Failed to record redo event: %s", e)
 
-    def get_events(self) -> List[TraceEvent]:
+    def get_events(self) -> list[TraceEvent]:
         """記録されたイベントのリストを取得します"""
         return self.events.copy()
 

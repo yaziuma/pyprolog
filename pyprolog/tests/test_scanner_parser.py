@@ -1,7 +1,8 @@
 import unittest
-from pyprolog.parser.scanner import Scanner
+
+from pyprolog.core.types import Atom, Term, Variable
 from pyprolog.parser.parser import Parser
-from pyprolog.core.types import Variable, Term, Atom
+from pyprolog.parser.scanner import Scanner
 from pyprolog.util.variable_mapper import VariableMapper
 
 

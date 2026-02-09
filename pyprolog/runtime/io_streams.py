@@ -1,10 +1,10 @@
 # prolog/runtime/io_streams.py
-from abc import ABC, abstractmethod
 import sys
-from typing import List, Optional  # For Python list type hint in StringStream
+from abc import ABC, abstractmethod
+
 from ..core.stream_errors import StreamOperationError, StreamStatus
-from .stream_buffer import StreamBuffer
 from .input_handlers import create_platform_handler
+from .stream_buffer import StreamBuffer
 
 # To use 'PrologType' as a type hint, it would typically be imported:
 # from prolog.core.types import PrologType
@@ -28,7 +28,7 @@ class IOStream(ABC):
         pass
 
     @abstractmethod
-    def read_line(self) -> Optional[str]:
+    def read_line(self) -> str | None:
         """
         Reads a line from the stream (up to and including newline).
         Returns the line without the newline character.
@@ -135,7 +135,7 @@ class ConsoleStream(IOStream):
         # Returns empty string "" on EOF.
         return sys.stdin.read(1)
 
-    def read_line(self) -> Optional[str]:
+    def read_line(self) -> str | None:
         # Read a line from stdin, strip the newline character
         try:
             line = sys.stdin.readline()
@@ -176,12 +176,12 @@ class StringStream(IOStream):
     Concrete IOStream implementation for reading from and writing to strings/buffers.
     """
 
-    def __init__(self, initial_input: str = "", output_buffer: List[str] = None):
+    def __init__(self, initial_input: str = "", output_buffer: list[str] = None):
         super().__init__()
         self.input_string = initial_input
         self.read_position = 0
         # Ensure output_buffer is a list. If None is passed, create a new list.
-        self.output_buffer: List[str] = (
+        self.output_buffer: list[str] = (
             output_buffer if output_buffer is not None else []
         )
         self._last_operation = "init"
@@ -197,7 +197,7 @@ class StringStream(IOStream):
         else:
             return ""  # Signify EOF
 
-    def read_line(self) -> Optional[str]:
+    def read_line(self) -> str | None:
         if self.read_position >= len(self.input_string):
             return None  # EOF - return None to distinguish from empty line
 
@@ -363,7 +363,7 @@ class BufferedConsoleStream(IOStream):
             error_message=None,
         )
 
-    def read_line(self) -> Optional[str]:
+    def read_line(self) -> str | None:
         """行読み取り（基本実装）"""
         self._last_operation = "read_line"
         line_chars = []

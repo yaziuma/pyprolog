@@ -3,13 +3,17 @@
 
 Prologルールと事実の効率的な検索機能を提供します。
 """
-from typing import List, Dict, Any
+
+from typing import Any
+
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.search.indexer import SearchIndex
 from pyprolog.search.pattern_matcher import PatternMatcher
 from pyprolog.search.search_result import SearchResult
 from pyprolog.util.logger import get_logger
+
 logger = get_logger(__name__)
+
 
 class SearchEngine:
     """Prologクエリの検索エンジン"""
@@ -22,16 +26,18 @@ class SearchEngine:
 
     def build_index(self) -> None:
         """検索インデックスを構築"""
-        logger.debug('検索インデックス構築開始')
+        logger.debug("検索インデックス構築開始")
         if not self.runtime or not self.runtime.rules:
-            logger.warning('ランタイムまたはルールが存在しません')
+            logger.warning("ランタイムまたはルールが存在しません")
             return
         self.index.build_index(self.runtime.rules)
         self.is_indexed = True
         self._index_cache_valid = True
-        logger.info('検索インデックス構築完了: %d ルール処理', len(self.runtime.rules))
+        logger.info("検索インデックス構築完了: %d ルール処理", len(self.runtime.rules))
 
-    def search(self, pattern: str, search_type: str='predicate', limit: int=100) -> List[SearchResult]:
+    def search(
+        self, pattern: str, search_type: str = "predicate", limit: int = 100
+    ) -> list[SearchResult]:
         """
         検索を実行
 
@@ -44,67 +50,90 @@ class SearchEngine:
             検索結果のリスト
         """
         self._ensure_index()
-        logger.debug("検索実行: pattern='%r', type=%r, limit=%r", pattern, search_type, limit)
+        logger.debug(
+            "検索実行: pattern='%r', type=%r, limit=%r", pattern, search_type, limit
+        )
         results = []
         try:
-            if search_type == 'predicate':
+            if search_type == "predicate":
                 results = self._search_predicate(pattern, limit)
-            elif search_type == 'argument':
+            elif search_type == "argument":
                 results = self._search_argument(pattern, limit)
-            elif search_type == 'full_text':
+            elif search_type == "full_text":
                 results = self._search_full_text(pattern, limit)
             else:
-                raise ValueError(f'不明な検索タイプ: {search_type}')
+                raise ValueError(f"不明な検索タイプ: {search_type}")
             results.sort(key=lambda x: x.confidence, reverse=True)
             results = results[:limit]
-            logger.debug('検索完了: %d 件の結果', len(results))
+            logger.debug("検索完了: %d 件の結果", len(results))
             return results
         except Exception as e:
-            logger.error('検索エラー: %s', e)
+            logger.error("検索エラー: %s", e)
             return []
 
-    def _search_predicate(self, pattern: str, limit: int) -> List[SearchResult]:
+    def _search_predicate(self, pattern: str, limit: int) -> list[SearchResult]:
         """述語名検索"""
         results = []
         index_results = self.index.search_predicates(pattern)
         results.extend(index_results)
         for rule_or_fact in self.runtime.rules:
             head_term = None
-            if hasattr(rule_or_fact, 'head'):
+            if hasattr(rule_or_fact, "head"):
                 head_term = rule_or_fact.head
             if head_term and PatternMatcher.match_predicate_name(pattern, head_term):
-                already_exists = any((r.rule_or_fact == rule_or_fact and r.match_type == 'predicate' for r in results))
+                already_exists = any(
+                    r.rule_or_fact == rule_or_fact and r.match_type == "predicate"
+                    for r in results
+                )
                 if not already_exists:
-                    search_result = SearchResult(rule_or_fact=rule_or_fact, file_path=None, line_number=0, matched_text=str(head_term), match_type='predicate', context_lines=[], confidence=1.0)
+                    search_result = SearchResult(
+                        rule_or_fact=rule_or_fact,
+                        file_path=None,
+                        line_number=0,
+                        matched_text=str(head_term),
+                        match_type="predicate",
+                        context_lines=[],
+                        confidence=1.0,
+                    )
                     results.append(search_result)
         return results
 
-    def _search_argument(self, pattern: str, limit: int) -> List[SearchResult]:
+    def _search_argument(self, pattern: str, limit: int) -> list[SearchResult]:
         """引数パターン検索"""
         results = []
         index_results = self.index.search_arguments(pattern)
         results.extend(index_results)
         for rule_or_fact in self.runtime.rules:
             terms_to_check = []
-            if hasattr(rule_or_fact, 'head'):
+            if hasattr(rule_or_fact, "head"):
                 terms_to_check.append(rule_or_fact.head)
-            if hasattr(rule_or_fact, 'body'):
+            if hasattr(rule_or_fact, "body"):
                 body_terms = self._extract_terms_from_body(rule_or_fact.body)
                 terms_to_check.extend(body_terms)
             for term in terms_to_check:
                 try:
-                    is_match, confidence = PatternMatcher.match_argument_pattern(pattern, term)
+                    is_match, confidence = PatternMatcher.match_argument_pattern(
+                        pattern, term
+                    )
                     if is_match:
-                        search_result = SearchResult(rule_or_fact=rule_or_fact, file_path=None, line_number=0, matched_text=str(term), match_type='argument', context_lines=[], confidence=confidence)
+                        search_result = SearchResult(
+                            rule_or_fact=rule_or_fact,
+                            file_path=None,
+                            line_number=0,
+                            matched_text=str(term),
+                            match_type="argument",
+                            context_lines=[],
+                            confidence=confidence,
+                        )
                         results.append(search_result)
                         if len(results) >= limit:
                             break
                 except Exception as e:
-                    logger.debug('引数マッチングエラー: %s', e)
+                    logger.debug("引数マッチングエラー: %s", e)
                     continue
         return results
 
-    def _search_full_text(self, pattern: str, limit: int) -> List[SearchResult]:
+    def _search_full_text(self, pattern: str, limit: int) -> list[SearchResult]:
         """全文検索"""
         results = []
         index_results = self.index.search_full_text(pattern)
@@ -113,10 +142,21 @@ class SearchEngine:
         for rule_or_fact in self.runtime.rules:
             rule_text = str(rule_or_fact)
             if pattern_lower in rule_text.lower():
-                already_exists = any((r.rule_or_fact == rule_or_fact and r.match_type == 'full_text' for r in results))
+                already_exists = any(
+                    r.rule_or_fact == rule_or_fact and r.match_type == "full_text"
+                    for r in results
+                )
                 if not already_exists:
                     confidence = self._calculate_text_relevance(pattern, rule_text)
-                    search_result = SearchResult(rule_or_fact=rule_or_fact, file_path=None, line_number=0, matched_text=rule_text, match_type='full_text', context_lines=[], confidence=confidence)
+                    search_result = SearchResult(
+                        rule_or_fact=rule_or_fact,
+                        file_path=None,
+                        line_number=0,
+                        matched_text=rule_text,
+                        match_type="full_text",
+                        context_lines=[],
+                        confidence=confidence,
+                    )
                     results.append(search_result)
                     if len(results) >= limit:
                         break
@@ -131,19 +171,23 @@ class SearchEngine:
         """インデックスキャッシュを無効化"""
         self._index_cache_valid = False
         self.is_indexed = False
-        logger.debug('検索インデックスキャッシュが無効化されました')
+        logger.debug("検索インデックスキャッシュが無効化されました")
 
-    def _extract_terms_from_body(self, body) -> List:
+    def _extract_terms_from_body(self, body) -> list:
         """ルールのボディから項を抽出"""
         terms = []
-        if hasattr(body, 'functor'):
-            functor_name = body.functor.name if hasattr(body.functor, 'name') else str(body.functor)
-            if functor_name == ',':
-                if hasattr(body, 'args') and len(body.args) >= 2:
+        if hasattr(body, "functor"):
+            functor_name = (
+                body.functor.name
+                if hasattr(body.functor, "name")
+                else str(body.functor)
+            )
+            if functor_name == ",":
+                if hasattr(body, "args") and len(body.args) >= 2:
                     terms.extend(self._extract_terms_from_body(body.args[0]))
                     terms.extend(self._extract_terms_from_body(body.args[1]))
-            elif functor_name == ';':
-                if hasattr(body, 'args') and len(body.args) >= 2:
+            elif functor_name == ";":
+                if hasattr(body, "args") and len(body.args) >= 2:
                     terms.extend(self._extract_terms_from_body(body.args[0]))
                     terms.extend(self._extract_terms_from_body(body.args[1]))
             else:
@@ -166,6 +210,13 @@ class SearchEngine:
         relevance = min(1.0, count * pattern_length / text_length * 5)
         return relevance
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """検索エンジンの統計情報を取得"""
-        return {'indexed': self.is_indexed, 'total_rules': len(self.runtime.rules) if self.runtime else 0, 'predicate_index_size': len(self.index.predicate_index), 'argument_index_size': len(self.index.argument_index), 'text_index_size': len(self.index.text_index), 'cache_valid': self._index_cache_valid}
+        return {
+            "indexed": self.is_indexed,
+            "total_rules": len(self.runtime.rules) if self.runtime else 0,
+            "predicate_index_size": len(self.index.predicate_index),
+            "argument_index_size": len(self.index.argument_index),
+            "text_index_size": len(self.index.text_index),
+            "cache_valid": self._index_cache_valid,
+        }

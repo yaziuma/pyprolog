@@ -5,19 +5,15 @@
 """
 
 import logging
-from typing import Optional
 
-from .logging_config import load_logging_config, detect_environment, get_config_info
-
+from .logging_config import detect_environment, get_config_info, load_logging_config
 
 # グローバルな初期化フラグ
 _initialized = False
 _current_environment = None
 
 
-def setup_logging(
-    environment: Optional[str] = None, force_reinit: bool = False
-) -> None:
+def setup_logging(environment: str | None = None, force_reinit: bool = False) -> None:
     """ログシステムを初期化します。
 
     Args:
@@ -45,7 +41,7 @@ def setup_logging(
     logger.info("ログシステムを初期化しました (環境: %s)", environment)
 
 
-def get_logger(name: Optional[str] = None) -> logging.Logger:
+def get_logger(name: str | None = None) -> logging.Logger:
     """ロガーを取得します。
 
     Args:

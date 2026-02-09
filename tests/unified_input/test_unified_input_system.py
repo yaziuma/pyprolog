@@ -5,14 +5,15 @@ UnifiedInputSystemのテスト
 シングル/マルチスレッドモード切り替えをテストする。
 """
 
-import pytest
 import threading
 import time
 import uuid
-from unittest.mock import Mock
-from typing import Optional, Dict, Any
-from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
+from unittest.mock import Mock
+
+import pytest
 
 
 # テスト用のデータ構造とクラス（実装前のテスト用）
@@ -22,10 +23,10 @@ class InputEvent:
 
     input_type: str
     predicate_name: str
-    args: Dict[str, Any]
+    args: dict[str, Any]
     timestamp: float
     event_id: str
-    context: Optional[Dict] = None
+    context: dict | None = None
 
 
 @dataclass
@@ -37,25 +38,25 @@ class InputRequest:
     prompt: str
     timestamp: float
     event_id: str
-    additional_params: Dict[str, Any]
+    additional_params: dict[str, Any]
 
 
 @dataclass
 class InputResponse:
     """スレッド間通信用入力応答"""
 
-    value: Optional[str]
+    value: str | None
     timestamp: float
     event_id: str
     success: bool = True
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 class InputHandler(ABC):
     """入力ハンドラインターフェース"""
 
     @abstractmethod
-    def handle_input_request(self, event: InputEvent) -> Optional[str]:
+    def handle_input_request(self, event: InputEvent) -> str | None:
         pass
 
 
@@ -71,12 +72,12 @@ class ThreadingController:
         self.request_lock = threading.Lock()  # 要求排他制御
 
         # データ交換
-        self.input_request: Optional[InputRequest] = None
-        self.input_response: Optional[InputResponse] = None
+        self.input_request: InputRequest | None = None
+        self.input_response: InputResponse | None = None
 
         # スレッド管理
-        self.input_thread: Optional[threading.Thread] = None
-        self.input_handler: Optional[InputHandler] = None
+        self.input_thread: threading.Thread | None = None
+        self.input_handler: InputHandler | None = None
 
         # 制御フラグ
         self.enabled = False
@@ -112,7 +113,7 @@ class ThreadingController:
 
     def request_input(
         self, input_type: str, predicate_name: str, prompt: str, **kwargs
-    ) -> Optional[str]:
+    ) -> str | None:
         """入力要求（ブロッキング）"""
         if not self.enabled:
             raise RuntimeError("ThreadingController not enabled")
@@ -210,7 +211,7 @@ class UnifiedInputSystem:
 
     def __init__(self):
         self.threading_controller = ThreadingController()
-        self.input_handler: Optional[InputHandler] = None
+        self.input_handler: InputHandler | None = None
         self.fallback_stream = None
 
         # 実行モード
@@ -252,7 +253,7 @@ class UnifiedInputSystem:
 
     def request_input(
         self, input_type: str, predicate_name: str, prompt: str = "", **kwargs
-    ) -> Optional[str]:
+    ) -> str | None:
         """統一入力要求（メインAPI）"""
         self.request_count += 1
 
@@ -273,7 +274,7 @@ class UnifiedInputSystem:
 
     def _request_input_sync(
         self, input_type: str, predicate_name: str, prompt: str, **kwargs
-    ) -> Optional[str]:
+    ) -> str | None:
         """シングルスレッド同期入力処理"""
         if not self.input_handler:
             self.error_count += 1
@@ -293,7 +294,7 @@ class UnifiedInputSystem:
             self.error_count += 1
             return self._fallback_input(prompt)
 
-    def _fallback_input(self, prompt: str) -> Optional[str]:
+    def _fallback_input(self, prompt: str) -> str | None:
         """フォールバック入力処理"""
         if self.fallback_stream and hasattr(self.fallback_stream, "read_line"):
             return self.fallback_stream.read_line()
@@ -301,7 +302,7 @@ class UnifiedInputSystem:
             # テスト環境では標準入力を使わない
             return None
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """統計情報取得"""
         uptime = time.time() - self.start_time
         return {
@@ -332,7 +333,7 @@ class TestInputHandler(InputHandler):
         self.call_history = []
         self.default_response = "test_input"
 
-    def handle_input_request(self, event: InputEvent) -> Optional[str]:
+    def handle_input_request(self, event: InputEvent) -> str | None:
         self.call_history.append(event)
 
         # 特定の入力タイプに対する応答
@@ -347,7 +348,7 @@ class TestInputHandler(InputHandler):
 class ErrorInputHandler(InputHandler):
     """エラーを発生させるテスト用InputHandler"""
 
-    def handle_input_request(self, event: InputEvent) -> Optional[str]:
+    def handle_input_request(self, event: InputEvent) -> str | None:
         raise Exception("Test handler error")
 
 

@@ -6,14 +6,12 @@ PyProlog入力待ち検知の完全な実装例
 全ての方法を実際に動作する形で実装しています。
 """
 
-import threading
-import time
-import queue
 import asyncio
 import concurrent.futures
+import time
+
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.runtime.io_streams import IOStream
-
 
 # =============================================================================
 # 方法1: カスタムストリーム方式 (最も実用的)
@@ -167,7 +165,7 @@ class PrologExecutionMonitor:
         finally:
             self.monitoring = False
             self.input_waiting = False
-            print(f"🏁 [監視終了] クエリ完了")
+            print("🏁 [監視終了] クエリ完了")
 
     def get_monitoring_report(self):
         """監視レポート生成"""
@@ -244,12 +242,12 @@ class AsyncPrologExecutor:
 
                     self.input_event.clear()
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue  # タイムアウト = まだ実行中
 
             try:
                 result = future.result(timeout=1.0)
-                print(f"🏁 [非同期完了] クエリ実行完了")
+                print("🏁 [非同期完了] クエリ実行完了")
                 return result
             except concurrent.futures.TimeoutError:
                 print("⚠️ [警告] クエリ結果の取得がタイムアウトしました")

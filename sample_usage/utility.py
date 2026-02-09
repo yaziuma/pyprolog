@@ -1,6 +1,6 @@
 # 1. 各Pythonファイルの冒頭に以下を追加（文字エンコーディング対策）
-import sys
 import io
+import sys
 
 if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")

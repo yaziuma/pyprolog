@@ -2,10 +2,12 @@
 # 分析ファイルの提案に基づく実装
 
 import logging
-from typing import List, Iterator, Dict, Any, Union, Optional
-from pyprolog.core.types import Variable, Term, Rule, Fact, Atom
+from collections.abc import Iterator
+from typing import Any
+
 from pyprolog.core.binding_environment import BindingEnvironment
-from pyprolog.core.errors import PrologError, CutException
+from pyprolog.core.errors import CutException, PrologError
+from pyprolog.core.types import Atom, Fact, Rule, Term, Variable
 from pyprolog.runtime.interpreter import Runtime
 
 logger = logging.getLogger(__name__)
@@ -23,7 +25,7 @@ class EnhancedRuntime(Runtime):
 
     def __init__(
         self,
-        rules: Optional[List[Union[Rule, Fact]]] = None,
+        rules: list[Rule | Fact] | None = None,
         debug_trace: bool = False,
         max_trace_depth: int = 50,
     ):
@@ -45,7 +47,7 @@ class EnhancedRuntime(Runtime):
             debug_trace,
         )
 
-    def _initialize_builtins(self) -> Dict[str, Any]:
+    def _initialize_builtins(self) -> dict[str, Any]:
         """組み込み述語の初期化とエラーチェック"""
         builtins = {}
 
@@ -200,7 +202,7 @@ class EnhancedRuntime(Runtime):
             raise
 
     def _execute_builtin(
-        self, predicate_name: str, args: List, env: BindingEnvironment
+        self, predicate_name: str, args: list, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
         """組み込み述語の安全な実行"""
         try:
@@ -288,7 +290,7 @@ class EnhancedRuntime(Runtime):
         indent = "  " * (len(self.trace_stack) - 1)
         print(f"{indent}[{call_id}] ERROR: {goal} - {type(error).__name__}: {error}")
 
-    def query_safe(self, query_string: str) -> List[Dict]:
+    def query_safe(self, query_string: str) -> list[dict]:
         """安全なクエリ実行"""
         try:
             if self.debug_trace:

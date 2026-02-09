@@ -1,6 +1,6 @@
 # pyprolog/parser/__init__.py
-from .scanner import Scanner
 from .parser import Parser
+from .scanner import Scanner
 from .token import Token
 from .token_type import TokenType
 

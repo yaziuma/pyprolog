@@ -131,7 +131,9 @@ class GoalSeqFrame(Frame):
     """
 
     goals: list[PrologType] = field(default_factory=list)
-    goal_stack: list[tuple[int, Iterator[BindingEnvironment]]] = field(default_factory=list)
+    goal_stack: list[tuple[int, Iterator[BindingEnvironment]]] = field(
+        default_factory=list
+    )
     frame_type: FrameType = field(default=FrameType.GOAL_SEQ, init=False)
     initialized: bool = False
 

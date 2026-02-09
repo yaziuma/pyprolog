@@ -8,10 +8,11 @@ Prologインタープリターの論理的推論エンジンの
 """
 
 import unittest
+from collections.abc import Iterator
+
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.errors import PrologError
-from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact, ListTerm
-from typing import Iterator
+from pyprolog.core.types import Atom, Fact, ListTerm, Number, Rule, Term, Variable
 
 
 class TestLogicInterpreter:

@@ -5,10 +5,11 @@ IOPredicate基底クラスのテスト
 テンプレートメソッドパターンと共通処理をテストする。
 """
 
-import pytest
-from unittest.mock import Mock
 from abc import ABC, abstractmethod
-from typing import Iterator, Optional
+from collections.abc import Iterator
+from unittest.mock import Mock
+
+import pytest
 
 
 # テスト用の抽象基底クラス実装（実際の実装前のテスト用）
@@ -105,7 +106,7 @@ class IOPredicate(BuiltinPredicate, ABC):
         pass
 
     @abstractmethod
-    def _convert_to_prolog_term(self, input_value: Optional[str]) -> PrologType:
+    def _convert_to_prolog_term(self, input_value: str | None) -> PrologType:
         """入力値をPrologタームに変換"""
         pass
 
@@ -139,7 +140,7 @@ class IOPredicate(BuiltinPredicate, ABC):
                 f"{expected_count} argument(s), got {actual_count}"
             )
 
-    def _request_input(self, runtime: Mock) -> Optional[str]:
+    def _request_input(self, runtime: Mock) -> str | None:
         """統一入力システム経由での入力要求"""
         return runtime.io_manager.request_input(
             input_type=self._get_input_type(),
@@ -169,7 +170,7 @@ class IOPredicate(BuiltinPredicate, ABC):
         """EOF処理"""
         return Atom("end_of_file")
 
-    def _try_convert_to_number(self, value: str) -> Optional[PrologType]:
+    def _try_convert_to_number(self, value: str) -> PrologType | None:
         """数値変換試行"""
         if not value:
             return None
@@ -195,7 +196,7 @@ class TestGetCharPredicate(IOPredicate):
     def _get_input_type(self) -> str:
         return "char"
 
-    def _convert_to_prolog_term(self, input_value: Optional[str]) -> PrologType:
+    def _convert_to_prolog_term(self, input_value: str | None) -> PrologType:
         if input_value is None or input_value == "":
             return self._handle_eof()
 
@@ -221,7 +222,7 @@ class TestReadLinePredicate(IOPredicate):
     def _get_input_type(self) -> str:
         return "line"
 
-    def _convert_to_prolog_term(self, input_value: Optional[str]) -> PrologType:
+    def _convert_to_prolog_term(self, input_value: str | None) -> PrologType:
         if input_value is None:
             return self._handle_eof()
 

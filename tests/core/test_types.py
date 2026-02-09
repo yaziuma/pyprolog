@@ -7,13 +7,13 @@ Prologインタープリターの基本データ型（Atom, Variable, Number, St
 
 from pyprolog.core.types import (
     Atom,
-    Variable,
+    Fact,
+    ListTerm,
     Number,
+    Rule,
     String,
     Term,
-    ListTerm,
-    Rule,
-    Fact,
+    Variable,
 )
 
 

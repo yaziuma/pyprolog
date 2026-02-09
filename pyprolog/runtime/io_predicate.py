@@ -5,13 +5,14 @@ IOPredicate基底クラス
 統一入力システムとの統合を提供する。
 """
 
-from abc import ABC, abstractmethod
-from typing import Iterator, Optional, Dict, Any, TYPE_CHECKING
 import logging
+from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any
 
-from pyprolog.core.types import PrologType, Atom, Number
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.errors import PrologError
+from pyprolog.core.types import Atom, Number, PrologType
 from pyprolog.runtime.builtins import BuiltinPredicate, try_convert_atom_to_number
 
 if TYPE_CHECKING:
@@ -73,7 +74,7 @@ class IOPredicate(BuiltinPredicate, ABC):
         pass
 
     @abstractmethod
-    def _convert_to_prolog_term(self, input_value: Optional[str]) -> PrologType:
+    def _convert_to_prolog_term(self, input_value: str | None) -> PrologType:
         """
         入力値をPrologタームに変換
 
@@ -141,7 +142,7 @@ class IOPredicate(BuiltinPredicate, ABC):
                 f"{expected_count} argument(s), got {actual_count}"
             )
 
-    def _request_input(self, runtime: "Runtime") -> Optional[str]:
+    def _request_input(self, runtime: "Runtime") -> str | None:
         """
         統一入力システム経由での入力要求
 
@@ -207,7 +208,7 @@ class IOPredicate(BuiltinPredicate, ABC):
         """
         return Atom("end_of_file")
 
-    def _try_convert_to_number(self, value: str) -> Optional[PrologType]:
+    def _try_convert_to_number(self, value: str) -> PrologType | None:
         """
         数値変換試行（共通ユーティリティ）
 
@@ -225,7 +226,7 @@ class IOPredicate(BuiltinPredicate, ABC):
             return Number(number_value)
         return None
 
-    def _get_additional_request_params(self) -> Dict[str, Any]:
+    def _get_additional_request_params(self) -> dict[str, Any]:
         """
         追加の入力要求パラメータ
 

@@ -5,9 +5,10 @@ ExplainToolのテスト
 """
 
 import pytest
-from pyprolog.tools.explain_tool import ExplainTool
+
+from pyprolog.core.types import Atom, Fact, Rule, Term, Variable
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.core.types import Fact, Rule, Term, Atom, Variable
+from pyprolog.tools.explain_tool import ExplainTool
 
 
 class TestExplainTool:

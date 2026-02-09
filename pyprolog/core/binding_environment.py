@@ -1,4 +1,4 @@
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import rpds
 
@@ -12,14 +12,14 @@ class BindingEnvironment:
     def __init__(
         self,
         parent: Optional["BindingEnvironment"] = None,
-        bindings: Optional[rpds.HashTrieMap] = None,
-        stats: Optional[dict] = None,
+        bindings: rpds.HashTrieMap | None = None,
+        stats: dict | None = None,
         stats_enabled: bool = False,
     ):
         self.bindings: rpds.HashTrieMap = (
             bindings if bindings is not None else rpds.HashTrieMap()
         )
-        self.parent: Optional["BindingEnvironment"] = parent
+        self.parent: BindingEnvironment | None = parent
         self.stats_enabled = stats_enabled
         self.stats = stats or {
             "deref_calls": 0,
@@ -76,7 +76,7 @@ class BindingEnvironment:
         from pyprolog.core.types import Variable
 
         items = []
-        env: Optional[BindingEnvironment] = self
+        env: BindingEnvironment | None = self
         level = 0
         while env:
             level_items = []

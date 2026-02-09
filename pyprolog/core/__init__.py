@@ -1,8 +1,8 @@
 # pyprolog/core/__init__.py
-from .types import Variable, Term, Rule
 from .binding_environment import BindingEnvironment
-from .errors import InterpreterError, ScannerError, ParserError
+from .errors import InterpreterError, ParserError, ScannerError
 from .merge_bindings import merge_bindings
+from .types import Rule, Term, Variable
 
 __all__ = [
     "Variable",

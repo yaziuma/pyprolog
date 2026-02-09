@@ -1,22 +1,30 @@
-import re
-from typing import Dict, Tuple, Set, Optional
 import logging
+import re
+
 logger = logging.getLogger(__name__)
+
 
 class FunctorMapper:
     """ファンクター名の非ASCII⇔英語マッピング管理"""
 
-    def __init__(self, existing_functors: Optional[Set[str]]=None):
-        self._non_ascii_to_english: Dict[str, str] = {}
-        self._english_to_non_ascii: Dict[str, str] = {}
+    def __init__(self, existing_functors: set[str] | None = None):
+        self._non_ascii_to_english: dict[str, str] = {}
+        self._english_to_non_ascii: dict[str, str] = {}
         self._next_functor_index: int = 1
-        self._existing_functors: Set[str] = existing_functors or set()
-        logger.debug('FunctorMapper initialized with %r existing functors', len(self._existing_functors))
+        self._existing_functors: set[str] = existing_functors or set()
+        logger.debug(
+            "FunctorMapper initialized with %r existing functors",
+            len(self._existing_functors),
+        )
 
-    def register_existing_functors(self, functors: Set[str]):
+    def register_existing_functors(self, functors: set[str]):
         """既存ファンクター名を登録（衝突回避用）"""
         self._existing_functors.update(functors)
-        logger.debug('Registered %r additional functors. Total: %r', len(functors), len(self._existing_functors))
+        logger.debug(
+            "Registered %r additional functors. Total: %r",
+            len(functors),
+            len(self._existing_functors),
+        )
 
     def _generate_safe_english_functor(self) -> str:
         """
@@ -26,8 +34,11 @@ class FunctorMapper:
         - 既存ファンクターとの衝突チェック
         """
         while True:
-            candidate = f'MAPPED_F{self._next_functor_index}'
-            if candidate not in self._english_to_non_ascii and candidate not in self._existing_functors:
+            candidate = f"MAPPED_F{self._next_functor_index}"
+            if (
+                candidate not in self._english_to_non_ascii
+                and candidate not in self._existing_functors
+            ):
                 self._next_functor_index += 1
                 return candidate
             self._next_functor_index += 1
@@ -57,8 +68,8 @@ class FunctorMapper:
         """
         if not name:
             return False
-        has_non_ascii = any((ord(char) > 127 for char in name))
-        unsafe_chars = re.search('[()[\\]{}.,;:!|"\\\'`~@#$%^&*+=<>?/\\\\]', name)
+        has_non_ascii = any(ord(char) > 127 for char in name)
+        unsafe_chars = re.search("[()[\\]{}.,;:!|\"\\'`~@#$%^&*+=<>?/\\\\]", name)
         if name in self._existing_functors and (not has_non_ascii):
             return False
         return has_non_ascii or bool(unsafe_chars)
@@ -67,13 +78,13 @@ class FunctorMapper:
         """識別子として有効な文字かチェック"""
         if not char:
             return False
-        invalid_chars = set('()[]{}.,;:!|"\'`~@#$%^&*+-=<>?/\\')
+        invalid_chars = set("()[]{}.,;:!|\"'`~@#$%^&*+-=<>?/\\")
         return char not in invalid_chars and (not char.isspace())
 
-    def extract_functors_from_string(self, prolog_string: str) -> Set[str]:
+    def extract_functors_from_string(self, prolog_string: str) -> set[str]:
         """Prolog文字列から基本的なファンクター名を抽出（簡易版）"""
         functors = set()
-        functor_pattern = '\\b([a-zA-Z][a-zA-Z0-9_]*)\\s*\\('
+        functor_pattern = "\\b([a-zA-Z][a-zA-Z0-9_]*)\\s*\\("
         matches = re.findall(functor_pattern, prolog_string)
         for match in matches:
             functors.add(match)
@@ -84,20 +95,20 @@ class FunctorMapper:
         self._non_ascii_to_english.clear()
         self._english_to_non_ascii.clear()
         self._next_functor_index = 1
-        logger.debug('FunctorMapper mapping cleared')
+        logger.debug("FunctorMapper mapping cleared")
 
-    def get_all_mappings(self) -> Tuple[Dict[str, str], Dict[str, str]]:
+    def get_all_mappings(self) -> tuple[dict[str, str], dict[str, str]]:
         """全マッピング情報を取得"""
         return (self._non_ascii_to_english.copy(), self._english_to_non_ascii.copy())
 
-    def get_non_ascii_to_english_map(self) -> Dict[str, str]:
+    def get_non_ascii_to_english_map(self) -> dict[str, str]:
         """非ASCII→英語マッピング辞書を取得"""
         return self._non_ascii_to_english.copy()
 
-    def get_english_to_non_ascii_map(self) -> Dict[str, str]:
+    def get_english_to_non_ascii_map(self) -> dict[str, str]:
         """英語→非ASCIIマッピング辞書を取得"""
         return self._english_to_non_ascii.copy()
 
-    def get_existing_functors(self) -> Set[str]:
+    def get_existing_functors(self) -> set[str]:
         """登録済み既存ファンクター名を取得"""
         return self._existing_functors.copy()

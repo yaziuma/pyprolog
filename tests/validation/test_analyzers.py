@@ -4,12 +4,12 @@
 各種アナライザー（ConflictAnalyzer、ReachabilityAnalyzer、UndefinedAnalyzer）のテストです。
 """
 
+from pyprolog.core.types import Atom, Fact, Rule, Term, Variable
 from pyprolog.validation.analyzers.conflict_analyzer import ConflictAnalyzer
 from pyprolog.validation.analyzers.reachability_analyzer import ReachabilityAnalyzer
 from pyprolog.validation.analyzers.undefined_analyzer import UndefinedAnalyzer
-from pyprolog.validation.symbol_table import SymbolTable
 from pyprolog.validation.dependency_graph import DependencyGraph
-from pyprolog.core.types import Fact, Rule, Term, Atom, Variable
+from pyprolog.validation.symbol_table import SymbolTable
 
 
 class TestConflictAnalyzer:

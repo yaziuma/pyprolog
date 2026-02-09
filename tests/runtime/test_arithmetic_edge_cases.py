@@ -6,10 +6,11 @@ Arithmetic Edge Cases テスト
 
 import math
 import sys
-from pyprolog.runtime.math_interpreter import MathInterpreter
+
 from pyprolog.core.binding_environment import BindingEnvironment
-from pyprolog.core.types import Number, Term, Atom, Variable
 from pyprolog.core.errors import PrologError
+from pyprolog.core.types import Atom, Number, Term, Variable
+from pyprolog.runtime.math_interpreter import MathInterpreter
 
 
 class TestArithmeticEdgeCases:

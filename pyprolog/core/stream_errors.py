@@ -1,6 +1,6 @@
 # pyprolog/core/stream_errors.py
 from dataclasses import dataclass
-from typing import Optional
+
 from .errors import PrologError
 
 
@@ -54,4 +54,4 @@ class StreamStatus:
 
     # エラー状態
     has_errors: bool
-    error_message: Optional[str]
+    error_message: str | None

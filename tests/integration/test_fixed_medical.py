@@ -4,6 +4,7 @@ Demonstrates that PyProlog actually works correctly
 """
 
 import unittest
+
 from pyprolog.core.types import Variable
 from pyprolog.runtime.interpreter import Runtime
 

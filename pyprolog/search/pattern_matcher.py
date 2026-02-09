@@ -5,8 +5,8 @@ Prolog述語名、引数パターン、全文検索のマッチング処理を�
 """
 
 import re
-from typing import Tuple, Union
-from pyprolog.core.types import Term, Atom, Variable
+
+from pyprolog.core.types import Atom, Term, Variable
 from pyprolog.util.logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,7 +16,7 @@ class PatternMatcher:
     """パターンマッチング処理を提供するクラス"""
 
     @staticmethod
-    def match_predicate_name(pattern: str, term: Union[Term, Atom]) -> bool:
+    def match_predicate_name(pattern: str, term: Term | Atom) -> bool:
         """
         述語名のパターンマッチング
 
@@ -61,7 +61,7 @@ class PatternMatcher:
             return False
 
     @staticmethod
-    def match_argument_pattern(pattern: str, term: Term) -> Tuple[bool, float]:
+    def match_argument_pattern(pattern: str, term: Term) -> tuple[bool, float]:
         """
         引数パターンマッチング
 
@@ -96,8 +96,8 @@ class PatternMatcher:
             解析されたTerm
         """
         try:
-            from pyprolog.parser.scanner import Scanner
             from pyprolog.parser.parser import Parser
+            from pyprolog.parser.scanner import Scanner
 
             scanner = Scanner(pattern)
             tokens = scanner.scan_tokens()
@@ -121,7 +121,7 @@ class PatternMatcher:
             return Atom(pattern)
 
     @staticmethod
-    def unify_patterns(pattern_term: Term, target_term: Term) -> Tuple[bool, float]:
+    def unify_patterns(pattern_term: Term, target_term: Term) -> tuple[bool, float]:
         """
         パターン項と対象項の単一化を試行し、マッチ度を計算
 

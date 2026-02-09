@@ -4,11 +4,10 @@
 Prologプログラムの到達不可能な述語（デッドコード）を検出します。
 """
 
-from typing import List, Set
-from pyprolog.validation.validation_result import ValidationIssue
-from pyprolog.validation.symbol_table import SymbolTable
-from pyprolog.validation.dependency_graph import DependencyGraph
 from pyprolog.util.logger import get_logger
+from pyprolog.validation.dependency_graph import DependencyGraph
+from pyprolog.validation.symbol_table import SymbolTable
+from pyprolog.validation.validation_result import ValidationIssue
 
 logger = get_logger(__name__)
 
@@ -18,7 +17,7 @@ class ReachabilityAnalyzer:
 
     def analyze(
         self, symbol_table: SymbolTable, dependency_graph: DependencyGraph
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """到達可能性分析を実行"""
         issues = []
 
@@ -61,7 +60,7 @@ class ReachabilityAnalyzer:
         logger.info("到達可能性分析完了: %d 個の問題を発見", len(issues))
         return issues
 
-    def _get_entry_points(self, symbol_table: SymbolTable) -> Set[str]:
+    def _get_entry_points(self, symbol_table: SymbolTable) -> set[str]:
         """エントリーポイントとなる述語を特定"""
         entry_points = set()
 
@@ -164,7 +163,7 @@ class ReachabilityAnalyzer:
 
     def _check_isolated_components(
         self, symbol_table: SymbolTable, dependency_graph: DependencyGraph
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """孤立したコンポーネントをチェック"""
         issues = []
 

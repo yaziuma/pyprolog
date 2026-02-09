@@ -1,13 +1,14 @@
 # tests/runtime/test_io_predicates.py
+
 import pytest
-from pyprolog.runtime.interpreter import Runtime
-from pyprolog.runtime.io_streams import StringStream
-from pyprolog.runtime.unified_input_system import StreamInputHandler
+
 from pyprolog.core.types import (
     Atom,
     Variable,
 )  # Term might be needed for query construction
-from typing import Dict, List, Optional
+from pyprolog.runtime.interpreter import Runtime
+from pyprolog.runtime.io_streams import StringStream
+from pyprolog.runtime.unified_input_system import StreamInputHandler
 
 
 class TestIOPredicates:
@@ -22,7 +23,7 @@ class TestIOPredicates:
     def assertQueryTrue(
         self,
         query_string: str,
-        expected_bindings_list: Optional[List[Dict[str, Atom]]] = None,
+        expected_bindings_list: list[dict[str, Atom]] | None = None,
         msg: str = None,
     ):
         """

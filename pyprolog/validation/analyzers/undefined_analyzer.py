@@ -4,11 +4,10 @@
 Prologプログラムで参照されているが定義されていない述語を検出します。
 """
 
-from typing import List, Set, Dict
-from pyprolog.validation.validation_result import ValidationIssue
-from pyprolog.validation.symbol_table import SymbolTable, predicate_key
-from pyprolog.validation.dependency_graph import DependencyGraph
 from pyprolog.util.logger import get_logger
+from pyprolog.validation.dependency_graph import DependencyGraph
+from pyprolog.validation.symbol_table import SymbolTable, predicate_key
+from pyprolog.validation.validation_result import ValidationIssue
 
 logger = get_logger(__name__)
 
@@ -18,7 +17,7 @@ class UndefinedAnalyzer:
 
     def analyze(
         self, symbol_table: SymbolTable, dependency_graph: DependencyGraph
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """未定義述語分析を実行"""
         issues = []
 
@@ -38,7 +37,7 @@ class UndefinedAnalyzer:
 
     def _check_undefined_predicates(
         self, symbol_table: SymbolTable
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """未定義述語のチェック"""
         issues = []
 
@@ -76,7 +75,7 @@ class UndefinedAnalyzer:
 
     def _check_potential_typos(
         self, symbol_table: SymbolTable
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """スペルミスの可能性をチェック"""
         issues = []
 
@@ -117,7 +116,7 @@ class UndefinedAnalyzer:
 
     def _check_missing_imports(
         self, symbol_table: SymbolTable, dependency_graph: DependencyGraph
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """欠落したインポートや依存関係をチェック"""
         issues = []
 
@@ -161,7 +160,7 @@ class UndefinedAnalyzer:
 
         return issues
 
-    def _collect_all_references(self, symbol_table: SymbolTable) -> Dict[str, List]:
+    def _collect_all_references(self, symbol_table: SymbolTable) -> dict[str, list]:
         """全ての述語参照を収集"""
         all_references = {}
 
@@ -201,8 +200,8 @@ class UndefinedAnalyzer:
             return f"述語 {name}/{arity} を定義してください"
 
     def _find_similar_predicates(
-        self, name: str, arity: int, defined_predicates: Set[str]
-    ) -> List[str]:
+        self, name: str, arity: int, defined_predicates: set[str]
+    ) -> list[str]:
         """類似の述語を検索"""
         similar = []
         name_lower = name.lower()

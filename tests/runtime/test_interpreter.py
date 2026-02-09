@@ -7,10 +7,11 @@ Runtime Interpreter テスト
 """
 
 import unittest
-from pyprolog.core.types import Term, Variable, Atom, Number
-from typing import Dict, List, Optional, Union
+
 import pytest
+
 from pyprolog.core.errors import PrologError
+from pyprolog.core.types import Atom, Number, Term, Variable
 
 # pytest is used for exception assertions in this file.
 
@@ -46,9 +47,8 @@ class TestRuntime:
     def assertQueryTrue(
         self,
         query_string: str,
-        expected_bindings_list: Optional[
-            List[Dict[str, Union[Atom, Number, Term, Variable]]]
-        ] = None,
+        expected_bindings_list: list[dict[str, Atom | Number | Term | Variable]]
+        | None = None,
         msg: None = None,
     ):
         """

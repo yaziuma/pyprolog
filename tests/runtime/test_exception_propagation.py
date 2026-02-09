@@ -10,6 +10,7 @@
 """
 
 import pytest
+
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.runtime.io_manager import IOManager
 

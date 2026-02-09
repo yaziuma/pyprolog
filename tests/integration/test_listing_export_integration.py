@@ -4,9 +4,10 @@ listing/export機能の統合テスト
 listing述語とexport_facts述語の統合動作を検証する
 """
 
-import tempfile
-import os
 import json
+import os
+import tempfile
+
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.runtime.io_streams import StringStream
 
@@ -103,7 +104,7 @@ class TestListingExportIntegration:
         assert len(solutions) == 1
 
         # ファイル内容を確認
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             content = f.read()
 
         # 事実データが含まれることを確認
@@ -137,7 +138,7 @@ class TestListingExportIntegration:
         assert len(solutions) == 1
 
         # export内容を読み込み
-        with open(export_file, "r", encoding="utf-8") as f:
+        with open(export_file, encoding="utf-8") as f:
             export_data = json.load(f)
 
         # 一貫性を確認
@@ -177,15 +178,15 @@ class TestListingExportIntegration:
         assert os.path.exists(project_file)
 
         # 内容の妥当性を確認
-        with open(person_file, "r") as f:
+        with open(person_file) as f:
             person_content = f.read()
             assert "alice" in person_content
 
-        with open(dept_file, "r") as f:
+        with open(dept_file) as f:
             dept_content = f.read()
             assert "engineering" in dept_content
 
-        with open(project_file, "r") as f:
+        with open(project_file) as f:
             project_data = json.load(f)
             assert len(project_data) == 2
             assert project_data[0]["functor"] == "project"
@@ -229,7 +230,7 @@ class TestListingExportIntegration:
         )
         assert len(solutions) == 1
 
-        with open(initial_file, "r") as f:
+        with open(initial_file) as f:
             initial_data = json.load(f)
         initial_count = len(initial_data)
 
@@ -243,7 +244,7 @@ class TestListingExportIntegration:
         )
         assert len(solutions) == 1
 
-        with open(updated_file, "r") as f:
+        with open(updated_file) as f:
             updated_data = json.load(f)
 
         # データが増えていることを確認

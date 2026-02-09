@@ -1,6 +1,4 @@
 # pyprolog/runtime/__init__.py
-from .interpreter import Runtime
-
 # from .builtins import Fail, Cut, Write, Nl, Tab, Retract # These are not currently defined as classes in builtins.py
 from .builtins import (
     DynamicAssertAPredicate as AssertA,
@@ -8,6 +6,7 @@ from .builtins import (
 from .builtins import (
     DynamicAssertZPredicate as AssertZ,
 )  # Assuming AssertZ is DynamicAssertZPredicate
+from .interpreter import Runtime
 from .logic_interpreter import LogicInterpreter
 from .math_interpreter import MathInterpreter
 

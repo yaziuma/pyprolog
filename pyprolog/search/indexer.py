@@ -4,11 +4,12 @@
 Prologルールと事実の効率的な検索のためのインデックス構築を提供します。
 """
 
-from typing import Dict, List, Union, Optional, Any
-from pyprolog.core.types import Rule, Fact, Term
+import re
+from typing import Any
+
+from pyprolog.core.types import Fact, Rule, Term
 from pyprolog.search.search_result import SearchResult
 from pyprolog.util.logger import get_logger
-import re
 
 logger = get_logger(__name__)
 
@@ -17,13 +18,13 @@ class SearchIndex:
     """検索インデックスを管理するクラス"""
 
     def __init__(self):
-        self.predicate_index: Dict[str, List[SearchResult]] = {}
-        self.argument_index: Dict[str, List[SearchResult]] = {}
-        self.text_index: Dict[str, List[SearchResult]] = {}
-        self.file_mapping: Dict[str, List[Union[Rule, Fact]]] = {}
+        self.predicate_index: dict[str, list[SearchResult]] = {}
+        self.argument_index: dict[str, list[SearchResult]] = {}
+        self.text_index: dict[str, list[SearchResult]] = {}
+        self.file_mapping: dict[str, list[Rule | Fact]] = {}
 
     def build_index(
-        self, rules: List[Union[Rule, Fact]], file_path: Optional[str] = None
+        self, rules: list[Rule | Fact], file_path: str | None = None
     ) -> None:
         """
         ルールリストからインデックスを構築
@@ -56,7 +57,7 @@ class SearchIndex:
         )
 
     def _build_predicate_index(
-        self, rules: List[Union[Rule, Fact]], file_path: Optional[str]
+        self, rules: list[Rule | Fact], file_path: str | None
     ) -> None:
         """述語名インデックスを構築"""
         for i, rule_or_fact in enumerate(rules):
@@ -77,7 +78,7 @@ class SearchIndex:
             self.predicate_index[predicate_name].append(search_result)
 
     def _build_argument_index(
-        self, rules: List[Union[Rule, Fact]], file_path: Optional[str]
+        self, rules: list[Rule | Fact], file_path: str | None
     ) -> None:
         """引数パターンインデックスを構築"""
         for i, rule_or_fact in enumerate(rules):
@@ -103,7 +104,7 @@ class SearchIndex:
                         self.argument_index[pattern_key].append(search_result)
 
     def _build_text_index(
-        self, rules: List[Union[Rule, Fact]], file_path: Optional[str]
+        self, rules: list[Rule | Fact], file_path: str | None
     ) -> None:
         """全文検索インデックスを構築"""
         for i, rule_or_fact in enumerate(rules):
@@ -125,7 +126,7 @@ class SearchIndex:
                 )
                 self.text_index[word].append(search_result)
 
-    def search_predicates(self, pattern: str) -> List[SearchResult]:
+    def search_predicates(self, pattern: str) -> list[SearchResult]:
         """述語名で検索"""
         results = []
 
@@ -135,7 +136,7 @@ class SearchIndex:
 
         return results
 
-    def search_arguments(self, pattern: str) -> List[SearchResult]:
+    def search_arguments(self, pattern: str) -> list[SearchResult]:
         """引数パターンで検索"""
         results = []
 
@@ -146,7 +147,7 @@ class SearchIndex:
 
         return results
 
-    def search_full_text(self, pattern: str) -> List[SearchResult]:
+    def search_full_text(self, pattern: str) -> list[SearchResult]:
         """全文検索"""
         results = []
 
@@ -167,7 +168,7 @@ class SearchIndex:
 
         return results
 
-    def _extract_predicate_name(self, rule_or_fact: Union[Rule, Fact]) -> str:
+    def _extract_predicate_name(self, rule_or_fact: Rule | Fact) -> str:
         """ルールまたは事実から述語名を抽出"""
         if isinstance(rule_or_fact, Fact):
             return self._get_functor_name(rule_or_fact.head)
@@ -176,7 +177,7 @@ class SearchIndex:
         else:
             return str(rule_or_fact)
 
-    def _extract_all_terms(self, rule_or_fact: Union[Rule, Fact]) -> List[Term]:
+    def _extract_all_terms(self, rule_or_fact: Rule | Fact) -> list[Term]:
         """ルールまたは事実からすべての項を抽出"""
         terms = []
 
@@ -188,7 +189,7 @@ class SearchIndex:
 
         return terms
 
-    def _extract_terms_from_body(self, body: Any) -> List[Term]:
+    def _extract_terms_from_body(self, body: Any) -> list[Term]:
         """ルールのボディから項を抽出"""
         terms = []
 
@@ -237,7 +238,7 @@ class SearchIndex:
             return "null"
         return str(arg)
 
-    def _tokenize_text(self, text: str) -> List[str]:
+    def _tokenize_text(self, text: str) -> list[str]:
         """テキストをトークンに分割（日本語対応）"""
         # 英数字、日本語文字、アンダースコアを単語として抽出
         tokens = re.findall(

@@ -2,11 +2,12 @@
 新しい演算子 <> と != のテスト
 """
 
-from pyprolog.parser.scanner import Scanner
-from pyprolog.parser.parser import Parser
-from pyprolog.runtime.interpreter import Runtime
+from typing import Any
+
 from pyprolog.core.binding_environment import BindingEnvironment
-from typing import Any, List, Union
+from pyprolog.parser.parser import Parser
+from pyprolog.parser.scanner import Scanner
+from pyprolog.runtime.interpreter import Runtime
 
 
 class TestNewOperators:
@@ -16,7 +17,7 @@ class TestNewOperators:
         """各テストメソッドの前に実行"""
         self.runtime = Runtime([])
 
-    def execute_goal(self, source: str) -> List[Union[BindingEnvironment, Any]]:
+    def execute_goal(self, source: str) -> list[BindingEnvironment | Any]:
         """ゴールを実行して結果を返す"""
         tokens = Scanner(source).scan_tokens()
         goals = Parser(tokens).parse()

@@ -1,11 +1,11 @@
+import logging.config
 import os
 import sys
-import logging.config
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 
-def get_config_file_path(environment: str) -> Optional[Path]:
+def get_config_file_path(environment: str) -> Path | None:
     """指定された環境の設定ファイルパスを取得します。"""
     # パッケージインストール時のパス解決を改善
     current_file = Path(__file__)
@@ -129,7 +129,7 @@ def load_logging_config(environment: str) -> None:
         setup_programmatic_logging(environment)
 
 
-def get_available_environments() -> List[str]:
+def get_available_environments() -> list[str]:
     """利用可能な環境一覧を取得します。
 
     Returns:
@@ -152,7 +152,7 @@ def get_available_environments() -> List[str]:
         return ["production", "test", "debug"]  # フォールバック
 
 
-def validate_config_files() -> Dict[str, bool]:
+def validate_config_files() -> dict[str, bool]:
     """すべての設定ファイルの存在を確認します。
 
     Returns:
@@ -171,7 +171,7 @@ def validate_config_files() -> Dict[str, bool]:
     return results
 
 
-def get_config_info(environment: str) -> Dict[str, Any]:
+def get_config_info(environment: str) -> dict[str, Any]:
     """指定された環境の設定情報を取得します。
 
     Args:

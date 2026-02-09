@@ -5,16 +5,17 @@ Prologプログラムバリデーター
 """
 
 import time
-from typing import List, Set, Union, Optional, Any
+from typing import Any
+
+from pyprolog.core.types import Fact, Rule
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.validation.symbol_table import SymbolTable, predicate_key
-from pyprolog.validation.dependency_graph import DependencyGraph
-from pyprolog.validation.validation_result import ValidationResult, ValidationIssue
+from pyprolog.util.logger import get_logger
 from pyprolog.validation.analyzers.conflict_analyzer import ConflictAnalyzer
 from pyprolog.validation.analyzers.reachability_analyzer import ReachabilityAnalyzer
 from pyprolog.validation.analyzers.undefined_analyzer import UndefinedAnalyzer
-from pyprolog.core.types import Rule, Fact
-from pyprolog.util.logger import get_logger
+from pyprolog.validation.dependency_graph import DependencyGraph
+from pyprolog.validation.symbol_table import SymbolTable, predicate_key
+from pyprolog.validation.validation_result import ValidationIssue, ValidationResult
 
 logger = get_logger(__name__)
 
@@ -157,8 +158,8 @@ class Validator:
 
     def _analyze_rule_or_fact(
         self,
-        rule_or_fact: Union[Rule, Fact],
-        file_path: Optional[str],
+        rule_or_fact: Rule | Fact,
+        file_path: str | None,
         line_number: int,
     ) -> None:
         """ルールまたは事実を解析してシンボルテーブルに追加"""
@@ -204,7 +205,7 @@ class Validator:
         name, arity = self._extract_predicate_info(term)
         return predicate_key(name, arity)
 
-    def _extract_terms_from_body(self, body: Any) -> List[Any]:
+    def _extract_terms_from_body(self, body: Any) -> list[Any]:
         """ルールのボディから全ての項を抽出"""
         terms = []
 
@@ -229,7 +230,7 @@ class Validator:
 
         return terms
 
-    def _perform_detailed_analysis(self) -> List[ValidationIssue]:
+    def _perform_detailed_analysis(self) -> list[ValidationIssue]:
         """詳細な解析を実行"""
         logger.debug("詳細解析開始")
         issues = []
@@ -246,7 +247,7 @@ class Validator:
         logger.debug("詳細解析完了: %d 個の問題", len(issues))
         return issues
 
-    def _analyze_complexity(self) -> List[ValidationIssue]:
+    def _analyze_complexity(self) -> list[ValidationIssue]:
         """複雑度を解析"""
         issues = []
 
@@ -271,7 +272,7 @@ class Validator:
 
         return issues
 
-    def _check_naming_conventions(self) -> List[ValidationIssue]:
+    def _check_naming_conventions(self) -> list[ValidationIssue]:
         """命名規則をチェック"""
         issues = []
 
@@ -295,7 +296,7 @@ class Validator:
 
         return issues
 
-    def _check_performance_issues(self) -> List[ValidationIssue]:
+    def _check_performance_issues(self) -> list[ValidationIssue]:
         """パフォーマンス問題をチェック"""
         issues = []
 
@@ -373,6 +374,6 @@ class Validator:
 
         return head_key == first_key
 
-    def get_entry_points(self) -> Set[str]:
+    def get_entry_points(self) -> set[str]:
         """エントリーポイントを取得"""
         return self.analyzers["unreachable"]._get_entry_points(self.symbol_table)

@@ -3,11 +3,15 @@ Search ツールの実装
 
 Prologルールと事実の検索機能を提供するためのツールです。
 """
-from typing import Dict, Any, Tuple
+
+from typing import Any
+
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.search.search_engine import SearchEngine
 from pyprolog.util.logger import get_logger
+
 logger = get_logger(__name__)
+
 
 class SearchTool:
     """Prologルールと事実の検索を提供するツール"""
@@ -16,7 +20,9 @@ class SearchTool:
         self.runtime = runtime
         self.search_engine = SearchEngine(runtime)
 
-    def search_query(self, pattern: str, search_type: str='predicate', limit: int=100) -> Dict[str, Any]:
+    def search_query(
+        self, pattern: str, search_type: str = "predicate", limit: int = 100
+    ) -> dict[str, Any]:
         """
         検索クエリを実行します
 
@@ -29,18 +35,39 @@ class SearchTool:
             検索結果を含む辞書
         """
         try:
-            logger.debug("検索実行: pattern='%r', type=%r, limit=%r", pattern, search_type, limit)
+            logger.debug(
+                "検索実行: pattern='%r', type=%r, limit=%r", pattern, search_type, limit
+            )
             results = self.search_engine.search(pattern, search_type, limit)
             result_dicts = []
             for result in results:
-                result_dict = {'rule': str(result.rule_or_fact), 'file_path': result.file_path, 'line_number': result.line_number, 'matched_text': result.matched_text, 'match_type': result.match_type, 'confidence': result.confidence}
+                result_dict = {
+                    "rule": str(result.rule_or_fact),
+                    "file_path": result.file_path,
+                    "line_number": result.line_number,
+                    "matched_text": result.matched_text,
+                    "match_type": result.match_type,
+                    "confidence": result.confidence,
+                }
                 result_dicts.append(result_dict)
-            return {'pattern': pattern, 'search_type': search_type, 'results': result_dicts, 'result_count': len(results), 'limit': limit, 'success': True}
+            return {
+                "pattern": pattern,
+                "search_type": search_type,
+                "results": result_dicts,
+                "result_count": len(results),
+                "limit": limit,
+                "success": True,
+            }
         except Exception as e:
             logger.error("検索エラー '%s': %s", pattern, e)
-            return {'pattern': pattern, 'search_type': search_type, 'error': str(e), 'success': False}
+            return {
+                "pattern": pattern,
+                "search_type": search_type,
+                "error": str(e),
+                "success": False,
+            }
 
-    def parse_search_command(self, search_command: str) -> Tuple[str, str, int]:
+    def parse_search_command(self, search_command: str) -> tuple[str, str, int]:
         """
         search(pattern, type, limit) コマンドをパースします
 
@@ -51,12 +78,12 @@ class SearchTool:
             (pattern, search_type, limit) のタプル
         """
         try:
-            if search_command.startswith('search(') and search_command.endswith(').'):
+            if search_command.startswith("search(") and search_command.endswith(")."):
                 inner = search_command[7:-2]
             else:
-                raise ValueError('無効なsearchコマンド形式')
+                raise ValueError("無効なsearchコマンド形式")
             parts = []
-            current = ''
+            current = ""
             paren_level = 0
             in_quotes = False
             for char in inner:
@@ -64,19 +91,19 @@ class SearchTool:
                     in_quotes = True
                 elif char == '"' and in_quotes:
                     in_quotes = False
-                elif char == '(' and (not in_quotes):
+                elif char == "(" and (not in_quotes):
                     paren_level += 1
-                elif char == ')' and (not in_quotes):
+                elif char == ")" and (not in_quotes):
                     paren_level -= 1
-                elif char == ',' and paren_level == 0 and (not in_quotes):
+                elif char == "," and paren_level == 0 and (not in_quotes):
                     parts.append(current.strip())
-                    current = ''
+                    current = ""
                     continue
                 current += char
             if current.strip():
                 parts.append(current.strip())
-            pattern = parts[0] if len(parts) > 0 else ''
-            search_type = parts[1] if len(parts) > 1 else 'predicate'
+            pattern = parts[0] if len(parts) > 0 else ""
+            search_type = parts[1] if len(parts) > 1 else "predicate"
             limit = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 100
             if search_type.startswith('"') and search_type.endswith('"'):
                 search_type = search_type[1:-1]
@@ -85,9 +112,11 @@ class SearchTool:
             return (pattern, search_type, limit)
         except Exception as e:
             logger.warning("searchコマンド解析エラー '%s': %s", search_command, e)
-            return (search_command, 'predicate', 100)
+            return (search_command, "predicate", 100)
 
-    def format_results(self, search_result: Dict[str, Any], format_type: str='text') -> str:
+    def format_results(
+        self, search_result: dict[str, Any], format_type: str = "text"
+    ) -> str:
         """
         検索結果をフォーマットします
 
@@ -99,55 +128,62 @@ class SearchTool:
             フォーマットされた結果文字列
         """
         try:
-            if not search_result.get('success'):
+            if not search_result.get("success"):
                 return f"検索エラー: {search_result.get('error', '不明なエラー')}"
-            results = search_result.get('results', [])
+            results = search_result.get("results", [])
             if not results:
                 return f"パターン '{search_result['pattern']}' に一致する結果が見つかりませんでした。"
-            if format_type == 'json':
+            if format_type == "json":
                 import json
+
                 return json.dumps(search_result, ensure_ascii=False, indent=2)
-            elif format_type == 'table':
+            elif format_type == "table":
                 return self._format_table(search_result)
             else:
                 return self._format_text(search_result)
         except Exception as e:
-            logger.error('結果フォーマットエラー: %s', e)
-            return f'フォーマットエラー: {e}'
+            logger.error("結果フォーマットエラー: %s", e)
+            return f"フォーマットエラー: {e}"
 
-    def _format_text(self, search_result: Dict[str, Any]) -> str:
+    def _format_text(self, search_result: dict[str, Any]) -> str:
         """テキスト形式でフォーマット"""
         lines = []
-        lines.append('=== 検索結果 ===')
+        lines.append("=== 検索結果 ===")
         lines.append(f"パターン: {search_result['pattern']}")
         lines.append(f"検索タイプ: {search_result['search_type']}")
         lines.append(f"結果数: {search_result['result_count']} 件")
-        lines.append('')
-        for i, result in enumerate(search_result['results'], 1):
-            lines.append(f"{i}. {result['match_type']}マッチ (信頼度: {result['confidence']:.2f})")
+        lines.append("")
+        for i, result in enumerate(search_result["results"], 1):
+            lines.append(
+                f"{i}. {result['match_type']}マッチ (信頼度: {result['confidence']:.2f})"
+            )
             lines.append(f"   ルール: {result['rule']}")
-            if result.get('file_path'):
+            if result.get("file_path"):
                 lines.append(f"   場所: {result['file_path']}:{result['line_number']}")
             lines.append(f"   マッチ箇所: {result['matched_text']}")
-            lines.append('')
-        return '\n'.join(lines)
+            lines.append("")
+        return "\n".join(lines)
 
-    def _format_table(self, search_result: Dict[str, Any]) -> str:
+    def _format_table(self, search_result: dict[str, Any]) -> str:
         """テーブル形式でフォーマット"""
         lines = []
-        lines.append(f"検索結果: {search_result['pattern']} ({search_result['result_count']} 件)")
-        lines.append('─' * 80)
+        lines.append(
+            f"検索結果: {search_result['pattern']} ({search_result['result_count']} 件)"
+        )
+        lines.append("─" * 80)
         lines.append(f"{'No.':<4} {'タイプ':<10} {'信頼度':<8} {'ルール'}")
-        lines.append('─' * 80)
-        for i, result in enumerate(search_result['results'], 1):
-            rule_text = result['rule']
+        lines.append("─" * 80)
+        for i, result in enumerate(search_result["results"], 1):
+            rule_text = result["rule"]
             if len(rule_text) > 50:
-                rule_text = rule_text[:47] + '...'
-            lines.append(f"{i:<4} {result['match_type']:<10} {result['confidence']:<8.2f} {rule_text}")
-        lines.append('─' * 80)
-        return '\n'.join(lines)
+                rule_text = rule_text[:47] + "..."
+            lines.append(
+                f"{i:<4} {result['match_type']:<10} {result['confidence']:<8.2f} {rule_text}"
+            )
+        lines.append("─" * 80)
+        return "\n".join(lines)
 
-    def get_search_statistics(self) -> Dict[str, Any]:
+    def get_search_statistics(self) -> dict[str, Any]:
         """検索エンジンの統計情報を取得"""
         return self.search_engine.get_statistics()
 
@@ -158,5 +194,5 @@ class SearchTool:
             self.search_engine.build_index()
             return True
         except Exception as e:
-            logger.error('インデックス再構築エラー: %s', e)
+            logger.error("インデックス再構築エラー: %s", e)
             return False
