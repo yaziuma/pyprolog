@@ -14,13 +14,15 @@ Key components:
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
-from abc import ABC, abstractmethod
-from typing import Iterator, Optional, List, TYPE_CHECKING
-from enum import Enum, auto
 
-from pyprolog.core.types import PrologType
+from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import TYPE_CHECKING
+
 from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.types import PrologType
 
 if TYPE_CHECKING:
     from pyprolog.runtime.interpreter import Interpreter
@@ -33,6 +35,7 @@ class FrameType(Enum):
     GOAL_SEQ = auto()
     OPERATOR = auto()
     CHOICE_POINT = auto()
+    NEGATION = auto()
 
 
 @dataclass
@@ -48,7 +51,7 @@ class Frame(ABC):
     env: BindingEnvironment
 
     @abstractmethod
-    def step(self, interpreter: Interpreter) -> Optional[BindingEnvironment]:
+    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
         """Execute one step of this frame.
 
         Args:
@@ -86,11 +89,11 @@ class GoalFrame(Frame):
     then produces solutions one at a time on subsequent calls.
     """
 
-    goal: Optional[PrologType] = None
-    solutions: Optional[Iterator[BindingEnvironment]] = None
+    goal: PrologType | None = None
+    solutions: Iterator[BindingEnvironment] | None = None
     frame_type: FrameType = field(default=FrameType.GOAL, init=False)
 
-    def step(self, interpreter: Interpreter) -> Optional[BindingEnvironment]:
+    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
         """Get next solution from goal execution.
 
         First call initializes the solutions iterator.
@@ -119,44 +122,113 @@ class GoalFrame(Frame):
 class GoalSeqFrame(Frame):
     """Frame for executing a sequence of goals (conjunction).
 
-    Tracks:
-    - Remaining goals to execute
-    - Current goal index
-    - Whether sequence completion should yield result
+    Implements backtracking-aware conjunction using an internal stack
+    of (index, iterator) pairs, mirroring _execute_goal_sequence logic.
 
-    The frame coordinates execution of multiple goals in sequence.
-    Each goal must succeed before proceeding to the next.
+    This approach enables proper Prolog conjunction semantics:
+    - When the last goal exhausts, backtrack to previous goal
+    - Previous goal's next solution re-initiates subsequent goals
     """
 
-    goals: List[PrologType] = field(default_factory=list)
-    current_index: int = 0
+    goals: list[PrologType] = field(default_factory=list)
+    goal_stack: list[tuple[int, Iterator[BindingEnvironment]]] = field(default_factory=list)
     frame_type: FrameType = field(default=FrameType.GOAL_SEQ, init=False)
+    initialized: bool = False
 
-    def step(self, interpreter: Interpreter) -> Optional[BindingEnvironment]:
-        """Process goal sequence.
+    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
+        """Execute conjunction with proper backtracking.
 
         Returns:
-        - None: Need to push next goal frame (not done yet)
-        - env: Sequence complete, yield this environment
+        - BindingEnvironment: A solution was found
+        - None: Conjunction exhausted all possibilities
         """
-        if self.current_index >= len(self.goals):
-            # All goals succeeded
-            return self.env
+        # Initialize on first call
+        if not self.initialized:
+            if not self.goals:
+                return self.env
+            # Start with first goal
+            first_iter = interpreter.execute(self.goals[0], self.env)
+            self.goal_stack.append((0, first_iter))
+            self.initialized = True
 
-        # Need to execute next goal
-        return None  # Signals: push GoalFrame for goals[current_index]
+        # Process goal stack (same logic as _execute_goal_sequence)
+        while self.goal_stack:
+            index, iterator = self.goal_stack[-1]
 
-    def advance(self, result_env: BindingEnvironment):
-        """Advance to next goal after current goal succeeded.
+            try:
+                next_env = next(iterator)
+            except StopIteration:
+                # Current goal exhausted, backtrack
+                self.goal_stack.pop()
+                continue
 
-        Args:
-            result_env: The binding environment from the successful goal
-        """
-        self.env = result_env
-        self.current_index += 1
+            # Check if last goal
+            if index == len(self.goals) - 1:
+                # All goals succeeded, return solution
+                return next_env
+
+            # Push next goal
+            next_index = index + 1
+            next_iter = interpreter.execute(self.goals[next_index], next_env)
+            self.goal_stack.append((next_index, next_iter))
+
+        # All goals exhausted
+        return None
 
     def can_backtrack(self) -> bool:
-        """Goal sequences don't backtrack themselves; child goals do."""
+        """Check if backtracking is possible."""
+        return len(self.goal_stack) > 0
+
+
+@dataclass
+class NegationFrame(Frame):
+    """Frame for negation as failure (\\+/1).
+
+    Handles:
+    - Tracking inner goal execution state
+    - Cut barrier enforcement (cuts within negation don't escape)
+    - Binding isolation (bindings within negation don't leak)
+
+    State tracking:
+    - entry_stack_depth: Stack depth when negation started
+    - entry_choice_depth: Choice point depth when negation started
+    - inner_started: Whether inner goal execution has started
+    - inner_succeeded: Whether inner goal produced any solution
+    """
+
+    inner_goal: PrologType | None = None
+    entry_stack_depth: int = 0
+    entry_choice_depth: int = 0
+    inner_started: bool = False
+    inner_succeeded: bool = False
+    frame_type: FrameType = field(default=FrameType.NEGATION, init=False)
+
+    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
+        """Execute negation as failure logic.
+
+        Returns:
+            - None: Inner goal needs to be pushed/executed
+            - env: Negation succeeded (inner goal failed completely)
+        """
+        if not self.inner_started:
+            # First step: push inner goal
+            self.inner_started = True
+            return None  # Signal: push inner_goal
+
+        # Inner goal has been executed
+        if self.inner_succeeded:
+            # Inner goal succeeded → negation fails
+            return None  # Pop frame, fail
+        else:
+            # Inner goal failed → negation succeeds
+            return self.env
+
+    def record_success(self):
+        """Mark that inner goal succeeded (negation should fail)."""
+        self.inner_succeeded = True
+
+    def can_backtrack(self) -> bool:
+        """Negation frames don't backtrack themselves."""
         return False
 
 
@@ -173,12 +245,12 @@ class OperatorFrame(Frame):
     """
 
     operator: str = ""
-    args: List[PrologType] = field(default_factory=list)
+    args: list[PrologType] = field(default_factory=list)
     state: str = "initial"  # "initial", "left", "right", "done"
     left_tried: bool = False
     frame_type: FrameType = field(default=FrameType.OPERATOR, init=False)
 
-    def step(self, interpreter: Interpreter) -> Optional[BindingEnvironment]:
+    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
         """Execute operator-specific logic.
 
         Returns:
@@ -186,10 +258,7 @@ class OperatorFrame(Frame):
         """
         if self.operator == ",":
             # Conjunction: should be flattened to GoalSeqFrame
-            # This is a fallback/transition case
-            from pyprolog.core.types import Term, Atom
-
-            goals = interpreter._flatten_conjunction(Term(Atom(","), self.args))
+            # This is a fallback/transition case (unused in v2)
             return None  # Signal: replace with GoalSeqFrame(goals)
 
         elif self.operator == ";":
@@ -235,7 +304,7 @@ class ChoicePoint:
     stack_depth: int
     alternative_frame: Frame
 
-    def restore(self, stack: List[Frame]):
+    def restore(self, stack: list[Frame]):
         """Restore stack to choice point and push alternative.
 
         Args:
@@ -261,24 +330,24 @@ class ExecutionState:
     replacing the implicit call stack of the recursive implementation.
     """
 
-    stack: List[Frame] = field(default_factory=list)
-    choice_points: List[ChoicePoint] = field(default_factory=list)
-    cut_barrier: Optional[int] = None  # Stack depth at cut
+    stack: list[Frame] = field(default_factory=list)
+    choice_points: list[ChoicePoint] = field(default_factory=list)
+    cut_barrier: int | None = None  # Stack depth at cut
 
     def push_goal(self, goal: PrologType, env: BindingEnvironment) -> None:
         """Push a new goal frame with logical operator detection.
 
         Routes goals to appropriate frame types:
         - Conjunction (,/2): GoalSeqFrame for sequential execution
-        - Disjunction (;/2): OperatorFrame (handled by operator evaluator)
-        - Negation (\+/1): OperatorFrame (handled by operator evaluator)
+        - Disjunction (;/2): ChoicePoint with two alternatives
+        - Negation (\\+/1): NegationFrame with inner goal
         - Atomic goals: GoalFrame (executed by _execute_single_goal)
 
         Args:
             goal: The goal to execute
             env: The binding environment
         """
-        from pyprolog.core.types import Term, Atom
+        from pyprolog.core.types import Atom, Term
 
         # Detect logical operators
         if isinstance(goal, Term) and isinstance(goal.functor, Atom):
@@ -292,27 +361,39 @@ class ExecutionState:
                 self.stack.append(GoalSeqFrame(env=env, goals=goals))
                 return
 
-            # Disjunction and Negation: use OperatorFrame
-            # (These will be handled by operator evaluators in execute())
-            if functor_name in (";", "\\+"):
-                # For now, create GoalFrame and let it fail with assertion
-                # Phase 4 will properly route these through execute()
-                self.stack.append(GoalFrame(env=env, goal=goal))
+            # Disjunction: create choice point with two alternatives
+            if functor_name == ";" and len(goal.args) == 2:
+                left_goal, right_goal = goal.args[0], goal.args[1]
+                # Push right alternative as choice point
+                right_frame = GoalFrame(env=env.copy(), goal=right_goal)
+                self.push_choice_point(right_frame)
+                # Push left alternative immediately
+                self.push_goal(left_goal, env)
+                return
+
+            # Negation: create NegationFrame
+            if functor_name == "\\+" and len(goal.args) == 1:
+                inner_goal = goal.args[0]
+                negation_frame = NegationFrame(
+                    env=env,
+                    inner_goal=inner_goal,
+                    entry_stack_depth=len(self.stack),
+                    entry_choice_depth=len(self.choice_points),
+                )
+                self.stack.append(negation_frame)
                 return
 
         # Default: atomic goal
         self.stack.append(GoalFrame(env=env, goal=goal))
 
-    def _flatten_conjunction(
-        self, goal: PrologType, result: list[PrologType]
-    ) -> None:
+    def _flatten_conjunction(self, goal: PrologType, result: list[PrologType]) -> None:
         """Flatten nested conjunction into a flat list.
 
         Args:
             goal: Goal to flatten
             result: List to append flattened goals to
         """
-        from pyprolog.core.types import Term, Atom
+        from pyprolog.core.types import Atom, Term
 
         if isinstance(goal, Term) and isinstance(goal.functor, Atom):
             if goal.functor.name == "," and len(goal.args) == 2:
@@ -325,8 +406,8 @@ class ExecutionState:
         result.append(goal)
 
     def push_goal_sequence(
-        self, goals: List[PrologType], env: BindingEnvironment
-    ) -> Optional[BindingEnvironment]:
+        self, goals: list[PrologType], env: BindingEnvironment
+    ) -> BindingEnvironment | None:
         """Push a goal sequence frame.
 
         Args:
@@ -339,7 +420,7 @@ class ExecutionState:
         if not goals:
             # Empty sequence: immediately yield env
             return env
-        self.stack.append(GoalSeqFrame(env=env, goals=goals, current_index=0))
+        self.stack.append(GoalSeqFrame(env=env, goals=goals))
         return None
 
     def push_choice_point(self, alternative: Frame) -> None:

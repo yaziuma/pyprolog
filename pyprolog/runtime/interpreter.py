@@ -38,6 +38,7 @@ from pyprolog.runtime.execution_frames import (
     ExecutionState,
     GoalFrame,
     GoalSeqFrame,
+    NegationFrame,
 )
 from pyprolog.runtime.logic_interpreter import LogicInterpreter
 from pyprolog.runtime.math_interpreter import MathInterpreter
@@ -574,7 +575,9 @@ class Runtime:
             and goal.name == "!"
             and "!" in self._operator_evaluators
         ):
-            logger.debug("_execute_single_goal: Atom('!') detected, routing to operator.")
+            logger.debug(
+                "_execute_single_goal: Atom('!') detected, routing to operator."
+            )
             processed_goal = Term(goal, [])
         elif isinstance(goal, Term):
             processed_goal = goal
@@ -880,10 +883,16 @@ class Runtime:
     def execute_iterative(
         self, goal: PrologType, env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
-        """Iterative goal execution using explicit stack.
+        """Iterative goal execution using explicit stack (v2).
 
         Replaces mutual recursion between execute/evaluator/_execute_goal_sequence
         with an explicit frame-based stack approach.
+
+        Implements v2 improvements:
+        - GoalSeqFrame preserves child frames for backtracking
+        - NegationFrame handles \\+/1 with proper cut isolation
+        - Disjunction uses choice points correctly
+        - Backtracking works across conjunctions
 
         Args:
             goal: The goal to execute
@@ -896,74 +905,113 @@ class Runtime:
             CutException: When cut (!) is executed
         """
         state = ExecutionState(stack=[], choice_points=[])
+        state.cut_barrier = len(state.stack)  # Set cut barrier
         state.push_goal(goal, env)
 
         while state.stack:
             frame = state.stack[-1]
 
             try:
-                # Special handling for GoalSeqFrame
+                # === NegationFrame handling ===
+                if isinstance(frame, NegationFrame):
+                    result = frame.step(self)
+
+                    if result is None:
+                        if not frame.inner_started:
+                            # Should never happen (step() sets inner_started)
+                            state.stack.pop()
+                            continue
+                        elif frame.inner_succeeded:
+                            # Inner goal succeeded → negation fails
+                            state.stack.pop()
+                            # Restore stack/choice points to entry state
+                            while len(state.stack) > frame.entry_stack_depth:
+                                state.stack.pop()
+                            while len(state.choice_points) > frame.entry_choice_depth:
+                                state.choice_points.pop()
+                            # Try backtracking
+                            if not state.backtrack():
+                                continue
+                        else:
+                            # Inner goal execution needed
+                            state.push_goal(frame.inner_goal, frame.env.copy())
+                        continue
+
+                    # Negation succeeded (inner goal failed)
+                    yield result
+                    state.stack.pop()
+                    continue
+
+                # === GoalSeqFrame handling ===
                 if isinstance(frame, GoalSeqFrame):
                     result = frame.step(self)
 
                     if result is None:
-                        # Need to push next goal in sequence
-                        if frame.current_index < len(frame.goals):
-                            next_goal = frame.goals[frame.current_index]
-                            state.push_goal(next_goal, frame.env)
-                        else:
-                            # Should not happen (step() should return env)
-                            state.stack.pop()
+                        # Conjunction exhausted
+                        state.stack.pop()
+                        if not state.backtrack():
+                            continue
                         continue
 
-                    # result is not None: sequence complete
+                    # Solution found, yield it
                     yield result
-                    state.stack.pop()
+                    # Keep frame on stack to continue producing solutions
                     continue
 
-                # Regular frame processing
-                result = frame.step(self)
-
-                if result is None:
-                    # Frame exhausted, pop and continue
-                    state.stack.pop()
-                    continue
-
-                # Frame produced a result
+                # === GoalFrame handling ===
                 if isinstance(frame, GoalFrame):
-                    # Check if this is part of a sequence
-                    parent_frame = (
-                        state.stack[-2] if len(state.stack) >= 2 else None
-                    )
+                    result = frame.step(self)
 
-                    if isinstance(parent_frame, GoalSeqFrame):
-                        # Goal in sequence succeeded, advance parent
-                        parent_frame.advance(result)
-                        state.stack.pop()  # Pop current GoalFrame
+                    if result is None:
+                        # Frame exhausted, pop and backtrack
+                        state.stack.pop()
+                        if not state.backtrack():
+                            continue
+                        continue
 
-                        # Check if sequence is complete
-                        if parent_frame.current_index >= len(parent_frame.goals):
-                            # Sequence complete, will be yielded in next iteration
-                            pass
-                        # else: next goal will be pushed in next iteration
+                    # Frame produced a result
+                    # Check if this is part of a negation
+                    parent_frame = state.stack[-2] if len(state.stack) >= 2 else None
+
+                    if isinstance(parent_frame, NegationFrame):
+                        # Goal within negation succeeded
+                        parent_frame.record_success()
+                        state.stack.pop()
+                        # Negation will fail in next iteration
                     else:
                         # Standalone goal succeeded
                         yield result
                         # Continue to try next solution from this frame
-                else:
-                    # Other frame types
-                    yield result
+                    continue
+
+                # === Other frame types ===
+                result = frame.step(self)
+                if result is None:
                     state.stack.pop()
+                    continue
+
+                yield result
+                state.stack.pop()
 
             except CutException:
-                # Handle cut: remove choice points
+                # Handle cut within negation
+                if any(isinstance(f, NegationFrame) for f in state.stack):
+                    # Cut within negation: mark as success (negation fails)
+                    for f in reversed(state.stack):
+                        if isinstance(f, NegationFrame):
+                            f.record_success()
+                            break
+                    continue
+
+                # Normal cut: remove choice points and re-raise
                 state.apply_cut()
                 raise
 
             except StopIteration:
                 # Frame exhausted, try backtracking
+                state.stack.pop()
                 if not state.backtrack():
-                    state.stack.pop()
+                    continue
 
     def query(self, query_string: str) -> list[dict[Variable, Any]]:
         logger.debug("QUERY: Executing query: %s", query_string)
@@ -1157,7 +1205,12 @@ class Runtime:
             for directive_type, pred_name, arity in directives:
                 if directive_type == "dynamic":
                     self.logic_interpreter.apply_dynamic(pred_name, arity)
-                    logger.info("Applied dynamic directive: %s/%d from %s", pred_name, arity, filename)
+                    logger.info(
+                        "Applied dynamic directive: %s/%d from %s",
+                        pred_name,
+                        arity,
+                        filename,
+                    )
 
             # Then add rules
             added_count = 0
@@ -1171,7 +1224,9 @@ class Runtime:
             if added_count > 0 or directives:
                 logger.info(
                     "Consulted %d directive(s) and %d rule(s)/fact(s) from %s",
-                    len(directives), added_count, filename
+                    len(directives),
+                    added_count,
+                    filename,
                 )
             else:
                 logger.info("No directives, rules or facts consulted from %s", filename)
