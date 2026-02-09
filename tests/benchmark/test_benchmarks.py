@@ -3,13 +3,16 @@ import os
 import sys
 
 import pytest
-from pyprolog.runtime.interpreter import Runtime
+
 from pyprolog.core.types import Variable
+from pyprolog.runtime.interpreter import Runtime
 
 BENCHMARK_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
 def get_benchmark_path(filename):
     return os.path.join(BENCHMARK_DIR, filename)
+
 
 def run_query(runtime, query):
     return list(runtime.query(query))
@@ -30,6 +33,7 @@ def _run_benchmark(benchmark, runtime, label, filename, query):
     logging.getLogger("prolog").info(message_done)
     return result
 
+
 @pytest.fixture
 def runtime():
     return Runtime()
@@ -42,9 +46,11 @@ def runtime_iterative():
     rt.use_iterative_execution = True
     return rt
 
+
 # -----------------------
 # Heavy benchmarks
 # -----------------------
+
 
 @pytest.mark.info_log
 @pytest.mark.bench_heavy
@@ -115,6 +121,7 @@ def test_primes_heavy(benchmark, runtime):
 # Medium benchmarks
 # -----------------------
 
+
 @pytest.mark.info_log
 @pytest.mark.bench_medium
 def test_queens_medium(benchmark, runtime):
@@ -168,8 +175,79 @@ def test_tak_medium(benchmark, runtime):
 
 
 # -----------------------
+# Light-Medium benchmarks (between light and medium)
+# -----------------------
+
+
+@pytest.mark.info_log
+@pytest.mark.bench_light_medium
+def test_queens_light_medium(benchmark, runtime):
+    """queens.pl (N-Queens light-medium)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "queens (9-Queens)",
+        "queens.pl",
+        "solve_queens(9, Solution).",
+    )
+
+
+@pytest.mark.info_log
+@pytest.mark.bench_light_medium
+def test_nrev_light_medium(benchmark, runtime):
+    """nrev.pl (Naive Reverse light-medium)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "nrev (list=90)",
+        "nrev.pl",
+        "benchmark(90).",
+    )
+
+
+@pytest.mark.info_log
+@pytest.mark.bench_light_medium
+def test_primes_light_medium(benchmark, runtime):
+    """primes.pl (Sieve light-medium)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "primes (limit=500)",
+        "primes.pl",
+        "benchmark(500).",
+    )
+
+
+@pytest.mark.info_log
+@pytest.mark.bench_light_medium
+def test_tak_light_medium(benchmark, runtime):
+    """tak.pl (Takeuchi function light-medium)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "tak (16,12,6)",
+        "tak.pl",
+        "tak(16, 12, 6, R).",
+    )
+
+
+@pytest.mark.info_log
+@pytest.mark.bench_light_medium
+def test_recursion_depth_light_medium(benchmark, runtime):
+    """recursion_depth.pl (Simple recursion light-medium)"""
+    _run_benchmark(
+        benchmark,
+        runtime,
+        "recursion_depth (N=300)",
+        "recursion_depth.pl",
+        "benchmark(300).",
+    )
+
+
+# -----------------------
 # Light benchmarks
 # -----------------------
+
 
 @pytest.mark.info_log
 @pytest.mark.bench_light
@@ -183,6 +261,7 @@ def test_queens_light(benchmark, runtime):
         "solve_queens(8, Solution).",
     )
 
+
 @pytest.mark.info_log
 @pytest.mark.bench_light
 def test_mini_crypt_light(benchmark, runtime):
@@ -194,6 +273,7 @@ def test_mini_crypt_light(benchmark, runtime):
         "mini_crypt.pl",
         "solve(I, B, L).",
     )
+
 
 @pytest.mark.info_log
 @pytest.mark.bench_light
@@ -219,6 +299,7 @@ def test_primes_light(benchmark, runtime):
         "primes.pl",
         "benchmark(100).",
     )
+
 
 @pytest.mark.info_log
 @pytest.mark.bench_light
@@ -250,6 +331,7 @@ def test_recursion_depth_light(benchmark, runtime):
 # -----------------------
 # Recursion depth tests (for iterative execution)
 # -----------------------
+
 
 @pytest.mark.info_log
 @pytest.mark.bench_medium
