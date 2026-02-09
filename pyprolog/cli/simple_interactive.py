@@ -6,14 +6,14 @@ Simple Interactive Prolog CLI
 
 import os
 import sys
-from typing import List, Optional, Any, Dict  # Added Any, Dict
+from typing import Any  # Added Any, Dict
 
 from colorama import Fore, Style, init
 
+from pyprolog.core.errors import InterpreterError, PrologError, ScannerError
+from pyprolog.core.types import Atom, Term, Variable  # Added Term, Atom, Number
 from pyprolog.parser.parser import Parser  # Not strictly needed here anymore
 from pyprolog.parser.scanner import Scanner  # Not strictly needed here anymore
-from pyprolog.core.types import Variable, Term, Atom  # Added Term, Atom, Number
-from pyprolog.core.errors import InterpreterError, ScannerError, PrologError
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
 
@@ -25,12 +25,12 @@ class SimplePrologInteractive:
     """シンプルな対話型Prologシステム"""
 
     def __init__(self):
-        self.runtime: Optional[Runtime] = None
+        self.runtime: Runtime | None = None
         self.variable_mapper = VariableMapper()  # Added VariableMapper instance
-        self.session_history: List[
+        self.session_history: list[
             str
         ] = []  # Consider changing to List[Dict[str, Any]] like enhanced REPL if more info is stored
-        self.current_rules_file: Optional[str] = None
+        self.current_rules_file: str | None = None
 
         print(self._get_welcome_message())
 
@@ -96,12 +96,12 @@ class SimplePrologInteractive:
         """情報メッセージのフォーマット"""
         return f"{Fore.BLUE}{text}{Style.RESET_ALL}"
 
-    def _init_runtime(self, rules_file: Optional[str] = None) -> bool:
+    def _init_runtime(self, rules_file: str | None = None) -> bool:
         """ランタイムを初期化"""
         try:
             if rules_file and os.path.exists(rules_file):
                 # ファイルからルールを読み込み
-                with open(rules_file, "r", encoding="utf-8") as f:
+                with open(rules_file, encoding="utf-8") as f:
                     rules_text = f.read()
 
                 parsed_rules = Parser(Scanner(rules_text).scan_tokens())._parse_rule()
@@ -268,7 +268,7 @@ class SimplePrologInteractive:
             return str(term)
 
     def _display_query_results(
-        self, solutions: List[Dict[Variable, Any]]
+        self, solutions: list[dict[Variable, Any]]
     ):  # Type hint for solutions
         """クエリ結果を表示"""
         if not solutions:

@@ -4,8 +4,8 @@
 Prolog述語間の呼び出し関係を管理し、到達可能性解析や循環検出を提供します。
 """
 
-from typing import Dict, Set, List, Optional
-from collections import deque, defaultdict
+from collections import defaultdict, deque
+
 from pyprolog.util.logger import get_logger
 
 logger = get_logger(__name__)
@@ -15,9 +15,9 @@ class DependencyGraph:
     """述語間の依存関係グラフ"""
 
     def __init__(self):
-        self.nodes: Set[str] = set()  # predicate/arity
-        self.edges: Dict[str, Set[str]] = defaultdict(set)  # caller -> callees
-        self.reverse_edges: Dict[str, Set[str]] = defaultdict(set)  # callee -> callers
+        self.nodes: set[str] = set()  # predicate/arity
+        self.edges: dict[str, set[str]] = defaultdict(set)  # caller -> callees
+        self.reverse_edges: dict[str, set[str]] = defaultdict(set)  # callee -> callers
 
     def add_node(self, predicate_key: str) -> None:
         """ノード（述語）を追加"""
@@ -32,15 +32,15 @@ class DependencyGraph:
         self.reverse_edges[callee].add(caller)
         logger.debug("依存関係追加: %s -> %s", caller, callee)
 
-    def get_dependencies(self, predicate_key: str) -> Set[str]:
+    def get_dependencies(self, predicate_key: str) -> set[str]:
         """指定された述語の依存先を取得"""
         return self.edges.get(predicate_key, set())
 
-    def get_dependents(self, predicate_key: str) -> Set[str]:
+    def get_dependents(self, predicate_key: str) -> set[str]:
         """指定された述語に依存する述語を取得"""
         return self.reverse_edges.get(predicate_key, set())
 
-    def get_reachable_from(self, start_nodes: Set[str]) -> Set[str]:
+    def get_reachable_from(self, start_nodes: set[str]) -> set[str]:
         """開始ノードから到達可能なノードを取得"""
         reachable = set()
         queue = deque(start_nodes)
@@ -64,7 +64,7 @@ class DependencyGraph:
         )
         return reachable
 
-    def get_unreachable_nodes(self, entry_points: Set[str]) -> Set[str]:
+    def get_unreachable_nodes(self, entry_points: set[str]) -> set[str]:
         """エントリーポイントから到達不可能なノードを取得"""
         reachable = self.get_reachable_from(entry_points)
         unreachable = self.nodes - reachable
@@ -72,13 +72,13 @@ class DependencyGraph:
         logger.debug("到達不可能ノード数: %d", len(unreachable))
         return unreachable
 
-    def detect_cycles(self) -> List[List[str]]:
+    def detect_cycles(self) -> list[list[str]]:
         """循環依存を検出"""
         cycles = []
         visited = set()
         rec_stack = set()
 
-        def dfs_cycle_detection(node: str, path: List[str]) -> bool:
+        def dfs_cycle_detection(node: str, path: list[str]) -> bool:
             if node in rec_stack:
                 # 循環を発見
                 cycle_start = path.index(node)
@@ -108,7 +108,7 @@ class DependencyGraph:
         logger.debug("循環依存検出: %d 個", len(cycles))
         return cycles
 
-    def topological_sort(self) -> Optional[List[str]]:
+    def topological_sort(self) -> list[str] | None:
         """トポロジカルソート（循環がある場合はNone）"""
         in_degree = defaultdict(int)
 
@@ -140,7 +140,7 @@ class DependencyGraph:
 
         return result
 
-    def get_strongly_connected_components(self) -> List[List[str]]:
+    def get_strongly_connected_components(self) -> list[list[str]]:
         """強連結成分を取得（Kosarajuのアルゴリズム）"""
         visited = set()
         stack = []
@@ -161,7 +161,7 @@ class DependencyGraph:
         visited.clear()
         components = []
 
-        def dfs2(node: str, component: List[str]):
+        def dfs2(node: str, component: list[str]):
             if node in visited:
                 return
             visited.add(node)
@@ -180,7 +180,7 @@ class DependencyGraph:
         logger.debug("強連結成分数: %d", len(components))
         return components
 
-    def get_path(self, start: str, end: str) -> Optional[List[str]]:
+    def get_path(self, start: str, end: str) -> list[str] | None:
         """2つのノード間のパスを取得（BFS）"""
         if start not in self.nodes or end not in self.nodes:
             return None
@@ -201,7 +201,7 @@ class DependencyGraph:
 
         return None
 
-    def get_statistics(self) -> Dict[str, int]:
+    def get_statistics(self) -> dict[str, int]:
         """グラフ統計情報を取得"""
         total_edges = sum(len(callees) for callees in self.edges.values())
         cycles = self.detect_cycles()

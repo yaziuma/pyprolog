@@ -3,11 +3,12 @@
 分析ファイルで指摘された不足述語を補完
 """
 
-from typing import Iterator
-from pyprolog.core.types import Term, Variable, Number, Atom
+import logging
+from collections.abc import Iterator
+
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.errors import PrologError
-import logging
+from pyprolog.core.types import Atom, Number, Term, Variable
 
 logger = logging.getLogger(__name__)
 

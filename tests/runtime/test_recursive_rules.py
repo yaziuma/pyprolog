@@ -1,6 +1,7 @@
 import pytest
+
+from pyprolog.core.types import Atom, Number, Term, Variable
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.core.types import Term, Variable, Atom, Number
 
 
 class TestRecursiveRules:

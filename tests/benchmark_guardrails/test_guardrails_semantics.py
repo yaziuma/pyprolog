@@ -1,7 +1,7 @@
 import pytest
 
-from pyprolog.runtime.interpreter import Runtime
 from pyprolog.core.types import Number
+from pyprolog.runtime.interpreter import Runtime
 
 
 @pytest.fixture
@@ -144,11 +144,13 @@ def test_guardrail_undefined_predicate_raises_existence_error(runtime):
 # ------------------------------------------------------------
 def test_guardrail_dynamic_predicate_with_no_clauses_fails(runtime):
     """GR-5: Dynamic predicate with no clauses should fail, not error"""
-    import tempfile
     import os
+    import tempfile
 
     # Create temp file with dynamic directive
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.prolog', delete=False, encoding='utf-8') as f:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".prolog", delete=False, encoding="utf-8"
+    ) as f:
         f.write(":- dynamic(p/1).\n")
         temp_file = f.name
 
@@ -214,6 +216,7 @@ def test_guardrail_index_integrity_after_retract(runtime):
 
     # Query should raise existence_error (undeclared predicate)
     from pyprolog.core.errors import PrologError
+
     with pytest.raises(PrologError) as exc_info:
         runtime.query("p(X).")
     assert "existence_error" in str(exc_info.value).lower()

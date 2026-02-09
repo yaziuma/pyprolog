@@ -4,9 +4,9 @@ SearchToolのテスト
 Prologルールと事実の検索機能のテストです。
 """
 
-from pyprolog.tools.search_tool import SearchTool
+from pyprolog.core.types import Atom, Fact, Rule, Term
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.core.types import Fact, Rule, Term, Atom
+from pyprolog.tools.search_tool import SearchTool
 
 
 class TestSearchTool:

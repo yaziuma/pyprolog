@@ -6,10 +6,11 @@
 
 import csv
 import json
-import os
-from typing import List, Dict, Any, Optional
-from pyprolog.core.types import Fact, Term, Atom, Variable, Number, PrologType
 import logging
+import os
+from typing import Any
+
+from pyprolog.core.types import Atom, Fact, Number, PrologType, Term, Variable
 from pyprolog.runtime.interpreter import Runtime
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 class DataExporter:
     """データエクスポーター"""
 
-    def __init__(self, runtime: Optional[Runtime] = None):
+    def __init__(self, runtime: Runtime | None = None):
         """
         エクスポーターを初期化
 
@@ -27,7 +28,7 @@ class DataExporter:
         """
         self.runtime = runtime
 
-    def export_to_csv(self, facts: List[Fact], filepath: str) -> bool:
+    def export_to_csv(self, facts: list[Fact], filepath: str) -> bool:
         """
         CSV形式でエクスポート
 
@@ -71,7 +72,7 @@ class DataExporter:
             logger.error("Failed to export CSV to %s: %s", filepath, e)
             return False
 
-    def export_to_json(self, facts: List[Fact], filepath: str) -> bool:
+    def export_to_json(self, facts: list[Fact], filepath: str) -> bool:
         """
         JSON形式でエクスポート
 
@@ -102,7 +103,7 @@ class DataExporter:
             logger.error("Failed to export JSON to %s: %s", filepath, e)
             return False
 
-    def export_to_tsv(self, facts: List[Fact], filepath: str) -> bool:
+    def export_to_tsv(self, facts: list[Fact], filepath: str) -> bool:
         """
         TSV形式でエクスポート
 
@@ -145,7 +146,7 @@ class DataExporter:
             logger.error("Failed to export TSV to %s: %s", filepath, e)
             return False
 
-    def _extract_args(self, term: Term) -> List[PrologType]:
+    def _extract_args(self, term: Term) -> list[PrologType]:
         """
         項から引数リストを抽出
 
@@ -160,7 +161,7 @@ class DataExporter:
         else:
             return []  # Atomなど引数がない場合
 
-    def _fact_to_csv_row(self, fact: Fact, max_args: int) -> List[str]:
+    def _fact_to_csv_row(self, fact: Fact, max_args: int) -> list[str]:
         """
         事実をCSV行データに変換
 
@@ -186,7 +187,7 @@ class DataExporter:
 
         return [functor_name] + arg_strings
 
-    def _fact_to_json_object(self, fact: Fact) -> Dict[str, Any]:
+    def _fact_to_json_object(self, fact: Fact) -> dict[str, Any]:
         """
         事実をJSONオブジェクトに変換
 
@@ -367,7 +368,7 @@ class DataExporter:
         else:
             return str(term)
 
-    def _prolog_list_to_json_array(self, term: Term) -> List[Any]:
+    def _prolog_list_to_json_array(self, term: Term) -> list[Any]:
         """
         Prologリスト構造をJSON配列に変換
 
@@ -445,7 +446,7 @@ class DataExporter:
         # 解析失敗時はデフォルト
         return ("csv", str(file_spec))
 
-    def export_facts(self, facts: List[Fact], file_spec: PrologType) -> bool:
+    def export_facts(self, facts: list[Fact], file_spec: PrologType) -> bool:
         """
         指定された形式で事実をエクスポート
 

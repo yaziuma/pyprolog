@@ -2,6 +2,7 @@
 import platform
 import sys
 from abc import ABC, abstractmethod
+
 from ..core.stream_errors import StreamCapabilityError
 
 

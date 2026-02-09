@@ -7,9 +7,9 @@ peek_char/1 と at_end_of_stream/0 述語の使用例を示します。
 条件付きの入力処理が可能になります。
 """
 
+from pyprolog.core.types import Variable
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.runtime.io_streams import StringStream
-from pyprolog.core.types import Variable
 
 
 def demo_basic_peek_operations():

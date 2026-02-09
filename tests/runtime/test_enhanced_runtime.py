@@ -3,8 +3,8 @@
 分析ファイルの提案に基づく包括的テスト実装
 """
 
-import sys
 import os
+import sys
 
 # パッケージのパスを追加
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))

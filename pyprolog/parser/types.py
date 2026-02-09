@@ -1,4 +1,4 @@
-from pyprolog.core.types import Term, Variable, TRUE_TERM, FALSE_TERM
+from pyprolog.core.types import FALSE_TERM, TRUE_TERM, Term, Variable
 
 
 class Number(Term):

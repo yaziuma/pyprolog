@@ -4,10 +4,11 @@ Validate ツールの実装
 Prologルールと事実の静的解析・検証機能を提供するためのツールです。
 """
 
-from typing import Dict, Any
+from typing import Any
+
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.validation.validator import Validator
 from pyprolog.util.logger import get_logger
+from pyprolog.validation.validator import Validator
 
 logger = get_logger(__name__)
 
@@ -21,7 +22,7 @@ class ValidateTool:
 
     def validate_query(
         self, check_type: str = "all", detailed: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         検証を実行します
 
@@ -63,7 +64,7 @@ class ValidateTool:
             }
 
     def format_results(
-        self, validation_result: Dict[str, Any], format_type: str = "text"
+        self, validation_result: dict[str, Any], format_type: str = "text"
     ) -> str:
         """
         検証結果をフォーマットします
@@ -94,7 +95,7 @@ class ValidateTool:
             logger.error("結果フォーマットエラー: %s", e)
             return f"フォーマットエラー: {e}"
 
-    def _format_text(self, validation_result: Dict[str, Any]) -> str:
+    def _format_text(self, validation_result: dict[str, Any]) -> str:
         """テキスト形式でフォーマット"""
         lines = []
 
@@ -184,7 +185,7 @@ class ValidateTool:
 
         return "\n".join(lines)
 
-    def _format_detailed(self, validation_result: Dict[str, Any]) -> str:
+    def _format_detailed(self, validation_result: dict[str, Any]) -> str:
         """詳細形式でフォーマット"""
         lines = []
 
@@ -266,7 +267,7 @@ class ValidateTool:
 
         return "\n".join(lines)
 
-    def get_validation_statistics(self) -> Dict[str, Any]:
+    def get_validation_statistics(self) -> dict[str, Any]:
         """検証エンジンの統計情報を取得"""
         try:
             symbol_stats = self.validator.symbol_table.get_statistics()

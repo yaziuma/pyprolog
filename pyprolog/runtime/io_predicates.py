@@ -4,8 +4,7 @@
 IOPredicate基底クラスを継承した入出力述語の具象実装
 """
 
-from typing import Optional
-from pyprolog.core.types import PrologType, Atom, Number
+from pyprolog.core.types import Atom, Number, PrologType
 from pyprolog.runtime.io_predicate import IOPredicate
 
 
@@ -21,7 +20,7 @@ class GetCharPredicate(IOPredicate):
     def _get_input_type(self) -> str:
         return "char"
 
-    def _convert_to_prolog_term(self, input_value: Optional[str]) -> PrologType:
+    def _convert_to_prolog_term(self, input_value: str | None) -> PrologType:
         """
         文字入力のPrologターム変換
 
@@ -58,7 +57,7 @@ class ReadLinePredicate(IOPredicate):
     def _get_input_type(self) -> str:
         return "line"
 
-    def _convert_to_prolog_term(self, input_value: Optional[str]) -> PrologType:
+    def _convert_to_prolog_term(self, input_value: str | None) -> PrologType:
         """
         行入力のPrologターム変換
 
@@ -90,7 +89,7 @@ class PeekCharPredicate(IOPredicate):
     def _get_input_type(self) -> str:
         return "peek_char"
 
-    def _convert_to_prolog_term(self, input_value: Optional[str]) -> PrologType:
+    def _convert_to_prolog_term(self, input_value: str | None) -> PrologType:
         """覗き見文字のPrologターム変換"""
         if input_value is None or input_value == "":
             return self._handle_eof()

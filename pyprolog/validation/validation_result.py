@@ -6,8 +6,9 @@ Prologルールと事実の静的解析結果を格納・管理します。
 
 import json
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Union, Any
-from pyprolog.core.types import Rule, Fact
+from typing import Any
+
+from pyprolog.core.types import Fact, Rule
 
 
 @dataclass
@@ -17,12 +18,12 @@ class ValidationIssue:
     issue_type: str  # "conflict", "unreachable", "undefined"
     severity: str  # "error", "warning", "info"
     message: str
-    rule_or_fact: Optional[Union[Rule, Fact]]
-    file_path: Optional[str]
+    rule_or_fact: Rule | Fact | None
+    file_path: str | None
     line_number: int
     column_number: int
-    suggested_fix: Optional[str] = None
-    related_items: List["ValidationIssue"] = field(default_factory=list)
+    suggested_fix: str | None = None
+    related_items: list["ValidationIssue"] = field(default_factory=list)
 
     def __str__(self) -> str:
         """文字列表現"""
@@ -40,7 +41,7 @@ class ValidationIssue:
         )
         return f"{severity_symbol} [{self.issue_type}] {self.message} ({location})"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """辞書形式に変換"""
         return {
             "issue_type": self.issue_type,
@@ -59,10 +60,10 @@ class ValidationIssue:
 class ValidationResult:
     """検証結果全体を表すクラス"""
 
-    issues: List[ValidationIssue]
+    issues: list[ValidationIssue]
     total_rules_analyzed: int
     analysis_duration: float
-    summary: Dict[str, int] = field(default_factory=dict)  # issue_type -> count
+    summary: dict[str, int] = field(default_factory=dict)  # issue_type -> count
 
     def __post_init__(self):
         """初期化後の処理"""
@@ -77,11 +78,11 @@ class ValidationResult:
         """警告が存在するかチェック"""
         return any(issue.severity == "warning" for issue in self.issues)
 
-    def filter_by_type(self, issue_type: str) -> List[ValidationIssue]:
+    def filter_by_type(self, issue_type: str) -> list[ValidationIssue]:
         """指定されたタイプの問題のみを抽出"""
         return [issue for issue in self.issues if issue.issue_type == issue_type]
 
-    def filter_by_severity(self, severity: str) -> List[ValidationIssue]:
+    def filter_by_severity(self, severity: str) -> list[ValidationIssue]:
         """指定された重要度の問題のみを抽出"""
         return [issue for issue in self.issues if issue.severity == severity]
 
@@ -97,7 +98,7 @@ class ValidationResult:
         }
         return json.dumps(result_dict, indent=2, ensure_ascii=False)
 
-    def _calculate_summary(self) -> Dict[str, int]:
+    def _calculate_summary(self) -> dict[str, int]:
         """問題の種類別サマリーを計算"""
         summary = {}
         for issue in self.issues:

@@ -6,7 +6,7 @@ Prologインタープリターのバインディング環境（変数の束縛�
 """
 
 from pyprolog.core.binding_environment import BindingEnvironment
-from pyprolog.core.types import Atom, Variable, Number, String, Term
+from pyprolog.core.types import Atom, Number, String, Term, Variable
 
 
 class TestBindingEnvironment:

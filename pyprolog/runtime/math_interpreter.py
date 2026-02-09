@@ -1,10 +1,10 @@
 # pyprolog/runtime/math_interpreter.py
-from pyprolog.core.types import Term, Variable, Number, Atom, PrologType
+import logging
+
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.errors import PrologError
-from pyprolog.core.operators import operator_registry, OperatorType
-from typing import Union, List
-import logging
+from pyprolog.core.operators import OperatorType, operator_registry
+from pyprolog.core.types import Atom, Number, PrologType, Term, Variable
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +15,7 @@ class MathInterpreter:
     def __init__(self):
         logger.debug("MathInterpreter initialized")
 
-    def evaluate(
-        self, expression: PrologType, env: BindingEnvironment
-    ) -> Union[int, float]:
+    def evaluate(self, expression: PrologType, env: BindingEnvironment) -> int | float:
         """統合設計：演算子レジストリを活用した式評価"""
 
         if isinstance(expression, Number):
@@ -64,8 +62,8 @@ class MathInterpreter:
         raise PrologError(f"Cannot evaluate expression: {expression}")
 
     def evaluate_binary_op(
-        self, op_symbol: str, left_val: Union[int, float], right_val: Union[int, float]
-    ) -> Union[int, float]:
+        self, op_symbol: str, left_val: int | float, right_val: int | float
+    ) -> int | float:
         """統合設計：バイナリ演算子の評価"""
 
         if not isinstance(left_val, (int, float)) or not isinstance(
@@ -120,8 +118,8 @@ class MathInterpreter:
             raise PrologError(f"Arithmetic error in {op_symbol}: {e}")
 
     def evaluate_unary_op(
-        self, op_symbol: str, operand_val: Union[int, float]
-    ) -> Union[int, float]:
+        self, op_symbol: str, operand_val: int | float
+    ) -> int | float:
         """単項演算子の評価"""
 
         if not isinstance(operand_val, (int, float)):
@@ -141,7 +139,7 @@ class MathInterpreter:
             raise PrologError(f"Unknown unary arithmetic operator: {op_symbol}")
 
     def evaluate_comparison_op(
-        self, op_symbol: str, left_val: Union[int, float], right_val: Union[int, float]
+        self, op_symbol: str, left_val: int | float, right_val: int | float
     ) -> bool:
         """統合設計：比較演算子の評価"""
 
@@ -173,8 +171,8 @@ class MathInterpreter:
             raise PrologError(f"Unsupported comparison operator: {op_symbol}")
 
     def _evaluate_function(
-        self, func_name: str, args: List[PrologType], env: BindingEnvironment
-    ) -> Union[int, float]:
+        self, func_name: str, args: list[PrologType], env: BindingEnvironment
+    ) -> int | float:
         """数学関数の評価（拡張可能）"""
 
         if func_name == "abs" and len(args) == 1:

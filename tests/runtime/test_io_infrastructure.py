@@ -1,8 +1,8 @@
 # tests/runtime/test_io_infrastructure.py
-from pyprolog.runtime.io_streams import StringStream, ConsoleStream
-from pyprolog.runtime.unified_input_system import StreamInputHandler
-from pyprolog.runtime.io_manager import IOManager
 from pyprolog.runtime.interpreter import Runtime  # Assuming Runtime is in interpreter
+from pyprolog.runtime.io_manager import IOManager
+from pyprolog.runtime.io_streams import ConsoleStream, StringStream
+from pyprolog.runtime.unified_input_system import StreamInputHandler
 
 
 # Test StringStream

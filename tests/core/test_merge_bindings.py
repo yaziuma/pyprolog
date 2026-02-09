@@ -5,14 +5,14 @@ Prologインタープリターのバインディング結合機能の
 動作を検証するテストスイート。
 """
 
+from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.merge_bindings import (
-    merge_bindings,
+    apply_substitution,
     bindings_to_dict,
     dict_to_binding_environment,
-    apply_substitution,
+    merge_bindings,
 )
-from pyprolog.core.binding_environment import BindingEnvironment
-from pyprolog.core.types import Atom, Variable, Number, String, Term
+from pyprolog.core.types import Atom, Number, String, Term, Variable
 
 
 class TestMergeBindings:

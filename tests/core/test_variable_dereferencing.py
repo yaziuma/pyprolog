@@ -5,9 +5,8 @@ Variable Dereferencing テスト
 """
 
 from pyprolog.core.binding_environment import BindingEnvironment
-from pyprolog.core.types import Variable, Atom, Number, Term, String
 from pyprolog.core.errors import PrologError
-from typing import Optional, Set, Union
+from pyprolog.core.types import Atom, Number, String, Term, Variable
 
 
 class TestVariableDereferencing:
@@ -219,8 +218,8 @@ class TestVariableDereferencing:
 
     # ヘルパーメソッド
     def _dereference_fully(
-        self, var: Variable, visited: Optional[Set[str]] = None
-    ) -> Union[Term, Variable, Number, Atom, String]:
+        self, var: Variable, visited: set[str] | None = None
+    ) -> Term | Variable | Number | Atom | String:
         """完全な間接参照の実装例"""
         if visited is None:
             visited = set()
@@ -244,8 +243,8 @@ class TestVariableDereferencing:
         return value
 
     def _dereference_term(
-        self, term: Union[Variable, Term]
-    ) -> Union[Variable, Term, Number, Atom, String]:
+        self, term: Variable | Term
+    ) -> Variable | Term | Number | Atom | String:
         """項内の変数を間接参照する実装例"""
         if isinstance(term, Variable):
             return self._dereference_fully(term)

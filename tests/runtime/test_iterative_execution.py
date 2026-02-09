@@ -4,11 +4,12 @@ Tests execute_iterative() method comparing results with recursive execute().
 """
 
 import pytest
-from pyprolog.core.types import Term, Atom, Variable, Number
+
 from pyprolog.core.binding_environment import BindingEnvironment
-from pyprolog.runtime.interpreter import Runtime
+from pyprolog.core.types import Atom, Number, Term, Variable
 from pyprolog.parser.parser import Parser
 from pyprolog.parser.scanner import Scanner
+from pyprolog.runtime.interpreter import Runtime
 
 
 @pytest.fixture

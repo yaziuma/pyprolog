@@ -1,8 +1,9 @@
 import pytest
-from pyprolog.runtime.interpreter import Runtime
-from pyprolog.core.types import Term, Variable, Atom, Number, PrologType
-from pyprolog.core.errors import PrologError  # Assuming CutException might be relevant
+
 from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.errors import PrologError  # Assuming CutException might be relevant
+from pyprolog.core.types import Atom, Number, PrologType, Term, Variable
+from pyprolog.runtime.interpreter import Runtime
 
 
 class TestMetaPredicates:

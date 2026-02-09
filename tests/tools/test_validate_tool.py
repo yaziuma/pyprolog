@@ -4,9 +4,9 @@ ValidateToolのテスト
 Prologプログラムの静的解析・検証機能のテストです。
 """
 
-from pyprolog.tools.validate_tool import ValidateTool
+from pyprolog.core.types import Atom, Fact, Rule, Term, Variable
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.core.types import Fact, Rule, Term, Atom, Variable
+from pyprolog.tools.validate_tool import ValidateTool
 
 
 class TestValidateTool:

@@ -1,8 +1,9 @@
 import unittest
-from pyprolog.runtime.interpreter import Runtime
-from pyprolog.core.types import Variable, Number
+from typing import Any
+
 from pyprolog.core.errors import PrologError
-from typing import Any, Dict, List, Optional, Type
+from pyprolog.core.types import Number, Variable
+from pyprolog.runtime.interpreter import Runtime
 
 
 class TestDynamicPredicates(unittest.TestCase):
@@ -19,7 +20,7 @@ class TestDynamicPredicates(unittest.TestCase):
     def assertQueryTrue(
         self,
         query_string: str,
-        expected_bindings_list: Optional[List[Dict[Any, Any]]] = None,
+        expected_bindings_list: list[dict[Any, Any]] | None = None,
         msg: None = None,
     ):
         solutions = self.runtime.query(query_string)
@@ -69,7 +70,7 @@ class TestDynamicPredicates(unittest.TestCase):
     def assertPrologError(
         self,
         query_string: str,
-        error_type: Type[PrologError] = PrologError,
+        error_type: type[PrologError] = PrologError,
         msg: None = None,
     ):
         # This helper assumes query() might raise PrologError directly,

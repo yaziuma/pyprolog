@@ -4,8 +4,8 @@ ValidationResultとValidationIssueのテスト
 検証結果クラスのテストです。
 """
 
-from pyprolog.validation.validation_result import ValidationResult, ValidationIssue
-from pyprolog.core.types import Fact, Term, Atom
+from pyprolog.core.types import Atom, Fact, Term
+from pyprolog.validation.validation_result import ValidationIssue, ValidationResult
 
 
 class TestValidationIssue:

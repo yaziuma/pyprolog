@@ -6,10 +6,10 @@ Prologインタープリターの演算子レジストリの
 """
 
 from pyprolog.core.operators import (
-    OperatorRegistry,
-    OperatorInfo,
-    OperatorType,
     Associativity,
+    OperatorInfo,
+    OperatorRegistry,
+    OperatorType,
     operator_registry,
 )
 

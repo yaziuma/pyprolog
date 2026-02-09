@@ -1,9 +1,10 @@
 # tests/runtime/test_peek_char.py
 import pytest
+
+from pyprolog.core.types import Atom, Variable
+from pyprolog.runtime.interpreter import Runtime
 from pyprolog.runtime.io_streams import StringStream
 from pyprolog.runtime.unified_input_system import StreamInputHandler
-from pyprolog.runtime.interpreter import Runtime
-from pyprolog.core.types import Variable, Atom
 
 
 class TestStringStreamPeekOperations:

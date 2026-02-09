@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import Union
 
 import msgspec
 
@@ -39,7 +39,7 @@ class Variable(BaseTerm):
 
 
 class Number(BaseTerm):
-    value: Union[int, float]
+    value: int | float
 
     def __repr__(self):
         return str(self.value)
@@ -66,7 +66,7 @@ class String(BaseTerm):
 
 class Term(BaseTerm):
     functor: Atom  # 述語名 (アトム)
-    args: List[PrologType] = msgspec.field(default_factory=list)
+    args: list[PrologType] = msgspec.field(default_factory=list)
 
     def __repr__(self):
         if not self.args:
@@ -96,7 +96,7 @@ class Term(BaseTerm):
 class ListTerm(
     BaseTerm
 ):  # パーサーが直接 '.'/2 を生成する場合、このクラスは高レベル表現
-    elements: List[PrologType] = msgspec.field(default_factory=list)
+    elements: list[PrologType] = msgspec.field(default_factory=list)
     # Prologのリストの末尾は通常 '[]' (アトム) または別のリスト (部分リストの場合は変数)
     tail: Union[Variable, Atom, "ListTerm", None] = None
 

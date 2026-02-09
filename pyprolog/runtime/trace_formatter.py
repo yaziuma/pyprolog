@@ -5,9 +5,10 @@
 """
 
 import json
-from typing import List, Dict, Any
-from pyprolog.runtime.tracer import TraceEvent
+from typing import Any
+
 from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.runtime.tracer import TraceEvent
 from pyprolog.util.logger import get_logger
 
 logger = get_logger(__name__)
@@ -17,7 +18,7 @@ class TraceFormatter:
     """トレース結果の出力フォーマットを提供するクラス"""
 
     @staticmethod
-    def format_text(events: List[TraceEvent]) -> str:
+    def format_text(events: list[TraceEvent]) -> str:
         """トレースイベントをテキスト形式で出力"""
         try:
             return TraceFormatter._safe_format_text(events)
@@ -26,7 +27,7 @@ class TraceFormatter:
             return f"Error formatting trace: {e}\nRaw events: {len(events)} events recorded"
 
     @staticmethod
-    def _safe_format_text(events: List[TraceEvent]) -> str:
+    def _safe_format_text(events: list[TraceEvent]) -> str:
         """安全なテキスト形式フォーマット"""
         if not events:
             return "No trace events recorded."
@@ -54,7 +55,7 @@ class TraceFormatter:
         return "\n".join(result)
 
     @staticmethod
-    def format_tree(events: List[TraceEvent]) -> str:
+    def format_tree(events: list[TraceEvent]) -> str:
         """トレースイベントをツリー形式で出力"""
         try:
             return TraceFormatter._safe_format_tree(events)
@@ -63,7 +64,7 @@ class TraceFormatter:
             return f"Error formatting trace tree: {e}"
 
     @staticmethod
-    def _safe_format_tree(events: List[TraceEvent]) -> str:
+    def _safe_format_tree(events: list[TraceEvent]) -> str:
         """安全なツリー形式フォーマット"""
         if not events:
             return "No trace events recorded."
@@ -80,7 +81,7 @@ class TraceFormatter:
         return "\n".join(result)
 
     @staticmethod
-    def format_json(events: List[TraceEvent], query: str, solutions: List[Dict]) -> str:
+    def format_json(events: list[TraceEvent], query: str, solutions: list[dict]) -> str:
         """トレースイベントをJSON形式で出力"""
         try:
             return TraceFormatter._safe_format_json(events, query, solutions)
@@ -94,7 +95,7 @@ class TraceFormatter:
 
     @staticmethod
     def _safe_format_json(
-        events: List[TraceEvent], query: str, solutions: List[Dict]
+        events: list[TraceEvent], query: str, solutions: list[dict]
     ) -> str:
         """安全なJSON形式フォーマット"""
         trace_data = []
@@ -140,7 +141,7 @@ class TraceFormatter:
         return f" [{', '.join(binding_strs)}]"
 
     @staticmethod
-    def _serialize_bindings(bindings: BindingEnvironment) -> Dict[str, Any]:
+    def _serialize_bindings(bindings: BindingEnvironment) -> dict[str, Any]:
         """バインディング環境をシリアライズ"""
         if not bindings or not bindings.bindings:
             return {}
@@ -156,7 +157,7 @@ class TraceFormatter:
         return result
 
     @staticmethod
-    def _build_tree_structure(events: List[TraceEvent]) -> List[Dict]:
+    def _build_tree_structure(events: list[TraceEvent]) -> list[dict]:
         """イベントから階層構造を構築"""
         nodes = []
         stack = []  # 現在の呼び出しスタック
@@ -201,7 +202,7 @@ class TraceFormatter:
         return nodes
 
     @staticmethod
-    def _render_tree(nodes: List[Dict], prefix: str = "") -> List[str]:
+    def _render_tree(nodes: list[dict], prefix: str = "") -> list[str]:
         """ツリーノードをテキスト表現でレンダリング"""
         result = []
 

@@ -345,9 +345,15 @@ class TestExecutionState:
         # Create multiple choice points at different depths
         state.stack = [GoalFrame(env=env, goal=Atom("frame"))]
 
-        cp1 = ChoicePoint(stack_depth=1, alternative_frame=GoalFrame(env=env, goal=Atom("alt1")))
-        cp2 = ChoicePoint(stack_depth=3, alternative_frame=GoalFrame(env=env, goal=Atom("alt2")))
-        cp3 = ChoicePoint(stack_depth=5, alternative_frame=GoalFrame(env=env, goal=Atom("alt3")))
+        cp1 = ChoicePoint(
+            stack_depth=1, alternative_frame=GoalFrame(env=env, goal=Atom("alt1"))
+        )
+        cp2 = ChoicePoint(
+            stack_depth=3, alternative_frame=GoalFrame(env=env, goal=Atom("alt2"))
+        )
+        cp3 = ChoicePoint(
+            stack_depth=5, alternative_frame=GoalFrame(env=env, goal=Atom("alt3"))
+        )
 
         state.choice_points = [cp1, cp2, cp3]
         state.cut_barrier = 3
@@ -363,8 +369,12 @@ class TestExecutionState:
         state = ExecutionState()
         env = BindingEnvironment()
 
-        cp1 = ChoicePoint(stack_depth=1, alternative_frame=GoalFrame(env=env, goal=Atom("alt1")))
-        cp2 = ChoicePoint(stack_depth=3, alternative_frame=GoalFrame(env=env, goal=Atom("alt2")))
+        cp1 = ChoicePoint(
+            stack_depth=1, alternative_frame=GoalFrame(env=env, goal=Atom("alt1"))
+        )
+        cp2 = ChoicePoint(
+            stack_depth=3, alternative_frame=GoalFrame(env=env, goal=Atom("alt2"))
+        )
 
         state.choice_points = [cp1, cp2]
         state.cut_barrier = None

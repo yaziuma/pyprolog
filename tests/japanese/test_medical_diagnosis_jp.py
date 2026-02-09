@@ -5,8 +5,8 @@ medical_diagnosis_kb_jp.plファイルを使用した
 日本語Prolog述語の包括的テストスイート
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # パッケージのパスを追加
@@ -38,7 +38,7 @@ class TestMedicalDiagnosisJapanese:
 
     def _load_medical_kb(self):
         """医療知識ベースファイルを読み込み"""
-        with open(self.kb_path, "r", encoding="utf-8") as f:
+        with open(self.kb_path, encoding="utf-8") as f:
             content = f.read()
 
         # Prologルールを行ごとに追加

@@ -1,7 +1,7 @@
 import pytest
+
+from pyprolog.core.types import Atom, Term, Variable
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.core.types import Term, Variable, Atom
-from typing import Dict, List, Optional, Union
 
 
 class TestListOperations:
@@ -16,7 +16,7 @@ class TestListOperations:
     def assertQuerySolutions(
         self,
         query_string: str,
-        expected_solutions_list: List[Dict[str, Union[Atom, Term, Variable]]],
+        expected_solutions_list: list[dict[str, Atom | Term | Variable]],
         msg: None = None,
     ):
         print(f"PYTHON_PRINT_ASSERT: Querying: '{query_string}'", flush=True)
@@ -65,7 +65,7 @@ class TestListOperations:
     def assertQueryTrue(
         self,
         query_string: str,
-        expected_bindings_list: Optional[List[Dict[str, Union[Atom, Term]]]] = None,
+        expected_bindings_list: list[dict[str, Atom | Term]] | None = None,
         msg: None = None,
     ):
         print(f"PYTHON_PRINT_ASSERT: Querying: '{query_string}'", flush=True)

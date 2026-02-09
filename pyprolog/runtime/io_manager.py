@@ -1,8 +1,9 @@
 # pyprolog/runtime/io_manager.py
-from .io_streams import IOStream, ConsoleStream
-from .unified_input_system import UnifiedInputSystem, InputHandler, StandardInputHandler
-from typing import Optional, Dict, Any
 import logging
+from typing import Any
+
+from .io_streams import ConsoleStream, IOStream
+from .unified_input_system import InputHandler, StandardInputHandler, UnifiedInputSystem
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class IOManager:
 
     def request_input(
         self, input_type: str, predicate_name: str, prompt: str = "", **kwargs
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         統一入力要求API
 
@@ -116,7 +117,7 @@ class IOManager:
     # 統計・診断API
     # ========================================================================
 
-    def get_input_statistics(self) -> Dict[str, Any]:
+    def get_input_statistics(self) -> dict[str, Any]:
         """統一入力処理統計情報取得"""
         return self.unified_input.get_statistics()
 

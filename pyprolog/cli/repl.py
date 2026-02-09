@@ -1,6 +1,6 @@
+import io
 import os
 import sys
-import io
 
 try:
     from colorama import Fore, init
@@ -14,17 +14,17 @@ except ImportError:
 
     Fore = DummyFore()
 
-from prompt_toolkit import prompt
-from prompt_toolkit.history import FileHistory
-from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from pathlib import Path
+
+from prompt_toolkit import prompt
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+from prompt_toolkit.history import FileHistory
+
+from pyprolog.core.errors import InterpreterError, ScannerError
+from pyprolog.core.types import Rule, Variable
 from pyprolog.parser.parser import Parser
 from pyprolog.parser.scanner import Scanner
-from pyprolog.core.types import Variable, Rule
-from pyprolog.core.errors import InterpreterError, ScannerError
-from pyprolog.parser.types import Dot, Bar
-from pyprolog.parser.types import FALSE
-
+from pyprolog.parser.types import FALSE, Bar, Dot
 
 init(autoreset=True)
 
@@ -38,8 +38,8 @@ if os.name == "nt":
         return msvcrt.getch().decode()
 
 else:
-    import tty
     import termios
+    import tty
 
     try:
         fd = sys.stdin.fileno()

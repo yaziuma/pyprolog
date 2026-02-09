@@ -4,9 +4,9 @@ Prolog構文フォーマッター
 事実・ルールを標準Prolog構文で整形する機能を提供
 """
 
-from typing import List, Union, Optional
-from pyprolog.core.types import Rule, Fact, Term, Atom, Variable, Number, PrologType
 import logging
+
+from pyprolog.core.types import Atom, Fact, Number, PrologType, Rule, Term, Variable
 from pyprolog.util.functor_mapper import FunctorMapper
 from pyprolog.util.variable_mapper import VariableMapper
 
@@ -18,8 +18,8 @@ class PrologFormatter:
 
     def __init__(
         self,
-        variable_mapper: Optional[VariableMapper] = None,
-        functor_mapper: Optional[FunctorMapper] = None,
+        variable_mapper: VariableMapper | None = None,
+        functor_mapper: FunctorMapper | None = None,
     ):
         """
         フォーマッターを初期化
@@ -66,7 +66,7 @@ class PrologFormatter:
             logger.warning("Failed to format rule %s: %s", rule, e)
             return f"% Error formatting rule: {rule}"
 
-    def format_rules_list(self, rules: List[Union[Rule, Fact]]) -> str:
+    def format_rules_list(self, rules: list[Rule | Fact]) -> str:
         """
         ルール・事実リストの一括変換
 
@@ -105,7 +105,7 @@ class PrologFormatter:
         return "\n".join(formatted_lines)
 
     def format_predicate_rules(
-        self, rules: List[Union[Rule, Fact]], predicate_name: str, arity: int
+        self, rules: list[Rule | Fact], predicate_name: str, arity: int
     ) -> str:
         """
         特定述語のルール・事実のみを整形
@@ -227,7 +227,7 @@ class PrologFormatter:
         return f"{functor_str}({args_str})"
 
     def _format_list(
-        self, term: Term, collected_elements: Optional[List[str]] = None
+        self, term: Term, collected_elements: list[str] | None = None
     ) -> str:
         """
         リスト構造を[a,b,c]形式で整形
@@ -383,7 +383,7 @@ class PrologFormatter:
         # その他の場合はクォート必要
         return True
 
-    def _group_by_predicate(self, rules: List[Union[Rule, Fact]]) -> dict:
+    def _group_by_predicate(self, rules: list[Rule | Fact]) -> dict:
         """
         ルール・事実を述語別にグループ化
 
@@ -457,8 +457,8 @@ class PrologFormatter:
             return str(functor)
 
     def _filter_rules_by_predicate(
-        self, rules: List[Union[Rule, Fact]], predicate_name: str, arity: int
-    ) -> List[Union[Rule, Fact]]:
+        self, rules: list[Rule | Fact], predicate_name: str, arity: int
+    ) -> list[Rule | Fact]:
         """
         指定述語のルール・事実をフィルタリング
 

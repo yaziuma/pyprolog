@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # logging標準の遅延フォーマットに変換。debugが無効なら repr が起きない
 # 使い方
-# 
+#
 # 1. まず dry-run（差分表示のみ）
 # uv run python scripts/convert_fstring_logging.py --root pyprolog --dry-run
-# 
+#
 # 2. 実際に書き換え（バックアップなし。gitで管理）
 # uv run python scripts/convert_fstring_logging.py --root pyprolog --write
-# 
+#
 # 3. 特定ファイルだけ
 # uv run python scripts/convert_fstring_logging.py --files pyprolog/runtime/logic_interpreter.py --write
 
@@ -40,8 +40,6 @@ import ast
 import difflib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
-
 
 LOG_METHODS = {"debug", "info", "warning", "error", "exception", "critical"}
 
@@ -63,14 +61,14 @@ def _escape_percent(s: str) -> str:
     return s.replace("%", "%%")
 
 
-def _joinedstr_to_percent(joined: ast.JoinedStr) -> Optional[Tuple[str, List[ast.AST]]]:
+def _joinedstr_to_percent(joined: ast.JoinedStr) -> tuple[str, list[ast.AST]] | None:
     """
     Convert an ast.JoinedStr into (format_string, args) for logging % formatting.
 
     Returns None if it contains unsupported features.
     """
-    fmt_parts: List[str] = []
-    fmt_args: List[ast.AST] = []
+    fmt_parts: list[str] = []
+    fmt_args: list[ast.AST] = []
 
     for v in joined.values:
         if isinstance(v, ast.Constant) and isinstance(v.value, str):
@@ -140,7 +138,7 @@ class LoggingFStringTransformer(ast.NodeTransformer):
 
         fmt, fmt_args = converted
 
-        new_args: List[ast.AST] = [ast.Constant(value=fmt), *fmt_args]
+        new_args: list[ast.AST] = [ast.Constant(value=fmt), *fmt_args]
         new_call = ast.Call(
             func=node.func,
             args=new_args,
@@ -153,7 +151,7 @@ class LoggingFStringTransformer(ast.NodeTransformer):
         return new_call
 
 
-def transform_source(src: str, filename: str) -> Tuple[str, int, int]:
+def transform_source(src: str, filename: str) -> tuple[str, int, int]:
     """
     Returns (new_source, conversions, skipped)
     """
@@ -167,7 +165,7 @@ def transform_source(src: str, filename: str) -> Tuple[str, int, int]:
     return new_src, tr.conversions, tr.skipped
 
 
-def iter_py_files(root: Path) -> List[Path]:
+def iter_py_files(root: Path) -> list[Path]:
     return [p for p in root.rglob("*.py") if p.is_file()]
 
 
@@ -184,10 +182,20 @@ def print_diff(path: Path, before: str, after: str) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", type=str, default=".", help="Root directory to scan (recursive)")
-    ap.add_argument("--files", nargs="*", help="Specific files to process (overrides --root)")
-    ap.add_argument("--dry-run", action="store_true", help="Show diffs but do not write")
-    ap.add_argument("--write", action="store_true", help="Write changes in place (no .bak; rely on git)")
+    ap.add_argument(
+        "--root", type=str, default=".", help="Root directory to scan (recursive)"
+    )
+    ap.add_argument(
+        "--files", nargs="*", help="Specific files to process (overrides --root)"
+    )
+    ap.add_argument(
+        "--dry-run", action="store_true", help="Show diffs but do not write"
+    )
+    ap.add_argument(
+        "--write",
+        action="store_true",
+        help="Write changes in place (no .bak; rely on git)",
+    )
     args = ap.parse_args()
 
     if args.write and args.dry_run:
@@ -200,7 +208,7 @@ def main() -> None:
     if not BASE_ROOT.exists():
         raise SystemExit(f"Base root not found: {BASE_ROOT}")
 
-    paths: List[Path]
+    paths: list[Path]
     if args.files:
         # 明示指定は base_root 配下のみ許可
         paths = []
@@ -244,7 +252,9 @@ def main() -> None:
                 path.write_text(after, encoding="utf-8")
 
     mode = "DRY-RUN" if args.dry_run else "WRITE"
-    print(f"\n[{mode}] files_scanned={len(paths)} touched={touched} conversions={total_conv} skipped={total_skip}")
+    print(
+        f"\n[{mode}] files_scanned={len(paths)} touched={touched} conversions={total_conv} skipped={total_skip}"
+    )
 
 
 if __name__ == "__main__":

@@ -4,7 +4,8 @@ Explain ツールの実装
 Prologクエリの実行過程を説明・可視化するためのツールです。
 """
 
-from typing import Dict, Optional, Any
+from typing import Any
+
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.runtime.trace_formatter import TraceFormatter
 from pyprolog.util.logger import get_logger
@@ -19,8 +20,8 @@ class ExplainTool:
         self.runtime = runtime
 
     def explain_query(
-        self, query_str: str, format_type: str = "text", max_depth: Optional[int] = None
-    ) -> Dict[str, Any]:
+        self, query_str: str, format_type: str = "text", max_depth: int | None = None
+    ) -> dict[str, Any]:
         """
         クエリの実行過程を説明します
 

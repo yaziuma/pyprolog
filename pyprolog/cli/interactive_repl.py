@@ -4,29 +4,29 @@ Enhanced interactive REPL for PyProlog
 対話型Prologインタープリター - 拡張版
 """
 
+import json
 import os
 import sys
-import json
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 # coloramaは既存REPLで使用されているのでそのまま使用
 from colorama import Fore, Style, init
 
+from pyprolog.core.errors import InterpreterError, PrologError, ScannerError
+from pyprolog.core.types import Atom, Term, Variable  # Added Term, Atom, Number
 from pyprolog.parser.parser import (
     Parser,
 )  # Not strictly needed here anymore for _execute_query
 from pyprolog.parser.scanner import (
     Scanner,
 )  # Not strictly needed here anymore for _execute_query
-from pyprolog.core.types import Variable, Term, Atom  # Added Term, Atom, Number
-from pyprolog.core.errors import InterpreterError, ScannerError, PrologError
 from pyprolog.runtime.interpreter import Runtime
-from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
 from pyprolog.tools.explain_tool import ExplainTool
 from pyprolog.tools.search_tool import SearchTool
 from pyprolog.tools.validate_tool import ValidateTool
+from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
 
 # カラー初期化
 init(autoreset=True)
@@ -36,15 +36,15 @@ class InteractiveProlog:
     """拡張された対話型Prologシステム"""
 
     def __init__(self):
-        self.runtime: Optional[Runtime] = None
+        self.runtime: Runtime | None = None
         self.variable_mapper = VariableMapper()  # Added VariableMapper instance
-        self.explain_tool: Optional[ExplainTool] = None
-        self.search_tool: Optional[SearchTool] = None
-        self.validate_tool: Optional[ValidateTool] = None
-        self.session_history: List[Dict[str, Any]] = []
+        self.explain_tool: ExplainTool | None = None
+        self.search_tool: SearchTool | None = None
+        self.validate_tool: ValidateTool | None = None
+        self.session_history: list[dict[str, Any]] = []
         self.home_path = str(Path.home())
         self.session_start_time = datetime.now()
-        self.current_rules_file: Optional[str] = None
+        self.current_rules_file: str | None = None
 
         print(self._get_welcome_message())
 
@@ -134,12 +134,12 @@ class InteractiveProlog:
         """情報メッセージのフォーマット"""
         return f"{Fore.BLUE}{text}{Style.RESET_ALL}"
 
-    def _init_runtime(self, rules_file: Optional[str] = None) -> bool:
+    def _init_runtime(self, rules_file: str | None = None) -> bool:
         """ランタイムを初期化"""
         try:
             if rules_file and os.path.exists(rules_file):
                 # ファイルからルールを読み込み
-                with open(rules_file, "r", encoding="utf-8") as f:
+                with open(rules_file, encoding="utf-8") as f:
                     rules_text = f.read()
 
                 rules = Parser(Scanner(rules_text).scan_tokens())._parse_rule()
@@ -480,7 +480,7 @@ class InteractiveProlog:
         except Exception as e:
             print(self._format_error(f"セッション保存エラー: {e}"))
 
-    def _display_query_results(self, goal, solutions: List):
+    def _display_query_results(self, goal, solutions: list):
         """クエリ結果を表示"""
         if not solutions:
             print(self._format_warning("解が見つかりませんでした"))

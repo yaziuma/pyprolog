@@ -10,11 +10,12 @@ PyProlog日本語ファンクター機能の統合テストスイート
 """
 
 import unittest
+
+from pyprolog.parser.parser import Parser
+from pyprolog.parser.scanner import Scanner
+from pyprolog.runtime.interpreter import Runtime
 from pyprolog.util.functor_mapper import FunctorMapper
 from pyprolog.util.variable_mapper import VariableMapper
-from pyprolog.parser.scanner import Scanner
-from pyprolog.parser.parser import Parser
-from pyprolog.runtime.interpreter import Runtime
 
 
 class TestJapaneseFunctorSupport(unittest.TestCase):

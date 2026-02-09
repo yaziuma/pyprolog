@@ -1,12 +1,13 @@
 # pyprolog/parser/parser.py
+import logging
+from collections.abc import Callable  # Added Optional, Tuple
+
+from pyprolog.core.operators import Associativity, operator_registry
+from pyprolog.core.types import Atom, Fact, Number, Rule, String, Term, Variable
 from pyprolog.parser.token import Token
 from pyprolog.parser.token_type import TokenType
-from pyprolog.core.types import Term, Variable, Atom, Number, String, Rule, Fact
-from pyprolog.core.operators import operator_registry, Associativity
-from typing import List, Optional, Callable, Union, Tuple  # Added Optional, Tuple
-from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
 from pyprolog.util.functor_mapper import FunctorMapper  # Added FunctorMapper
-import logging
+from pyprolog.util.variable_mapper import VariableMapper  # Added VariableMapper
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +21,10 @@ class Parser:
 
     def __init__(
         self,
-        tokens: List[Token],
+        tokens: list[Token],
         error_handler: Callable[[Token, str], None] = default_error_handler,
-        variable_mapper: Optional[VariableMapper] = None,  # Added variable_mapper
-        functor_mapper: Optional[FunctorMapper] = None,  # Added functor_mapper
+        variable_mapper: VariableMapper | None = None,  # Added variable_mapper
+        functor_mapper: FunctorMapper | None = None,  # Added functor_mapper
     ):
         self._tokens = tokens
         self._current = 0
@@ -32,10 +33,10 @@ class Parser:
             variable_mapper if variable_mapper is not None else VariableMapper()
         )  # Initialize variable_mapper
         self._functor_mapper = functor_mapper  # Store functor_mapper
-        self.directives: List[Tuple[str, str, int]] = []  # Store parsed directives
+        self.directives: list[tuple[str, str, int]] = []  # Store parsed directives
         logger.debug("Parser initialized with %d tokens", len(tokens))
 
-    def parse(self) -> List[Union[Rule, Fact]]:
+    def parse(self) -> list[Rule | Fact]:
         """プログラム全体を解析"""
         rules = []
 
@@ -55,7 +56,7 @@ class Parser:
         logger.info("Parsed %d rules/facts", len(rules))
         return rules
 
-    def _parse_rule(self) -> Optional[Union[Rule, Fact]]:
+    def _parse_rule(self) -> Rule | Fact | None:
         """ルール解析（統合設計対応版）"""
         # Check for directive first: :- Body.
         # If COLONMINUS is at the start, it's a directive, not a rule
@@ -124,10 +125,13 @@ class Parser:
             return None
 
         # Check functor is "dynamic"
-        if not isinstance(directive_term.functor, Atom) or directive_term.functor.name != "dynamic":
+        if (
+            not isinstance(directive_term.functor, Atom)
+            or directive_term.functor.name != "dynamic"
+        ):
             self._error(
                 self._previous(),
-                f"Unsupported directive: {directive_term.functor}. Only 'dynamic' is supported."
+                f"Unsupported directive: {directive_term.functor}. Only 'dynamic' is supported.",
             )
             return None
 
@@ -135,7 +139,7 @@ class Parser:
         if len(directive_term.args) != 1:
             self._error(
                 self._previous(),
-                f"dynamic directive expects 1 argument, got {len(directive_term.args)}"
+                f"dynamic directive expects 1 argument, got {len(directive_term.args)}",
             )
             return None
 
@@ -151,17 +155,19 @@ class Parser:
         logger.info("Parsed dynamic directive: %s/%d", pred_name, arity)
         return None
 
-    def _parse_predicate_indicator(self, indicator) -> Tuple[Optional[str], Optional[int]]:
+    def _parse_predicate_indicator(self, indicator) -> tuple[str | None, int | None]:
         """Parse p/1 format, return (name, arity) or (None, None) on error"""
         if not isinstance(indicator, Term):
-            self._error(self._previous(), "Predicate indicator must be a term (name/arity)")
+            self._error(
+                self._previous(), "Predicate indicator must be a term (name/arity)"
+            )
             return None, None
 
         # Must be / operator
         if not isinstance(indicator.functor, Atom) or indicator.functor.name != "/":
             self._error(
                 self._previous(),
-                f"Predicate indicator must use '/' operator, got: {indicator.functor}"
+                f"Predicate indicator must use '/' operator, got: {indicator.functor}",
             )
             return None, None
 
@@ -169,7 +175,7 @@ class Parser:
         if len(indicator.args) != 2:
             self._error(
                 self._previous(),
-                f"Predicate indicator must have 2 arguments (name/arity), got {len(indicator.args)}"
+                f"Predicate indicator must have 2 arguments (name/arity), got {len(indicator.args)}",
             )
             return None, None
 
@@ -178,7 +184,7 @@ class Parser:
         if not isinstance(name_arg, Atom):
             self._error(
                 self._previous(),
-                f"Predicate name must be an atom, got: {type(name_arg).__name__}"
+                f"Predicate name must be an atom, got: {type(name_arg).__name__}",
             )
             return None, None
 
@@ -187,26 +193,30 @@ class Parser:
         if not isinstance(arity_arg, Number):
             self._error(
                 self._previous(),
-                f"Predicate arity must be a number, got: {type(arity_arg).__name__}"
+                f"Predicate arity must be a number, got: {type(arity_arg).__name__}",
             )
             return None, None
 
         arity_value = arity_arg.value
-        if not isinstance(arity_value, (int, float)) or (isinstance(arity_value, float) and arity_value != int(arity_value)):
+        if not isinstance(arity_value, (int, float)) or (
+            isinstance(arity_value, float) and arity_value != int(arity_value)
+        ):
             self._error(
                 self._previous(),
-                f"Predicate arity must be an integer, got: {arity_value}"
+                f"Predicate arity must be an integer, got: {arity_value}",
             )
             return None, None
 
         arity = int(arity_value)
         if arity < 0:
-            self._error(self._previous(), f"Predicate arity cannot be negative: {arity}")
+            self._error(
+                self._previous(), f"Predicate arity cannot be negative: {arity}"
+            )
             return None, None
 
         return name_arg.name, arity
 
-    def _build_conjunction(self, terms: List) -> Union[Term, Atom]:
+    def _build_conjunction(self, terms: list) -> Term | Atom:
         """項リストからコンジャンクションを構築（統合設計版）"""
         if len(terms) == 1:
             return terms[0]

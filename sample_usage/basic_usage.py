@@ -4,11 +4,13 @@ PyProlog基本使用例
 基本的なランタイム操作とクエリ実行のサンプル
 """
 
+import io
+import sys
+
+from utility import safe_get_variable
+
 from pyprolog import Runtime
 from pyprolog.core.errors import PrologError
-from utility import safe_get_variable
-import sys
-import io
 
 # UTF-8出力の設定（Windows対応）
 if sys.platform == "win32":

@@ -4,9 +4,10 @@ export_facts/2述語のテスト
 事実データのエクスポート機能を検証する
 """
 
-import tempfile
-import os
 import json
+import os
+import tempfile
+
 from pyprolog.runtime.interpreter import Runtime
 
 
@@ -55,7 +56,7 @@ class TestExportFactsPredicate:
         assert os.path.exists(output_file)
 
         # CSV内容を確認
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             content = f.read()
 
         # ヘッダーと各行が含まれていることを確認
@@ -86,7 +87,7 @@ class TestExportFactsPredicate:
         assert os.path.exists(output_file)
 
         # JSON内容を確認
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             data = json.load(f)
 
         # JSONが配列であることを確認
@@ -116,7 +117,7 @@ class TestExportFactsPredicate:
         assert os.path.exists(output_file)
 
         # TSV内容を確認
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             content = f.read()
 
         # タブ区切りであることを確認
@@ -145,7 +146,7 @@ class TestExportFactsPredicate:
         assert os.path.exists(output_file)
 
         # ファイル内容を確認（ヘッダーのみまたは空）
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             content = f.read().strip()
 
         # ルール内容は含まれていないことを確認
@@ -169,7 +170,7 @@ class TestExportFactsPredicate:
         assert os.path.exists(output_file)
 
         # ファイルが空またはヘッダーのみであることを確認
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             content = f.read().strip()
 
         # データは含まれていない
@@ -228,7 +229,7 @@ class TestExportFactsPredicate:
         assert os.path.exists(output_file)
 
         # ファイル内容を確認（UTF-8で正しく保存されている）
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             content = f.read()
 
         # 日本語データが含まれていることを確認
@@ -255,7 +256,7 @@ class TestExportFactsPredicate:
         assert os.path.exists(output_file)
 
         # JSON内容を確認
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             data = json.load(f)
 
         # データが正しく構造化されていることを確認
@@ -282,7 +283,7 @@ class TestExportFactsPredicate:
         assert len(solutions) == 1
 
         # ファイルが上書きされていることを確認
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             content = f.read()
 
         # 古いコンテンツは残っていない
@@ -339,7 +340,7 @@ class TestExportFactsEdgeCases:
         assert os.path.exists(output_file)
 
         # UTF-8エンコーディングで正しく保存されていることを確認
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             content = f.read()
 
         # Unicode文字が含まれていることを確認

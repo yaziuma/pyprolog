@@ -1,6 +1,6 @@
 # pyprolog/runtime/stream_buffer.py
 from collections import deque
-from typing import Optional
+
 from ..core.stream_errors import StreamBufferError
 
 
@@ -16,14 +16,14 @@ class StreamBuffer:
         self._buffer = deque(maxlen=capacity)
         self._capacity = capacity
 
-    def peek(self) -> Optional[str]:
+    def peek(self) -> str | None:
         """先頭文字をpeek（位置変更なし）"""
         try:
             return self._buffer[0]
         except IndexError:
             return None
 
-    def get(self) -> Optional[str]:
+    def get(self) -> str | None:
         """先頭文字を読み取り（除去）"""
         try:
             return self._buffer.popleft()

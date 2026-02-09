@@ -5,16 +5,17 @@ Prologインタープリターのパーサー（構文解析器）の
 動作を検証するテストスイート。
 """
 
+from typing import Any
+
+from pyprolog.core.types import Atom, Fact, Number, Rule, Term, Variable
 from pyprolog.parser.parser import Parser
 from pyprolog.parser.scanner import Scanner
-from pyprolog.core.types import Term, Variable, Atom, Number, Rule, Fact
-from typing import Any, List, Union
 
 
 class TestParser:
     """パーサーのテスト"""
 
-    def _parse_source(self, source: str) -> List[Union[Any, Rule, Fact]]:
+    def _parse_source(self, source: str) -> list[Any | Rule | Fact]:
         """ソースコードを解析するヘルパーメソッド"""
         scanner = Scanner(source)
         tokens = scanner.scan_tokens()

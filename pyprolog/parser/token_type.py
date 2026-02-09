@@ -1,8 +1,9 @@
 # pyprolog/parser/token_type.py
 from __future__ import annotations
-from enum import Enum
-from typing import Type, Dict, Any
+
 import logging
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class TokenTypeManager:
     _instance = None
     _initialized = False
 
-    def __new__(cls: Type[TokenTypeManager]) -> "TokenTypeManager":
+    def __new__(cls: type[TokenTypeManager]) -> TokenTypeManager:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -55,7 +56,7 @@ class TokenTypeManager:
     def __init__(self):
         if self._initialized:
             return
-        self._dynamic_tokens: Dict[str, Any] = {}
+        self._dynamic_tokens: dict[str, Any] = {}
         self._initialized = True
 
     def ensure_operator_tokens(self):

@@ -5,20 +5,20 @@ Prologルールと事実の検索結果を格納・管理します。
 """
 
 from dataclasses import dataclass, field
-from typing import Union, Optional, List
-from pyprolog.core.types import Rule, Fact
+
+from pyprolog.core.types import Fact, Rule
 
 
 @dataclass
 class SearchResult:
     """検索結果を表すクラス"""
 
-    rule_or_fact: Union[Rule, Fact]
-    file_path: Optional[str]
+    rule_or_fact: Rule | Fact
+    file_path: str | None
     line_number: int
     matched_text: str
     match_type: str  # "predicate", "argument", "full_text"
-    context_lines: List[str] = field(default_factory=list)  # 前後の行
+    context_lines: list[str] = field(default_factory=list)  # 前後の行
     confidence: float = 1.0  # マッチ度（0.0-1.0）
 
     def __str__(self) -> str:

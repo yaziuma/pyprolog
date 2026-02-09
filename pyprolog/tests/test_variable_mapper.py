@@ -1,4 +1,5 @@
 import unittest
+
 from pyprolog.util.variable_mapper import VariableMapper
 
 

@@ -4,12 +4,13 @@
 Prologプログラムの論理的矛盾や競合する定義を検出します。
 """
 
-from typing import List, Set, Any
-from pyprolog.validation.validation_result import ValidationIssue
-from pyprolog.validation.symbol_table import SymbolTable, PredicateInfo
-from pyprolog.validation.dependency_graph import DependencyGraph
-from pyprolog.core.types import Rule, Fact, Atom
+from typing import Any
+
+from pyprolog.core.types import Atom, Fact, Rule
 from pyprolog.util.logger import get_logger
+from pyprolog.validation.dependency_graph import DependencyGraph
+from pyprolog.validation.symbol_table import PredicateInfo, SymbolTable
+from pyprolog.validation.validation_result import ValidationIssue
 
 logger = get_logger(__name__)
 
@@ -19,7 +20,7 @@ class ConflictAnalyzer:
 
     def analyze(
         self, symbol_table: SymbolTable, dependency_graph: DependencyGraph
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """矛盾分析を実行"""
         issues = []
 
@@ -42,7 +43,7 @@ class ConflictAnalyzer:
 
     def _check_multiple_definitions(
         self, symbol_table: SymbolTable
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """複数定義のチェック"""
         issues = []
 
@@ -94,7 +95,7 @@ class ConflictAnalyzer:
 
     def _check_logical_conflicts(
         self, symbol_table: SymbolTable
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """論理的矛盾のチェック"""
         issues = []
 
@@ -137,7 +138,7 @@ class ConflictAnalyzer:
 
     def _check_type_inconsistencies(
         self, symbol_table: SymbolTable
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """型の不整合チェック"""
         issues = []
 
@@ -164,7 +165,7 @@ class ConflictAnalyzer:
 
     def _check_infinite_recursion(
         self, symbol_table: SymbolTable, dependency_graph: DependencyGraph
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """無限再帰の可能性をチェック"""
         issues = []
 
@@ -299,7 +300,7 @@ class ConflictAnalyzer:
         except Exception:
             return False
 
-    def _analyze_argument_types(self, predicate_infos: List[PredicateInfo]) -> Set[str]:
+    def _analyze_argument_types(self, predicate_infos: list[PredicateInfo]) -> set[str]:
         """引数の型パターンを分析"""
         type_patterns = set()
 

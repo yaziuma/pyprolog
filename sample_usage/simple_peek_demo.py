@@ -5,9 +5,9 @@ PyProlog 非ブロッキング入力機能 簡単なデモ
 peek_char/1 と at_end_of_stream/0 述語の基本的な使用例を示します。
 """
 
+from pyprolog.core.types import Variable
 from pyprolog.runtime.interpreter import Runtime
 from pyprolog.runtime.io_streams import StringStream
-from pyprolog.core.types import Variable
 
 
 def demo_basic_functionality():

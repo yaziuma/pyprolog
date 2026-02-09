@@ -4,11 +4,13 @@ PyProlog計算処理サンプル
 算術演算、比較演算、複雑な数式の評価例
 """
 
+import io
+import sys
+
+from utility import safe_get_variable
+
 from pyprolog import Runtime
 from pyprolog.core.errors import PrologError
-from utility import safe_get_variable
-import sys
-import io
 
 # UTF-8出力の設定（Windows対応）
 if sys.platform == "win32":
