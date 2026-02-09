@@ -4,18 +4,16 @@ Tests frame creation, state transitions, and stack operations without
 requiring full interpreter integration.
 """
 
-import pytest
+from pyprolog.core.binding_environment import BindingEnvironment
+from pyprolog.core.types import Atom, Term, Variable
 from pyprolog.runtime.execution_frames import (
-    Frame,
+    ChoicePoint,
+    ExecutionState,
     FrameType,
     GoalFrame,
     GoalSeqFrame,
     OperatorFrame,
-    ChoicePoint,
-    ExecutionState,
 )
-from pyprolog.core.types import Term, Atom, Variable, Number
-from pyprolog.core.binding_environment import BindingEnvironment
 
 
 class TestFrameType:
@@ -79,11 +77,11 @@ class TestGoalSeqFrame:
             Term(Atom("c"), [Variable("X")]),
         ]
         env = BindingEnvironment()
-        frame = GoalSeqFrame(env=env, goals=goals, current_index=0)
+        frame = GoalSeqFrame(env=env, goals=goals)
 
         assert frame.frame_type == FrameType.GOAL_SEQ
         assert frame.goals == goals
-        assert frame.current_index == 0
+        assert not frame.initialized
         assert frame.env == env
 
     def test_goal_seq_frame_advancement(self):
@@ -94,49 +92,49 @@ class TestGoalSeqFrame:
             Term(Atom("c"), [Variable("X")]),
         ]
         env = BindingEnvironment()
-        frame = GoalSeqFrame(env=env, goals=goals, current_index=0)
+        frame = GoalSeqFrame(env=env, goals=goals)
 
-        assert frame.current_index == 0
-
-        # Advance through goals
-        new_env = BindingEnvironment()
-        frame.advance(new_env)
-        assert frame.current_index == 1
-        assert frame.env == new_env
-
-        frame.advance(new_env)
-        assert frame.current_index == 2
-
-        frame.advance(new_env)
-        assert frame.current_index == 3
+        # V2: GoalSeqFrame uses goal_stack internally, no current_index
+        assert frame.goals == goals
+        assert not frame.initialized
+        assert frame.goal_stack == []
 
     def test_goal_seq_frame_step_completion(self):
         """Test step returns env when all goals completed."""
-        goals = [Atom("a"), Atom("b")]
+        goals = []
         env = BindingEnvironment()
-        frame = GoalSeqFrame(env=env, goals=goals, current_index=2)
+        frame = GoalSeqFrame(env=env, goals=goals)
 
-        # All goals done (current_index >= len(goals))
+        # Empty goals: step should return env immediately
         result = frame.step(None)  # type: ignore
         assert result == env
 
     def test_goal_seq_frame_step_not_done(self):
-        """Test step returns None when more goals remain."""
+        """Test step returns None when more goals remain (exhausted)."""
         goals = [Atom("a"), Atom("b")]
         env = BindingEnvironment()
-        frame = GoalSeqFrame(env=env, goals=goals, current_index=0)
+        frame = GoalSeqFrame(env=env, goals=goals)
 
-        # Still have goals to execute
+        # V2: After initialization, step needs interpreter to execute goals
+        # For unit test without interpreter, we simulate exhausted state
+        frame.initialized = True
+        frame.goal_stack = []  # All goals exhausted
+
         result = frame.step(None)  # type: ignore
         assert result is None
 
     def test_goal_seq_frame_cannot_backtrack(self):
-        """Test goal sequences don't backtrack themselves."""
+        """Test goal sequences can backtrack when goal_stack is not empty."""
         goals = [Atom("a"), Atom("b")]
         env = BindingEnvironment()
-        frame = GoalSeqFrame(env=env, goals=goals, current_index=0)
+        frame = GoalSeqFrame(env=env, goals=goals)
 
-        assert not frame.can_backtrack()
+        # V2: can_backtrack checks len(goal_stack) > 0
+        assert not frame.can_backtrack()  # Initially empty
+
+        # Simulate goal_stack with an item
+        frame.goal_stack = [(0, iter([env]))]
+        assert frame.can_backtrack()
 
 
 class TestOperatorFrame:
@@ -275,7 +273,7 @@ class TestExecutionState:
         assert len(state.stack) == 1
         assert isinstance(state.stack[0], GoalSeqFrame)
         assert state.stack[0].goals == goals
-        assert state.stack[0].current_index == 0
+        assert not state.stack[0].initialized
 
     def test_push_goal_sequence_empty(self):
         """Test pushing empty goal sequence returns env immediately."""
@@ -406,22 +404,18 @@ class TestFrameIntegration:
             Atom("goal3"),
         ]
 
-        frame = GoalSeqFrame(env=env, goals=goals, current_index=0)
+        frame = GoalSeqFrame(env=env, goals=goals)
 
-        # Initially at first goal
-        assert frame.step(None) is None  # type: ignore
-        assert frame.current_index == 0
+        # V2: GoalSeqFrame requires interpreter for step()
+        # Unit test without interpreter: verify initialization
+        assert frame.goals == goals
+        assert not frame.initialized
+        assert frame.goal_stack == []
 
-        # Advance through goals
-        for i in range(len(goals)):
-            new_env = BindingEnvironment()
-            frame.advance(new_env)
-            assert frame.current_index == i + 1
-
-        # All goals completed
-        result = frame.step(None)  # type: ignore
-        assert result is not None
-        assert frame.current_index == 3
+        # Simulate empty goals (completed)
+        frame_empty = GoalSeqFrame(env=env, goals=[])
+        result = frame_empty.step(None)  # type: ignore
+        assert result == env
 
     def test_execution_state_complex_workflow(self):
         """Test complex execution state workflow."""
