@@ -36,6 +36,8 @@ class FrameType(Enum):
     OPERATOR = auto()
     CHOICE_POINT = auto()
     NEGATION = auto()
+    CONJUNCTION = auto()
+    BODY = auto()
 
 
 @dataclass
@@ -289,6 +291,209 @@ class OperatorFrame(Frame):
     def can_backtrack(self) -> bool:
         """Disjunction can backtrack between branches."""
         return self.operator == ";" and self.state == "left"
+
+
+@dataclass
+class ConjunctionFrame(Frame):
+    """Frame for executing conjunction (A, B, C) iteratively.
+
+    Replaces _execute_conjunction_recursive to eliminate recursion.
+    Uses an internal stack like GoalSeqFrame but calls _execute_body_direct_iterative.
+
+    State:
+    - goals: List of goals to execute
+    - goal_stack: Stack of (index, iterator) pairs for backtracking
+    - initialized: Whether first goal has been pushed
+    """
+
+    goals: list[PrologType] = field(default_factory=list)
+    goal_stack: list[tuple[int, Iterator[BindingEnvironment]]] = field(
+        default_factory=list
+    )
+    initialized: bool = False
+    frame_type: FrameType = field(default=FrameType.CONJUNCTION, init=False)
+
+    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
+        """Execute conjunction with proper backtracking.
+
+        Returns:
+            - BindingEnvironment: A solution was found
+            - None: Conjunction exhausted all possibilities
+        """
+        # Initialize on first call
+        if not self.initialized:
+            if not self.goals:
+                # Empty conjunction succeeds with current env
+                return self.env
+
+            # Start with first goal
+            # Call _execute_body_direct_iterative which uses BodyFrame
+            first_iter = interpreter.logic_interpreter._execute_body_direct_iterative(
+                self.goals[0], self.env
+            )
+            self.goal_stack.append((0, first_iter))
+            self.initialized = True
+
+        # Process goal stack (same logic as GoalSeqFrame)
+        while self.goal_stack:
+            index, iterator = self.goal_stack[-1]
+
+            try:
+                next_env = next(iterator)
+            except StopIteration:
+                # Current goal exhausted, backtrack
+                self.goal_stack.pop()
+                continue
+
+            # Check if last goal
+            if index == len(self.goals) - 1:
+                # All goals succeeded, return solution
+                return next_env
+
+            # Push next goal
+            next_index = index + 1
+            next_iter = interpreter.logic_interpreter._execute_body_direct_iterative(
+                self.goals[next_index], next_env
+            )
+            self.goal_stack.append((next_index, next_iter))
+
+        # All goals exhausted
+        return None
+
+    def can_backtrack(self) -> bool:
+        """Check if backtracking is possible."""
+        return len(self.goal_stack) > 0
+
+
+@dataclass
+class BodyFrame(Frame):
+    """Frame for executing rule body with disjunction/negation handling.
+
+    Replaces _execute_body_direct to eliminate recursion.
+    Handles:
+    - Conjunction (,/2): delegates to ConjunctionFrame
+    - Disjunction (;/2): tries left then right branch
+    - Negation (\\+/1): delegates to NegationFrame
+    - Atomic goals: delegates to _execute_single_goal
+
+    State:
+    - body: Goal to execute
+    - state: Execution state ('initial', 'left', 'right', 'done')
+    - child_iterator: Iterator for current branch/goal
+    """
+
+    body: PrologType | None = None
+    state: str = "initial"
+    child_iterator: Iterator[BindingEnvironment] | None = None
+    frame_type: FrameType = field(default=FrameType.BODY, init=False)
+
+    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
+        """Execute body step by step.
+
+        Returns:
+            - BindingEnvironment: A solution found
+            - None: Need to continue or exhausted
+        """
+        from pyprolog.core.types import Atom, Term
+
+        if self.state == "done":
+            return None
+
+        # Detect logical operators
+        if isinstance(self.body, Term) and isinstance(self.body.functor, Atom):
+            functor_name = self.body.functor.name
+
+            # Conjunction (,/2): flatten and delegate to ConjunctionFrame
+            if functor_name == "," and len(self.body.args) == 2:
+                if self.state == "initial":
+                    # Flatten conjunction and create ConjunctionFrame
+                    goals = interpreter.logic_interpreter._flatten_conjunction_iterative(
+                        self.body
+                    )
+                    self.child_iterator = interpreter.logic_interpreter._execute_conjunction_recursive(
+                        goals, self.env
+                    )
+                    self.state = "executing"
+
+                try:
+                    result_env = next(self.child_iterator)
+                    return result_env
+                except StopIteration:
+                    self.state = "done"
+                    return None
+
+            # Disjunction (;/2): try left then right
+            elif functor_name == ";" and len(self.body.args) == 2:
+                left_goal, right_goal = self.body.args
+
+                if self.state == "initial":
+                    # Try left branch first
+                    self.child_iterator = interpreter.logic_interpreter._execute_body_direct(
+                        left_goal, self.env
+                    )
+                    self.state = "left"
+
+                if self.state == "left":
+                    try:
+                        result_env = next(self.child_iterator)
+                        return result_env
+                    except StopIteration:
+                        # Left exhausted, try right
+                        self.child_iterator = interpreter.logic_interpreter._execute_body_direct(
+                            right_goal, self.env
+                        )
+                        self.state = "right"
+
+                if self.state == "right":
+                    try:
+                        result_env = next(self.child_iterator)
+                        return result_env
+                    except StopIteration:
+                        self.state = "done"
+                        return None
+
+            # Negation (\\+/1): negation as failure
+            elif functor_name == "\\+" and len(self.body.args) == 1:
+                if self.state == "initial":
+                    inner_goal = self.body.args[0]
+                    self.child_iterator = interpreter.logic_interpreter._execute_body_direct(
+                        inner_goal, self.env
+                    )
+                    self.state = "checking"
+
+                if self.state == "checking":
+                    solution_found = False
+                    try:
+                        next(self.child_iterator)
+                        solution_found = True
+                    except StopIteration:
+                        pass
+
+                    self.state = "done"
+                    if not solution_found:
+                        # Negation succeeded (inner goal failed)
+                        return self.env
+                    else:
+                        # Negation failed (inner goal succeeded)
+                        return None
+
+        # Atomic goal: delegate to _execute_single_goal
+        if self.state == "initial":
+            self.child_iterator = interpreter.runtime._execute_single_goal(
+                self.body, self.env
+            )
+            self.state = "executing"
+
+        try:
+            result_env = next(self.child_iterator)
+            return result_env
+        except StopIteration:
+            self.state = "done"
+            return None
+
+    def can_backtrack(self) -> bool:
+        """Check if body has more alternatives."""
+        return self.child_iterator is not None and self.state != "done"
 
 
 @dataclass
