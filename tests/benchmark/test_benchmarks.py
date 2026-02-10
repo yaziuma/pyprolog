@@ -40,6 +40,16 @@ def runtime():
 
 
 @pytest.fixture
+def benchmark():
+    """pytest-benchmark 未導入環境向けの互換フィクスチャ。"""
+
+    def _benchmark(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    return _benchmark
+
+
+@pytest.fixture
 def runtime_iterative():
     """Runtime with iterative execution enabled."""
     rt = Runtime()
