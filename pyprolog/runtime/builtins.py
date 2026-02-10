@@ -559,89 +559,110 @@ class AppendPredicate(BuiltinPredicate):
     def execute(
         self, runtime: "Runtime", env: BindingEnvironment
     ) -> Iterator[BindingEnvironment]:
-        env_clause1 = env.copy()
-        unified_l1_empty, env_clause1_after_l1 = runtime.logic_interpreter.unify(
-            self.args[0], Atom("[]"), env_clause1
-        )
-        logger.debug(
-            "APPEND_CP1: L1='%r', L2='%r', L3='%r'. Trying to unify L1 with [].",
-            self.args[0],
-            self.args[1],
-            self.args[2],
-        )
-        if unified_l1_empty:
+        """Execute append/3 using explicit stack (non-recursive).
+
+        Implements:
+        - append([], L, L).
+        - append([H|T1], L2, [H|T3]) :- append(T1, L2, T3).
+
+        Maintains multi-directionality:
+        - Pattern 1: append(+List, +List, -Result) — concatenation
+        - Pattern 2: append(-Prefix, -Suffix, +List) — splitting
+        - Pattern 3: append(-X, -Y, +List) — enumeration of all splits
+        """
+        # Stack: list of (list1_arg, list2_arg, list3_arg, env)
+        stack = [(self.args[0], self.args[1], self.args[2], env)]
+
+        while stack:
+            l1, l2, l3, current_env = stack.pop()
+
+            # === Clause 1: append([], L, L) ===
+            env_clause1 = current_env.copy()
+            unified_l1_empty, env_clause1_after_l1 = runtime.logic_interpreter.unify(
+                l1, Atom("[]"), env_clause1
+            )
             logger.debug(
-                "APPEND_CP1: L1 unified with []. Env after L1 unify: %r",
-                env_clause1_after_l1.bindings,
+                "APPEND_CP1: L1='%r', L2='%r', L3='%r'. Trying to unify L1 with [].",
+                l1,
+                l2,
+                l3,
             )
-            unified_l2_l3, final_env_clause1 = runtime.logic_interpreter.unify(
-                self.args[1], self.args[2], env_clause1_after_l1
-            )
-            if unified_l2_l3:
+            if unified_l1_empty:
                 logger.debug(
-                    "APPEND_CP1: L2 and L3 unified. Yielding solution from CP1. Env: %r",
-                    final_env_clause1.bindings,
+                    "APPEND_CP1: L1 unified with []. Env after L1 unify: %r",
+                    env_clause1_after_l1.bindings,
                 )
-                yield final_env_clause1
+                unified_l2_l3, final_env_clause1 = runtime.logic_interpreter.unify(
+                    l2, l3, env_clause1_after_l1
+                )
+                if unified_l2_l3:
+                    logger.debug(
+                        "APPEND_CP1: L2 and L3 unified. Yielding solution from CP1. Env: %r",
+                        final_env_clause1.bindings,
+                    )
+                    yield final_env_clause1
+                else:
+                    logger.debug("APPEND_CP1: L2 and L3 failed to unify.")
             else:
-                logger.debug("APPEND_CP1: L2 and L3 failed to unify.")
-        else:
-            logger.debug("APPEND_CP1: L1 failed to unify with [].")
-        logger.debug(
-            "APPEND_CP2: L1='%r', L2='%r', L3='%r'. Creating patterns.",
-            self.args[0],
-            self.args[1],
-            self.args[2],
-        )
-        env_clause2 = env.copy()
-        counter = runtime.logic_interpreter._unique_var_counter
-        h1_var = Variable(f"_HAppend_{counter}")
-        t1_var = Variable(f"_T1Append_{counter + 1}")
-        t3_var = Variable(f"_T3Append_{counter + 2}")
-        runtime.logic_interpreter._unique_var_counter += 3
-        list1_pattern = Term(Atom("."), [h1_var, t1_var])
-        logger.debug(
-            "APPEND_CP2: Attempting to unify L1 ('%r') with pattern '%r'.",
-            self.args[0],
-            list1_pattern,
-        )
-        unified_l1_cons, env_clause2_after_l1 = runtime.logic_interpreter.unify(
-            self.args[0], list1_pattern, env_clause2
-        )
-        if unified_l1_cons:
+                logger.debug("APPEND_CP1: L1 failed to unify with [].")
+
+            # === Clause 2: append([H|T1], L2, [H|T3]) :- append(T1, L2, T3) ===
             logger.debug(
-                "APPEND_CP2: L1 unified with '%r'. Env after L1 unify: %r",
+                "APPEND_CP2: L1='%r', L2='%r', L3='%r'. Creating patterns.",
+                l1,
+                l2,
+                l3,
+            )
+            env_clause2 = current_env.copy()
+            counter = runtime.logic_interpreter._unique_var_counter
+            h1_var = Variable(f"_HAppend_{counter}")
+            t1_var = Variable(f"_T1Append_{counter + 1}")
+            t3_var = Variable(f"_T3Append_{counter + 2}")
+            runtime.logic_interpreter._unique_var_counter += 3
+            list1_pattern = Term(Atom("."), [h1_var, t1_var])
+            logger.debug(
+                "APPEND_CP2: Attempting to unify L1 ('%r') with pattern '%r'.",
+                l1,
                 list1_pattern,
-                env_clause2_after_l1.bindings,
             )
-            list3_pattern = Term(Atom("."), [h1_var, t3_var])
-            logger.debug(
-                "APPEND_CP2: Attempting to unify L3 ('%r') with pattern '%r'.",
-                self.args[2],
-                list3_pattern,
+            unified_l1_cons, env_clause2_after_l1 = runtime.logic_interpreter.unify(
+                l1, list1_pattern, env_clause2
             )
-            unified_l3_cons, env_clause2_after_l3 = runtime.logic_interpreter.unify(
-                self.args[2], list3_pattern, env_clause2_after_l1
-            )
-            if unified_l3_cons:
+            if unified_l1_cons:
                 logger.debug(
-                    "APPEND_CP2: L3 unified with '%r'. Env after L3 unify: %r",
+                    "APPEND_CP2: L1 unified with '%r'. Env after L1 unify: %r",
+                    list1_pattern,
+                    env_clause2_after_l1.bindings,
+                )
+                list3_pattern = Term(Atom("."), [h1_var, t3_var])
+                logger.debug(
+                    "APPEND_CP2: Attempting to unify L3 ('%r') with pattern '%r'.",
+                    l3,
                     list3_pattern,
-                    env_clause2_after_l3.bindings,
                 )
-                logger.debug(
-                    "APPEND_CP2: Making recursive call: append(%r, %r, %r) with env: %r",
-                    t1_var,
-                    self.args[1],
-                    t3_var,
-                    env_clause2_after_l3.bindings,
+                unified_l3_cons, env_clause2_after_l3 = runtime.logic_interpreter.unify(
+                    l3, list3_pattern, env_clause2_after_l1
                 )
-                recursive_predicate = AppendPredicate(t1_var, self.args[1], t3_var)
-                yield from recursive_predicate.execute(runtime, env_clause2_after_l3)
+                if unified_l3_cons:
+                    logger.debug(
+                        "APPEND_CP2: L3 unified with '%r'. Env after L3 unify: %r",
+                        list3_pattern,
+                        env_clause2_after_l3.bindings,
+                    )
+                    logger.debug(
+                        "APPEND_CP2: Pushing recursive call: append(%r, %r, %r) with env: %r",
+                        t1_var,
+                        l2,
+                        t3_var,
+                        env_clause2_after_l3.bindings,
+                    )
+                    # Instead of recursive call, push to stack
+                    stack.append((t1_var, l2, t3_var, env_clause2_after_l3))
+                else:
+                    logger.debug("APPEND_CP2: L3 failed to unify with '%s'.", list3_pattern)
             else:
-                logger.debug("APPEND_CP2: L3 failed to unify with '%s'.", list3_pattern)
-        else:
-            logger.debug("APPEND_CP2: L1 failed to unify with '%s'.", list1_pattern)
+                logger.debug("APPEND_CP2: L1 failed to unify with '%s'.", list1_pattern)
+
         return
 
 

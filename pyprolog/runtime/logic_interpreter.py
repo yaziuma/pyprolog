@@ -998,8 +998,8 @@ class LogicInterpreter:
             if functor_name == "," and len(body.args) == 2:
                 # Flatten conjunction chain to reduce recursion depth
                 goals = self._flatten_conjunction_iterative(body)
-                # Execute flattened goals recursively (simpler, correct Cut handling)
-                yield from self._execute_conjunction_recursive(goals, env)
+                # Execute flattened goals iteratively (no recursion, explicit stack)
+                yield from self._execute_conjunction_iterative(goals, env)
                 return
 
             # Disjunction (;/2): try left, then right
@@ -1106,6 +1106,69 @@ class LogicInterpreter:
                 )
         except CutException:
             raise
+
+    def _execute_conjunction_iterative(
+        self, goals: list[PrologType], env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """Execute flattened conjunction goals iteratively (no recursion).
+
+        This replaces _execute_conjunction_recursive to eliminate stack consumption
+        from conjunction execution. Uses explicit stack to manage backtracking.
+
+        Args:
+            goals: Flattened list of goals from conjunction
+            env: Initial environment
+
+        Yields:
+            Binding environments for each solution
+
+        Raises:
+            CutException: When cut is encountered
+        """
+        # Base case: no goals
+        if not goals:
+            yield env
+            return
+
+        n = len(goals)
+        # Stack: list of (goal_index, result_iterator)
+        # Represents the execution state for backtracking
+        stack: list[tuple[int, Iterator[BindingEnvironment]]] = []
+
+        # Start with first goal
+        try:
+            first_iter = self._execute_body_direct(goals[0], env)
+            stack.append((0, first_iter))
+        except CutException:
+            raise
+
+        # Process stack iteratively
+        while stack:
+            goal_idx, iterator = stack[-1]
+
+            try:
+                result_env = next(iterator)
+            except StopIteration:
+                # Current goal exhausted, backtrack
+                stack.pop()
+                continue
+            except CutException:
+                # Cut encountered
+                raise
+
+            # Check if this is the last goal
+            if goal_idx == n - 1:
+                # All goals succeeded, yield solution
+                yield result_env
+                # Continue to get next solution from current goal
+            else:
+                # Move to next goal
+                next_idx = goal_idx + 1
+                try:
+                    next_iter = self._execute_body_direct(goals[next_idx], result_env)
+                    stack.append((next_idx, next_iter))
+                except CutException:
+                    raise
 
     def instantiate_term(self, term: PrologType, env: BindingEnvironment) -> PrologType:
         """
