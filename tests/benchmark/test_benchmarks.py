@@ -39,14 +39,18 @@ def runtime():
     return Runtime()
 
 
-@pytest.fixture
-def benchmark():
-    """pytest-benchmark 未導入環境向けの互換フィクスチャ。"""
+try:
+    import pytest_benchmark  # noqa: F401
+except ImportError:
 
-    def _benchmark(func, *args, **kwargs):
-        return func(*args, **kwargs)
+    @pytest.fixture
+    def benchmark():
+        """pytest-benchmark 未導入環境向けの互換フィクスチャ。"""
 
-    return _benchmark
+        def _benchmark(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        return _benchmark
 
 
 @pytest.fixture
