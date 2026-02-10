@@ -28,6 +28,24 @@ if TYPE_CHECKING:
     from pyprolog.runtime.interpreter import Interpreter
 
 
+@dataclass
+class PushFrame:
+    """step() return value: Request to push a child goal onto the stack.
+
+    The while loop determines the goal type and creates appropriate frame.
+    """
+
+    goal: PrologType
+    env: BindingEnvironment
+
+
+@dataclass
+class YieldEnv:
+    """step() return value: Request to yield a solution."""
+
+    env: BindingEnvironment
+
+
 class FrameType(Enum):
     """Frame type discriminator for pattern matching."""
 
@@ -38,6 +56,7 @@ class FrameType(Enum):
     NEGATION = auto()
     CONJUNCTION = auto()
     BODY = auto()
+    DISJUNCTION = auto()
 
 
 @dataclass
@@ -53,18 +72,20 @@ class Frame(ABC):
     env: BindingEnvironment
 
     @abstractmethod
-    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
+    def step(self, interpreter: Interpreter) -> PushFrame | YieldEnv | None:
         """Execute one step of this frame.
 
         Args:
             interpreter: The interpreter instance for accessing execution methods
 
         Returns:
-            - BindingEnvironment: Frame produced a result, yield this environment
-            - None: Frame needs more work or should be popped
+            - PushFrame: Push a child goal onto the stack
+            - YieldEnv: Yield a solution environment
+            - None: Internal state transition (loop will call step() again)
 
         Raises:
             StopIteration: Frame exhausted all alternatives
+            CutException: Cut occurred
         """
         pass
 
@@ -80,44 +101,60 @@ class Frame(ABC):
 
 @dataclass
 class GoalFrame(Frame):
-    """Frame for executing a single goal.
+    """Frame for executing a single atomic goal — fully frame-driven version.
 
-    Encapsulates:
-    - The goal to execute
-    - Iterator over solutions
-    - Current solution binding environment
-
-    The frame lazily initializes the solutions iterator on first step(),
-    then produces solutions one at a time on subsequent calls.
+    State machine: init → try_clause → wait_body → try_clause → ... → done
+    Clause candidates are iterated internally.
+    Body execution is delegated to the stack via PushFrame (no recursion).
     """
 
     goal: PrologType | None = None
-    solutions: Iterator[BindingEnvironment] | None = None
+    state: str = "init"
+    _clause_iter: Iterator | None = field(default=None, repr=False)
     frame_type: FrameType = field(default=FrameType.GOAL, init=False)
 
-    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
-        """Get next solution from goal execution.
-
-        First call initializes the solutions iterator.
-        Subsequent calls pull next solution.
+    def step(self, interpreter: Interpreter) -> PushFrame | YieldEnv | None:
+        """Execute one step of goal resolution.
 
         Returns:
-            Next binding environment or None if exhausted
-        """
-        if self.solutions is None:
-            # First call: initialize solutions iterator
-            # Use interpreter's internal method to execute this single goal
-            self.solutions = interpreter._execute_single_goal(self.goal, self.env)
+            - PushFrame: Delegate body execution to stack
+            - YieldEnv: Solution from builtin predicate
+            - None: Internal state transition
 
-        try:
-            next_env = next(self.solutions)
-            return next_env
-        except StopIteration:
-            return None  # Signal to pop this frame
+        Raises:
+            StopIteration: All clauses exhausted
+        """
+        if self.state == "init":
+            # Request clause candidates from interpreter
+            self._clause_iter = interpreter.logic_interpreter._solve_goal_for_frame(
+                self.goal, self.env
+            )
+            self.state = "try_clause"
+            return None  # Next step() will try first clause
+
+        elif self.state == "try_clause":
+            try:
+                result = next(self._clause_iter)
+                # result is PushFrame (user-defined predicate body)
+                # or YieldEnv (builtin solution)
+                if isinstance(result, PushFrame):
+                    self.state = "wait_body"
+                return result
+            except StopIteration:
+                raise  # All clauses failed
+
+        elif self.state == "wait_body":
+            # Body frame popped with StopIteration → came back here
+            # This clause exhausted all solutions → try next clause
+            self.state = "try_clause"
+            return None  # Next step() will try next clause
+
+        else:
+            raise StopIteration
 
     def can_backtrack(self) -> bool:
-        """Check if goal has more solutions."""
-        return self.solutions is not None
+        """Check if goal has more clauses to try."""
+        return self._clause_iter is not None and self.state != "done"
 
 
 @dataclass
@@ -186,54 +223,120 @@ class GoalSeqFrame(Frame):
 
 @dataclass
 class NegationFrame(Frame):
-    """Frame for negation as failure (\\+/1).
+    """Frame for negation as failure (\\+/1) — inner_goal success/failure check.
 
-    Handles:
-    - Tracking inner goal execution state
-    - Cut barrier enforcement (cuts within negation don't escape)
-    - Binding isolation (bindings within negation don't leak)
+    inner_goal succeeds → negation fails (StopIteration)
+    inner_goal fails → negation succeeds (YieldEnv)
+    CutException is absorbed (Cut barrier)
 
-    State tracking:
-    - entry_stack_depth: Stack depth when negation started
-    - entry_choice_depth: Choice point depth when negation started
-    - inner_started: Whether inner goal execution has started
-    - inner_succeeded: Whether inner goal produced any solution
+    Note: inner_goal is executed via PushFrame delegation to maintain explicit stack.
+    State machine ensures proper cut isolation and backtracking behavior.
     """
 
     inner_goal: PrologType | None = None
-    entry_stack_depth: int = 0
-    entry_choice_depth: int = 0
-    inner_started: bool = False
-    inner_succeeded: bool = False
+    checked: bool = False
+    solution_found: bool = False
+    inner_started: bool = False  # Tracks if inner goal execution has been initiated
+    inner_succeeded: bool = False  # Tracks if inner goal produced a solution
+    entry_stack_depth: int = 0  # Stack depth at entry (for restoration on failure)
+    entry_choice_depth: int = 0  # Choice point depth at entry (for cut isolation)
     frame_type: FrameType = field(default=FrameType.NEGATION, init=False)
 
-    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
-        """Execute negation as failure logic.
+    def step(self, interpreter: Interpreter) -> PushFrame | YieldEnv | None:
+        """Execute negation as failure logic with explicit frame delegation.
+
+        State machine:
+        1. First call: Set inner_started, return None (execute_iterative will push inner goal)
+        2. Inner goal completion: Check inner_succeeded
+           - If succeeded: negation fails (StopIteration)
+           - If failed: negation succeeds (YieldEnv)
 
         Returns:
-            - None: Inner goal needs to be pushed/executed
-            - env: Negation succeeded (inner goal failed completely)
+            - None: Signal to push inner goal onto stack
+            - YieldEnv: Negation succeeded (inner goal failed)
+
+        Raises:
+            StopIteration: Negation failed (inner goal succeeded) or already checked
         """
+        if self.checked:
+            raise StopIteration
+
+        # Mark as started for execute_iterative
         if not self.inner_started:
-            # First step: push inner goal
             self.inner_started = True
-            return None  # Signal: push inner_goal
+            return None  # Signal: execute_iterative will push inner_goal
 
-        # Inner goal has been executed
-        if self.inner_succeeded:
-            # Inner goal succeeded → negation fails
-            return None  # Pop frame, fail
+        # Inner goal execution completed, check result
+        self.checked = True
+
+        if not self.inner_succeeded:
+            return YieldEnv(env=self.env)  # negation succeeds
         else:
-            # Inner goal failed → negation succeeds
-            return self.env
+            raise StopIteration  # negation fails
 
-    def record_success(self):
-        """Mark that inner goal succeeded (negation should fail)."""
+    def record_success(self) -> None:
+        """Record that inner goal succeeded (called by execute_iterative)."""
         self.inner_succeeded = True
 
     def can_backtrack(self) -> bool:
         """Negation frames don't backtrack themselves."""
         return False
+
+
+@dataclass
+class DisjunctionFrame(Frame):
+    """Frame for disjunction (;/2) — fully frame-driven version.
+
+    State machine: init_left → wait_left → init_right → wait_right → done
+    Child frames' YieldEnv are yielded directly by the while loop (not through DisjunctionFrame).
+    Child frame StopIteration → pop → DisjunctionFrame.step() is called.
+
+    CutException handling:
+    - DisjunctionFrame does NOT catch CutException
+    - While loop catches it and pops frames up to the disjunction
+    - Right branch is skipped (because DisjunctionFrame is popped)
+    """
+
+    left_goal: PrologType | None = None
+    right_goal: PrologType | None = None
+    state: str = "init_left"
+    frame_type: FrameType = field(default=FrameType.DISJUNCTION, init=False)
+
+    def step(self, interpreter: Interpreter) -> PushFrame | YieldEnv | None:
+        """Execute disjunction state machine.
+
+        Returns:
+            - PushFrame: Push left or right child goal
+            - None: Internal state transition
+
+        Raises:
+            StopIteration: Both branches exhausted
+        """
+        if self.state == "init_left":
+            self.state = "wait_left"
+            return PushFrame(goal=self.left_goal, env=self.env)
+
+        elif self.state == "wait_left":
+            # Child frame (left) popped with StopIteration → came back here
+            # Left exhausted → move to right
+            self.state = "init_right"
+            return self.step(interpreter)  # Immediately transition to init_right
+
+        elif self.state == "init_right":
+            self.state = "wait_right"
+            return PushFrame(goal=self.right_goal, env=self.env)
+
+        elif self.state == "wait_right":
+            # Right also exhausted
+            self.state = "done"
+            raise StopIteration
+
+        else:
+            raise StopIteration
+
+    def can_backtrack(self) -> bool:
+        """Check if disjunction has more alternatives."""
+        return self.state not in ("done", "wait_right")
 
 
 @dataclass
@@ -291,209 +394,6 @@ class OperatorFrame(Frame):
     def can_backtrack(self) -> bool:
         """Disjunction can backtrack between branches."""
         return self.operator == ";" and self.state == "left"
-
-
-@dataclass
-class ConjunctionFrame(Frame):
-    """Frame for executing conjunction (A, B, C) iteratively.
-
-    Replaces _execute_conjunction_recursive to eliminate recursion.
-    Uses an internal stack like GoalSeqFrame but calls _execute_body_direct_iterative.
-
-    State:
-    - goals: List of goals to execute
-    - goal_stack: Stack of (index, iterator) pairs for backtracking
-    - initialized: Whether first goal has been pushed
-    """
-
-    goals: list[PrologType] = field(default_factory=list)
-    goal_stack: list[tuple[int, Iterator[BindingEnvironment]]] = field(
-        default_factory=list
-    )
-    initialized: bool = False
-    frame_type: FrameType = field(default=FrameType.CONJUNCTION, init=False)
-
-    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
-        """Execute conjunction with proper backtracking.
-
-        Returns:
-            - BindingEnvironment: A solution was found
-            - None: Conjunction exhausted all possibilities
-        """
-        # Initialize on first call
-        if not self.initialized:
-            if not self.goals:
-                # Empty conjunction succeeds with current env
-                return self.env
-
-            # Start with first goal
-            # Call _execute_body_direct_iterative which uses BodyFrame
-            first_iter = interpreter.logic_interpreter._execute_body_direct_iterative(
-                self.goals[0], self.env
-            )
-            self.goal_stack.append((0, first_iter))
-            self.initialized = True
-
-        # Process goal stack (same logic as GoalSeqFrame)
-        while self.goal_stack:
-            index, iterator = self.goal_stack[-1]
-
-            try:
-                next_env = next(iterator)
-            except StopIteration:
-                # Current goal exhausted, backtrack
-                self.goal_stack.pop()
-                continue
-
-            # Check if last goal
-            if index == len(self.goals) - 1:
-                # All goals succeeded, return solution
-                return next_env
-
-            # Push next goal
-            next_index = index + 1
-            next_iter = interpreter.logic_interpreter._execute_body_direct_iterative(
-                self.goals[next_index], next_env
-            )
-            self.goal_stack.append((next_index, next_iter))
-
-        # All goals exhausted
-        return None
-
-    def can_backtrack(self) -> bool:
-        """Check if backtracking is possible."""
-        return len(self.goal_stack) > 0
-
-
-@dataclass
-class BodyFrame(Frame):
-    """Frame for executing rule body with disjunction/negation handling.
-
-    Replaces _execute_body_direct to eliminate recursion.
-    Handles:
-    - Conjunction (,/2): delegates to ConjunctionFrame
-    - Disjunction (;/2): tries left then right branch
-    - Negation (\\+/1): delegates to NegationFrame
-    - Atomic goals: delegates to _execute_single_goal
-
-    State:
-    - body: Goal to execute
-    - state: Execution state ('initial', 'left', 'right', 'done')
-    - child_iterator: Iterator for current branch/goal
-    """
-
-    body: PrologType | None = None
-    state: str = "initial"
-    child_iterator: Iterator[BindingEnvironment] | None = None
-    frame_type: FrameType = field(default=FrameType.BODY, init=False)
-
-    def step(self, interpreter: Interpreter) -> BindingEnvironment | None:
-        """Execute body step by step.
-
-        Returns:
-            - BindingEnvironment: A solution found
-            - None: Need to continue or exhausted
-        """
-        from pyprolog.core.types import Atom, Term
-
-        if self.state == "done":
-            return None
-
-        # Detect logical operators
-        if isinstance(self.body, Term) and isinstance(self.body.functor, Atom):
-            functor_name = self.body.functor.name
-
-            # Conjunction (,/2): flatten and delegate to ConjunctionFrame
-            if functor_name == "," and len(self.body.args) == 2:
-                if self.state == "initial":
-                    # Flatten conjunction and create ConjunctionFrame
-                    goals = interpreter.logic_interpreter._flatten_conjunction_iterative(
-                        self.body
-                    )
-                    self.child_iterator = interpreter.logic_interpreter._execute_conjunction_recursive(
-                        goals, self.env
-                    )
-                    self.state = "executing"
-
-                try:
-                    result_env = next(self.child_iterator)
-                    return result_env
-                except StopIteration:
-                    self.state = "done"
-                    return None
-
-            # Disjunction (;/2): try left then right
-            elif functor_name == ";" and len(self.body.args) == 2:
-                left_goal, right_goal = self.body.args
-
-                if self.state == "initial":
-                    # Try left branch first
-                    self.child_iterator = interpreter.logic_interpreter._execute_body_direct(
-                        left_goal, self.env
-                    )
-                    self.state = "left"
-
-                if self.state == "left":
-                    try:
-                        result_env = next(self.child_iterator)
-                        return result_env
-                    except StopIteration:
-                        # Left exhausted, try right
-                        self.child_iterator = interpreter.logic_interpreter._execute_body_direct(
-                            right_goal, self.env
-                        )
-                        self.state = "right"
-
-                if self.state == "right":
-                    try:
-                        result_env = next(self.child_iterator)
-                        return result_env
-                    except StopIteration:
-                        self.state = "done"
-                        return None
-
-            # Negation (\\+/1): negation as failure
-            elif functor_name == "\\+" and len(self.body.args) == 1:
-                if self.state == "initial":
-                    inner_goal = self.body.args[0]
-                    self.child_iterator = interpreter.logic_interpreter._execute_body_direct(
-                        inner_goal, self.env
-                    )
-                    self.state = "checking"
-
-                if self.state == "checking":
-                    solution_found = False
-                    try:
-                        next(self.child_iterator)
-                        solution_found = True
-                    except StopIteration:
-                        pass
-
-                    self.state = "done"
-                    if not solution_found:
-                        # Negation succeeded (inner goal failed)
-                        return self.env
-                    else:
-                        # Negation failed (inner goal succeeded)
-                        return None
-
-        # Atomic goal: delegate to _execute_single_goal
-        if self.state == "initial":
-            self.child_iterator = interpreter.runtime._execute_single_goal(
-                self.body, self.env
-            )
-            self.state = "executing"
-
-        try:
-            result_env = next(self.child_iterator)
-            return result_env
-        except StopIteration:
-            self.state = "done"
-            return None
-
-    def can_backtrack(self) -> bool:
-        """Check if body has more alternatives."""
-        return self.child_iterator is not None and self.state != "done"
 
 
 @dataclass
@@ -584,8 +484,12 @@ class ExecutionState:
                 negation_frame = NegationFrame(
                     env=env,
                     inner_goal=inner_goal,
-                    entry_stack_depth=len(self.stack),
-                    entry_choice_depth=len(self.choice_points),
+                    entry_stack_depth=len(
+                        self.stack
+                    ),  # Now matches NegationFrame fields
+                    entry_choice_depth=len(
+                        self.choice_points
+                    ),  # Now matches NegationFrame fields
                 )
                 self.stack.append(negation_frame)
                 return

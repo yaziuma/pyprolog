@@ -15,6 +15,13 @@ from pyprolog.core.types import (
     Term,
     Variable,
 )
+from pyprolog.runtime.execution_frames import (
+    DisjunctionFrame,
+    GoalFrame,
+    NegationFrame,
+    PushFrame,
+    YieldEnv,
+)
 
 if TYPE_CHECKING:
     from pyprolog.runtime.interpreter import Runtime
@@ -824,6 +831,47 @@ class LogicInterpreter:
         try:
             self._refresh_index_if_needed()
 
+            # Check for builtin predicates (meta-predicates, list operations, dynamic predicates, etc.)
+            # These are handled in runtime.execute() but not yet in defined_registry
+            if isinstance(actual_goal.functor, Atom):
+                functor_name = actual_goal.functor.name
+                arity = len(actual_goal.args)
+                builtin_predicates = {
+                    # Type checking
+                    ("var", 1),
+                    ("atom", 1),
+                    ("number", 1),
+                    ("atom_number", 2),
+                    ("functor", 3),
+                    ("arg", 3),
+                    ("=..", 2),
+                    # Dynamic predicates
+                    ("asserta", 1),
+                    ("assertz", 1),
+                    ("retract", 1),
+                    # List operations
+                    ("member", 2),
+                    ("append", 3),
+                    # Meta predicates
+                    ("findall", 3),
+                    # Listing/export
+                    ("listing", 0),
+                    ("listing", 1),
+                    ("export_facts", 2),
+                    # IO predicates
+                    ("get_char", 1),
+                    ("read_line", 1),
+                    ("peek_char", 1),
+                    ("at_end_of_stream", 0),
+                }
+                if (functor_name, arity) in builtin_predicates:
+                    # Delegate to runtime.execute() which has the builtin implementations
+                    for result_env in self.runtime._execute_single_goal(
+                        actual_goal, env
+                    ):
+                        yield YieldEnv(env=result_env)
+                    return
+
             # Existence check
             if isinstance(
                 actual_goal.functor, Atom
@@ -929,9 +977,9 @@ class LogicInterpreter:
 
                 if unified:
                     if is_rule_from_fact_structure:
-                        # Execute body directly without runtime.execute()
+                        # Execute body with frame-driven iterative approach (Phase 2)
                         try:
-                            yield from self._execute_body_direct(
+                            yield from self._execute_body_iterative(
                                 rule_body_from_fact_structure, new_env_after_unify
                             )
                         except CutException:
@@ -951,9 +999,9 @@ class LogicInterpreter:
                             )
                         yield new_env_after_unify
                     elif isinstance(renamed_entry, Rule):
-                        # Execute body directly without runtime.execute()
+                        # Execute body with frame-driven iterative approach (Phase 2)
                         try:
-                            yield from self._execute_body_direct(
+                            yield from self._execute_body_iterative(
                                 renamed_entry.body, new_env_after_unify
                             )
                         except CutException:
@@ -1035,6 +1083,474 @@ class LogicInterpreter:
 
         # Atomic goal: delegate to _execute_single_goal()
         yield from self.runtime._execute_single_goal(body, env)
+
+    # ═══════════════════════════════════════════════════════════════
+    # Phase 2: Complete Frame-Driven Execution (while + explicit stack)
+    # ═══════════════════════════════════════════════════════════════
+
+    def _make_frame(self, body: PrologType, env: BindingEnvironment):
+        """Create appropriate frame for body based on its type.
+
+        This is a helper for _execute_body_iterative to dispatch to the correct frame type.
+
+        Args:
+            body: Goal to execute
+            env: Binding environment
+
+        Returns:
+            Frame object (GoalFrame, DisjunctionFrame, NegationFrame, etc.)
+        """
+        # Detect logical operators
+        if isinstance(body, Term) and isinstance(body.functor, Atom):
+            functor_name = body.functor.name
+
+            # Disjunction (;/2)
+            if functor_name == ";" and len(body.args) == 2:
+                left_goal, right_goal = body.args[0], body.args[1]
+                return DisjunctionFrame(
+                    env=env, left_goal=left_goal, right_goal=right_goal
+                )
+
+            # Negation (\+/1)
+            if functor_name == "\\+" and len(body.args) == 1:
+                inner_goal = body.args[0]
+                # Note: entry_stack_depth/entry_choice_depth are not used in _execute_body_iterative context
+                # They default to 0, which is fine for this local stack-based execution
+                return NegationFrame(
+                    env=env,
+                    inner_goal=inner_goal,
+                    entry_stack_depth=0,  # Not used in local stack context
+                    entry_choice_depth=0,  # Not used in local stack context
+                )
+
+        # Atomic goal (including conjunction, which is handled in _execute_body_iterative)
+        return GoalFrame(env=env, goal=body)
+
+    def _solve_goal_for_frame(
+        self, goal: PrologType, env: BindingEnvironment
+    ) -> Iterator[PushFrame | YieldEnv]:
+        """Solve goal for frame-driven execution (PushFrame/YieldEnv version of solve_goal_direct).
+
+        This is called by GoalFrame.step(). It's essentially solve_goal_direct but instead of
+        yielding BindingEnvironment directly or using yield from _execute_body_direct(), it:
+        - Yields PushFrame for clause bodies (to push onto frame stack)
+        - Yields YieldEnv for builtin solutions
+
+        Args:
+            goal: Goal to solve
+            env: Binding environment
+
+        Yields:
+            PushFrame: For clause bodies that need execution
+            YieldEnv: For builtin/fact solutions
+
+        Raises:
+            CutException: When cut is encountered
+            PrologError: On predicate errors
+        """
+        # Operator check: delegate to _execute_single_goal and wrap in YieldEnv
+        from pyprolog.core.operators import operator_registry
+
+        # Check for Atom operators (like "!")
+        if isinstance(goal, Atom):
+            functor_name = goal.name
+            op_info = operator_registry.get_operator(functor_name)
+
+            if (
+                op_info
+                and functor_name in self.runtime._operator_evaluators
+                and functor_name not in (",", ";", "\\+")
+            ):
+                # Delegate to _execute_single_goal and wrap results in YieldEnv
+                for result_env in self.runtime._execute_single_goal(goal, env):
+                    yield YieldEnv(env=result_env)
+                return
+
+        # Check for Term operators (like "=(X, Y)", "is(X, Y)", etc.)
+        if isinstance(goal, Term) and isinstance(goal.functor, Atom):
+            functor_name = goal.functor.name
+            op_info = operator_registry.get_operator(functor_name)
+
+            # If it's an operator (not a logical operator, those are handled elsewhere)
+            if (
+                op_info
+                and functor_name in self.runtime._operator_evaluators
+                and functor_name not in (",", ";", "\\+")
+            ):
+                # Delegate to _execute_single_goal and wrap results in YieldEnv
+                for result_env in self.runtime._execute_single_goal(goal, env):
+                    yield YieldEnv(env=result_env)
+                return
+
+        # This is a copy of solve_goal_direct with body execution changed to PushFrame
+        if env.stats_enabled:
+            env.stats["solve_calls_total"] += 1
+
+        actual_goal: Term
+        if isinstance(goal, Atom):
+            actual_goal = Term(goal, [])
+        elif isinstance(goal, Term):
+            actual_goal = goal
+        else:
+            return
+
+        current_goal_key: tuple[str, int] | None = None
+        if isinstance(actual_goal.functor, Atom):
+            current_goal_key = (actual_goal.functor.name, len(actual_goal.args))
+
+        if env.stats_enabled:
+            previous_goal_key = env.stats.get("current_goal_key")
+            env.stats["current_goal_key"] = current_goal_key
+            if current_goal_key:
+                env.stats["solve_calls_by_pred"][current_goal_key] = (
+                    env.stats["solve_calls_by_pred"].get(current_goal_key, 0) + 1
+                )
+        else:
+            previous_goal_key = None
+
+        try:
+            self._refresh_index_if_needed()
+
+            # Check for builtin predicates (meta-predicates, list operations, dynamic predicates, etc.)
+            # These are handled in runtime.execute() but not yet in defined_registry
+            if isinstance(actual_goal.functor, Atom):
+                functor_name = actual_goal.functor.name
+                arity = len(actual_goal.args)
+                builtin_predicates = {
+                    # Type checking
+                    ("var", 1),
+                    ("atom", 1),
+                    ("number", 1),
+                    ("atom_number", 2),
+                    ("functor", 3),
+                    ("arg", 3),
+                    ("=..", 2),
+                    # Dynamic predicates
+                    ("asserta", 1),
+                    ("assertz", 1),
+                    ("retract", 1),
+                    # List operations
+                    ("member", 2),
+                    ("append", 3),
+                    # Meta predicates
+                    ("findall", 3),
+                    # Listing/export
+                    ("listing", 0),
+                    ("listing", 1),
+                    ("export_facts", 2),
+                    # IO predicates
+                    ("get_char", 1),
+                    ("read_line", 1),
+                    ("peek_char", 1),
+                    ("at_end_of_stream", 0),
+                }
+                if (functor_name, arity) in builtin_predicates:
+                    # Delegate to runtime.execute() which has the builtin implementations
+                    for result_env in self.runtime._execute_single_goal(
+                        actual_goal, env
+                    ):
+                        yield YieldEnv(env=result_env)
+                    return
+
+            # Existence check
+            if isinstance(
+                actual_goal.functor, Atom
+            ) and actual_goal.functor.name not in (
+                "true",
+                "fail",
+            ):
+                key = (actual_goal.functor.name, len(actual_goal.args))
+
+                if (
+                    key not in self.defined_registry
+                    and key not in self.dynamic_registry
+                ):
+                    raise PrologError(
+                        f"existence_error(procedure, {actual_goal.functor.name}/{len(actual_goal.args)})"
+                    )
+
+                if key not in self.rules_by_pred or not self.rules_by_pred[key]:
+                    if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                        self.runtime.tracer.record_fail(actual_goal)
+                    return
+
+            # Tracer: call
+            if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                self.runtime.tracer.record_call(actual_goal, env)
+
+            # Special predicates
+            if actual_goal.functor.name == "true" and not actual_goal.args:
+                if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                    self.runtime.tracer.record_exit(actual_goal, env, Fact(actual_goal))
+                yield YieldEnv(env=env)
+                return
+            elif actual_goal.functor.name == "fail" and not actual_goal.args:
+                if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                    self.runtime.tracer.record_fail(actual_goal)
+                return
+
+            # Get candidate clauses
+            candidate_entries: list[Rule | Fact]
+            if isinstance(actual_goal.functor, Atom):
+                candidate_entries, used_secondary_index = self.get_candidate_clauses(
+                    actual_goal, env
+                )
+                if env.stats_enabled:
+                    if used_secondary_index:
+                        env.stats["index2_hit"] += 1
+                    else:
+                        env.stats["index2_miss_or_fallback"] += 1
+            else:
+                candidate_entries = self.rules
+
+            if env.stats_enabled:
+                env.stats["candidate_entries_scanned_total"] += len(candidate_entries)
+                if current_goal_key:
+                    env.stats["candidate_entries_scanned_by_pred"][current_goal_key] = (
+                        env.stats["candidate_entries_scanned_by_pred"].get(
+                            current_goal_key, 0
+                        )
+                        + len(candidate_entries)
+                    )
+                if env.stats["solve_calls_total"]:
+                    env.stats["avg_candidates_per_goal"] = (
+                        env.stats["candidate_entries_scanned_total"]
+                        / env.stats["solve_calls_total"]
+                    )
+
+            # Try each candidate clause
+            for db_entry in candidate_entries:
+                renamed_entry = self._rename_variables(db_entry, env)
+
+                current_head: Term
+                if isinstance(renamed_entry, Rule):
+                    current_head = renamed_entry.head
+                elif isinstance(renamed_entry, Fact):
+                    current_head = renamed_entry.head
+                else:
+                    raise PrologError(
+                        "Internal error: Renamed DB entry is not Rule or Fact."
+                    )
+
+                # Handle potential parser issue
+                effective_head = current_head
+                is_rule_from_fact_structure = False
+                rule_body_from_fact_structure = None
+
+                if (
+                    isinstance(renamed_entry, Fact)
+                    and isinstance(current_head, Term)
+                    and current_head.functor.name == ":-"
+                    and len(current_head.args) == 2
+                ):
+                    logger.warning(
+                        "LOGIC_INTERP (PATCH DETECTED): Fact's head is a ':-' term: %s. Treating as rule.",
+                        current_head,
+                    )
+                    effective_head = current_head.args[0]
+                    rule_body_from_fact_structure = current_head.args[1]
+                    is_rule_from_fact_structure = True
+
+                unified, new_env_after_unify = self.unify(
+                    actual_goal, effective_head, env
+                )
+
+                if unified:
+                    if is_rule_from_fact_structure:
+                        # Execute body: yield PushFrame instead of yield from
+                        try:
+                            yield PushFrame(
+                                goal=rule_body_from_fact_structure,
+                                env=new_env_after_unify,
+                            )
+                        except CutException:
+                            raise
+                        except Exception as e:
+                            if "Input required" in str(e) or hasattr(e, "input_type"):
+                                raise
+                            raise
+                    elif isinstance(renamed_entry, Fact):
+                        # Genuine Fact: yield solution
+                        if (
+                            hasattr(self.runtime, "tracer")
+                            and self.runtime.tracer.enabled
+                        ):
+                            self.runtime.tracer.record_exit(
+                                actual_goal, new_env_after_unify, renamed_entry
+                            )
+                        yield YieldEnv(env=new_env_after_unify)
+                    elif isinstance(renamed_entry, Rule):
+                        # Execute body: yield PushFrame instead of yield from
+                        try:
+                            yield PushFrame(
+                                goal=renamed_entry.body, env=new_env_after_unify
+                            )
+                        except CutException:
+                            raise
+                        except Exception as e:
+                            if "Input required" in str(e) or hasattr(e, "input_type"):
+                                raise
+                            raise
+
+            # Tracer: fail
+            if hasattr(self.runtime, "tracer") and self.runtime.tracer.enabled:
+                self.runtime.tracer.record_fail(actual_goal)
+        finally:
+            if env.stats_enabled:
+                env.stats["current_goal_key"] = previous_goal_key
+
+    def _execute_body_iterative(
+        self, body: PrologType, env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """Execute rule body with complete frame-driven approach (Phase 2).
+
+        This replaces _execute_body_direct to eliminate Python stack consumption from
+        Prolog predicate recursion. Uses while loop + explicit frame stack.
+
+        Key features:
+        - yield ONLY in one place (while loop)
+        - No yield from for goal → solve → body recursion
+        - Frames communicate via PushFrame/YieldEnv
+
+        Args:
+            body: Rule body to execute
+            env: Binding environment
+
+        Yields:
+            Binding environments for each solution
+
+        Raises:
+            CutException: When cut is encountered
+        """
+        from pyprolog.core.types import Atom, Term
+
+        # Special case: conjunction is handled with existing iterative approach
+        # (conjunction chains are flattened, not deeply recursive)
+        if isinstance(body, Term) and isinstance(body.functor, Atom):
+            if body.functor.name == "," and len(body.args) == 2:
+                goals = self._flatten_conjunction_iterative(body)
+                yield from self._execute_conjunction_with_frame(goals, env)
+                return
+
+        # Frame-driven execution with explicit stack
+        stack = [self._make_frame(body, env)]
+
+        while stack:
+            frame = stack[-1]
+
+            try:
+                result = frame.step(self.runtime)
+            except StopIteration:
+                # Frame exhausted
+                stack.pop()
+                # For NegationFrame: if inner goal failed, step() would have returned YieldEnv
+                # If we get StopIteration, it means negation failed (inner goal succeeded)
+                continue
+            except CutException:
+                # Cut within negation: mark inner goal as succeeded
+                if any(isinstance(f, NegationFrame) for f in stack):
+                    for f in reversed(stack):
+                        if isinstance(f, NegationFrame):
+                            f.record_success()
+                            break
+                    continue
+                # Normal cut: clear stack and propagate
+                stack.clear()
+                raise
+
+            if result is None:
+                # Internal state transition
+                # For NegationFrame: need to push inner goal
+                if (
+                    isinstance(frame, NegationFrame)
+                    and frame.inner_started
+                    and not frame.checked
+                ):
+                    inner_frame = self._make_frame(frame.inner_goal, frame.env.copy())
+                    stack.append(inner_frame)
+                # For other frames: just continue to next step
+                continue
+            elif isinstance(result, PushFrame):
+                # Push child frame
+                new_frame = self._make_frame(result.goal, result.env)
+                stack.append(new_frame)
+            elif isinstance(result, YieldEnv):
+                # Check if this is within a NegationFrame
+                parent_frame = stack[-2] if len(stack) >= 2 else None
+                if isinstance(parent_frame, NegationFrame):
+                    # Inner goal of negation succeeded → mark it
+                    parent_frame.record_success()
+                    # Pop inner goal frame
+                    stack.pop()
+                    # Negation will fail on next step
+                else:
+                    # Normal solution: yield it
+                    yield result.env
+            # Other cases: continue
+
+    def _execute_conjunction_with_frame(
+        self, goals: list[PrologType], env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        """Execute conjunction iteratively with frame-driven body execution.
+
+        This is based on _execute_conjunction_iterative but calls _execute_body_iterative
+        for each goal instead of _execute_body_direct.
+
+        Args:
+            goals: Flattened list of goals from conjunction
+            env: Initial environment
+
+        Yields:
+            Binding environments for each solution
+
+        Raises:
+            CutException: When cut is encountered
+        """
+        # Base case: no goals
+        if not goals:
+            yield env
+            return
+
+        n = len(goals)
+        # Stack: list of (goal_index, result_iterator)
+        stack: list[tuple[int, Iterator[BindingEnvironment]]] = []
+
+        # Start with first goal (using _execute_body_iterative)
+        try:
+            first_iter = self._execute_body_iterative(goals[0], env)
+            stack.append((0, first_iter))
+        except CutException:
+            raise
+
+        # Process stack iteratively
+        while stack:
+            goal_idx, iterator = stack[-1]
+
+            try:
+                result_env = next(iterator)
+            except StopIteration:
+                # Current goal exhausted, backtrack
+                stack.pop()
+                continue
+            except CutException:
+                # Cut encountered
+                raise
+
+            # Check if this is the last goal
+            if goal_idx == n - 1:
+                # All goals succeeded, yield solution
+                yield result_env
+                # Continue to get next solution from current goal
+            else:
+                # Move to next goal (using _execute_body_iterative)
+                next_idx = goal_idx + 1
+                try:
+                    next_iter = self._execute_body_iterative(
+                        goals[next_idx], result_env
+                    )
+                    stack.append((next_idx, next_iter))
+                except CutException:
+                    raise
 
     def _flatten_conjunction_iterative(self, body: PrologType) -> list[PrologType]:
         """Flatten nested conjunctions into a flat list (iterative, no recursion).

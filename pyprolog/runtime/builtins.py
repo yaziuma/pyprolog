@@ -659,7 +659,9 @@ class AppendPredicate(BuiltinPredicate):
                     # Instead of recursive call, push to stack
                     stack.append((t1_var, l2, t3_var, env_clause2_after_l3))
                 else:
-                    logger.debug("APPEND_CP2: L3 failed to unify with '%s'.", list3_pattern)
+                    logger.debug(
+                        "APPEND_CP2: L3 failed to unify with '%s'.", list3_pattern
+                    )
             else:
                 logger.debug("APPEND_CP2: L1 failed to unify with '%s'.", list1_pattern)
 

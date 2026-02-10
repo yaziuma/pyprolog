@@ -39,6 +39,8 @@ from pyprolog.runtime.execution_frames import (
     GoalFrame,
     GoalSeqFrame,
     NegationFrame,
+    PushFrame,
+    YieldEnv,
 )
 from pyprolog.runtime.logic_interpreter import LogicInterpreter
 from pyprolog.runtime.math_interpreter import MathInterpreter
@@ -917,30 +919,23 @@ class Runtime:
                     result = frame.step(self)
 
                     if result is None:
-                        if not frame.inner_started:
-                            # Should never happen (step() sets inner_started)
-                            state.stack.pop()
-                            continue
-                        elif frame.inner_succeeded:
-                            # Inner goal succeeded → negation fails
-                            state.stack.pop()
-                            # Restore stack/choice points to entry state
-                            while len(state.stack) > frame.entry_stack_depth:
-                                state.stack.pop()
-                            while len(state.choice_points) > frame.entry_choice_depth:
-                                state.choice_points.pop()
-                            # Try backtracking
-                            if not state.backtrack():
-                                continue
-                        else:
-                            # Inner goal execution needed
+                        # First call: inner goal execution needed
+                        if frame.inner_started and not frame.checked:
+                            # Push inner goal onto stack
                             state.push_goal(frame.inner_goal, frame.env.copy())
+                        # If checked, negation will raise StopIteration on next step()
                         continue
 
-                    # Negation succeeded (inner goal failed)
-                    yield result
-                    state.stack.pop()
-                    continue
+                    elif isinstance(result, YieldEnv):
+                        # Negation succeeded (inner goal failed)
+                        yield result.env
+                        state.stack.pop()
+                        continue
+                    else:
+                        # Unexpected result type (shouldn't happen)
+                        yield result
+                        state.stack.pop()
+                        continue
 
                 # === GoalSeqFrame handling ===
                 if isinstance(frame, GoalSeqFrame):
@@ -963,35 +958,64 @@ class Runtime:
                     result = frame.step(self)
 
                     if result is None:
-                        # Frame exhausted, pop and backtrack
-                        state.stack.pop()
-                        if not state.backtrack():
-                            continue
+                        # Internal state transition, continue to next step
+                        continue
+                    elif isinstance(result, PushFrame):
+                        # Push child frame onto stack
+                        state.push_goal(result.goal, result.env)
+                        continue
+                    elif isinstance(result, YieldEnv):
+                        # Check if this is part of a negation
+                        parent_frame = (
+                            state.stack[-2] if len(state.stack) >= 2 else None
+                        )
+
+                        if isinstance(parent_frame, NegationFrame):
+                            # Goal within negation succeeded
+                            parent_frame.record_success()
+                            state.stack.pop()
+                            # Negation will fail in next iteration
+                        else:
+                            # Standalone goal succeeded, yield the environment
+                            yield result.env
+                            # Continue to try next solution from this frame
+                        continue
+                    else:
+                        # Fallback for compatibility (old behavior, shouldn't happen)
+                        # Check if this is part of a negation
+                        parent_frame = (
+                            state.stack[-2] if len(state.stack) >= 2 else None
+                        )
+
+                        if isinstance(parent_frame, NegationFrame):
+                            # Goal within negation succeeded
+                            parent_frame.record_success()
+                            state.stack.pop()
+                        else:
+                            # Standalone goal succeeded
+                            yield result
                         continue
 
-                    # Frame produced a result
-                    # Check if this is part of a negation
-                    parent_frame = state.stack[-2] if len(state.stack) >= 2 else None
-
-                    if isinstance(parent_frame, NegationFrame):
-                        # Goal within negation succeeded
-                        parent_frame.record_success()
-                        state.stack.pop()
-                        # Negation will fail in next iteration
-                    else:
-                        # Standalone goal succeeded
-                        yield result
-                        # Continue to try next solution from this frame
-                    continue
-
-                # === Other frame types ===
+                # === Other frame types (DisjunctionFrame, etc.) ===
                 result = frame.step(self)
-                if result is None:
-                    state.stack.pop()
-                    continue
 
-                yield result
-                state.stack.pop()
+                if result is None:
+                    # Internal state transition, continue
+                    continue
+                elif isinstance(result, PushFrame):
+                    # Push child frame onto stack
+                    state.push_goal(result.goal, result.env)
+                    continue
+                elif isinstance(result, YieldEnv):
+                    # Yield solution
+                    yield result.env
+                    # Keep frame on stack to produce more solutions
+                    continue
+                else:
+                    # Fallback for backward compatibility (shouldn't happen with proper frames)
+                    yield result
+                    # Keep frame on stack for backtracking
+                    continue
 
             except CutException:
                 # Handle cut within negation
