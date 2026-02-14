@@ -39,31 +39,40 @@ class TestGoalFrame:
         assert frame.frame_type == FrameType.GOAL
         assert frame.goal == goal
         assert frame.env == env
-        assert frame.solutions is None
+        assert frame._clause_iter is None
+        assert frame.state == "init"
 
     def test_goal_frame_can_backtrack(self):
-        """Test can_backtrack returns True when solutions iterator exists."""
+        """Test can_backtrack returns True when clause iterator exists."""
         env = BindingEnvironment()
         frame = GoalFrame(env=env, goal=Atom("test"))
 
-        # Before step: no solutions yet
-        assert frame.solutions is None
+        # Before step: no clause iterator yet
+        assert frame._clause_iter is None
         assert not frame.can_backtrack()
 
-        # After setting solutions (simulated)
-        frame.solutions = iter([env])
+        # After setting clause iterator (simulated)
+        frame._clause_iter = iter([env])
+        frame.state = "try_clause"
         assert frame.can_backtrack()
 
-    def test_goal_frame_step_returns_none_when_exhausted(self):
-        """Test step returns None when solutions exhausted."""
+        # Done state: cannot backtrack
+        frame.state = "done"
+        assert not frame.can_backtrack()
+
+    def test_goal_frame_step_raises_stopiteration_when_exhausted(self):
+        """Test step raises StopIteration when clauses exhausted."""
+        import pytest
+
         env = BindingEnvironment()
         frame = GoalFrame(env=env, goal=Atom("test"))
 
-        # Simulate exhausted iterator
-        frame.solutions = iter([])
+        # Set up state as if init already happened
+        frame.state = "try_clause"
+        frame._clause_iter = iter([])
 
-        result = frame.step(None)  # type: ignore
-        assert result is None
+        with pytest.raises(StopIteration):
+            frame.step(None)  # type: ignore
 
 
 class TestGoalSeqFrame:

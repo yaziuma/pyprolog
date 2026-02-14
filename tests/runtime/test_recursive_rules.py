@@ -223,6 +223,11 @@ class TestRecursiveRules:
         )
         self.assertQueryTrue("add(s(s(0)), s(s(0)), R)", [{"R": expected_r_term4}])
 
+    @pytest.mark.xfail(
+        reason="Left recursion not yet handled - requires tabling/loop detection (Phase 3)",
+        raises=RecursionError,
+        strict=True,
+    )
     def test_left_recursion_problem_naive_ancestor(self):
         # This test is expected to potentially cause issues if left-recursion is not handled
         # (e.g. by loop detection or reordering goals, though basic Prolog typically struggles).

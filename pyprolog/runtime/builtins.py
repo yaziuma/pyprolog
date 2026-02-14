@@ -98,7 +98,7 @@ class AtomNumberPredicate(BuiltinPredicate):
         atom_arg = runtime.logic_interpreter.dereference(self.args[0], env)
         number_arg = runtime.logic_interpreter.dereference(self.args[1], env)
         if isinstance(atom_arg, Atom) and (not isinstance(number_arg, Number)):
-            number_value = try_convert_atom_to_number(atom_arg.value)
+            number_value = try_convert_atom_to_number(atom_arg.name)
             if number_value is not None:
                 target_number = Number(number_value)
                 unified, final_env = runtime.logic_interpreter.unify(
@@ -116,7 +116,7 @@ class AtomNumberPredicate(BuiltinPredicate):
                 yield final_env
             return
         elif isinstance(atom_arg, Atom) and isinstance(number_arg, Number):
-            number_value = try_convert_atom_to_number(atom_arg.value)
+            number_value = try_convert_atom_to_number(atom_arg.name)
             if number_value == number_arg.value:
                 yield env
             return
