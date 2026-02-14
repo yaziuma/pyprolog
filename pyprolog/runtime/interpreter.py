@@ -1031,6 +1031,13 @@ class Runtime:
                 state.apply_cut()
                 raise
 
+            except RecursionError:
+                # Left recursion detected - treat current frame as exhausted.
+                # This allows the next clause (base case) to be tried.
+                state.stack.pop()
+                if not state.backtrack():
+                    continue
+
             except StopIteration:
                 # Frame exhausted, try backtracking
                 state.stack.pop()

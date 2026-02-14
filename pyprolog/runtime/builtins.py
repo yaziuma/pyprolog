@@ -1173,17 +1173,14 @@ class ExportFactsPredicate(BuiltinPredicate):
             return str(functor)
 
 
-from .io_predicates import GetCharPredicate as UnifiedGetCharPredicate
-from .io_predicates import PeekCharPredicate as UnifiedPeekCharPredicate
-from .io_predicates import ReadLinePredicate as UnifiedReadLinePredicate
-
-
 def create_get_char_predicate(arg: PrologType) -> BuiltinPredicate:
     """
     get_char/1述語のファクトリ関数
 
     統一入力システム対応版を返す。
     """
+    from .io_predicates import GetCharPredicate as UnifiedGetCharPredicate
+
     return UnifiedGetCharPredicate(arg)
 
 
@@ -1193,6 +1190,8 @@ def create_read_line_predicate(arg: PrologType) -> BuiltinPredicate:
 
     統一入力システム対応版を返す。
     """
+    from .io_predicates import ReadLinePredicate as UnifiedReadLinePredicate
+
     return UnifiedReadLinePredicate(arg)
 
 
@@ -1202,4 +1201,6 @@ def create_peek_char_predicate(arg: PrologType) -> BuiltinPredicate:
 
     統一入力システム対応版を返す。
     """
+    from .io_predicates import PeekCharPredicate as UnifiedPeekCharPredicate
+
     return UnifiedPeekCharPredicate(arg)
