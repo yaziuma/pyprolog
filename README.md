@@ -45,6 +45,14 @@ PyPrologは、Pythonで実装された拡張性の高いPrologインタープリ
 
 ## 更新履歴
 
+**2026年4月1日 - unsafe外部Python実行機能追加 (v0.9.0)**
+
+- **unsafe外部実行**: `py_register/2`, `py_unregister/1`, `py_registered/2`, `py_call/5` を追加
+- **directive対応**: `:- py_register(Name, "/absolute/path/script.py").` をサポート
+- **実行制約**: 絶対パス `.py` 限定、`Args` はコマンドライン引数のみ、`shell=False`・stdin 無効で同期実行
+- **CLI対応**: `pyprolog.cli.prolog --unsafe` を追加
+- **テスト**: 非ベンチマーク系テスト `639 passed`
+
 **2025年9月14日 - 統一入力システム完全実装 (v0.7.0)**
 
 - **統一入力システム**: InputHandlerインターフェースによる入力処理の統一
