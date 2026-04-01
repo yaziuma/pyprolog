@@ -858,6 +858,11 @@ class LogicInterpreter:
                     ("listing", 0),
                     ("listing", 1),
                     ("export_facts", 2),
+                    # Unsafe external execution
+                    ("py_register", 2),
+                    ("py_unregister", 1),
+                    ("py_registered", 2),
+                    ("py_call", 5),
                     # IO predicates
                     ("get_char", 1),
                     ("read_line", 1),
@@ -1238,6 +1243,11 @@ class LogicInterpreter:
                     ("listing", 0),
                     ("listing", 1),
                     ("export_facts", 2),
+                    # Unsafe external execution
+                    ("py_register", 2),
+                    ("py_unregister", 1),
+                    ("py_registered", 2),
+                    ("py_call", 5),
                     # IO predicates
                     ("get_char", 1),
                     ("read_line", 1),

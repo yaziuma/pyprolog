@@ -14,6 +14,26 @@ class PrologError(Exception):
     pass
 
 
+class UnsafeModeError(PrologError):
+    pass
+
+
+class ScriptRegistrationError(PrologError):
+    pass
+
+
+class InvalidCliArgsError(PrologError):
+    pass
+
+
+class ScriptNotRegisteredError(PrologError):
+    pass
+
+
+class ExternalExecutionError(PrologError):
+    pass
+
+
 class UnificationError(Exception):
     pass
 

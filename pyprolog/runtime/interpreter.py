@@ -1,12 +1,10 @@
 # pyprolog/runtime/interpreter.py
 import logging
 from collections.abc import Callable, Iterator  # Optional was already here
-from typing import (
-    Any,
-)
+from typing import Any
 
 from pyprolog.core.binding_environment import BindingEnvironment
-from pyprolog.core.errors import CutException, PrologError
+from pyprolog.core.errors import CutException, PrologError, UnsafeModeError
 from pyprolog.core.operators import OperatorInfo, OperatorType, operator_registry
 from pyprolog.core.types import Atom, Fact, Number, PrologType, Rule, Term, Variable
 from pyprolog.parser.parser import Parser
@@ -27,6 +25,10 @@ from pyprolog.runtime.builtins import (
     ListingWithPredicatePredicate,
     MemberPredicate,
     NumberPredicate,
+    PyCallPredicate,
+    PyRegisteredPredicate,
+    PyRegisterPredicate,
+    PyUnregisterPredicate,
     UnivPredicate,
     VarPredicate,
     # 統一入力システム対応版ファクトリ関数
@@ -42,13 +44,16 @@ from pyprolog.runtime.execution_frames import (
     PushFrame,
     YieldEnv,
 )
+from pyprolog.runtime.external.executor import ExecutionResult, ExternalPythonExecutor
+from pyprolog.runtime.external.path_policy import validate_absolute_python_path
+from pyprolog.runtime.external.registry import PythonScriptRegistry
+from pyprolog.runtime.io_manager import IOManager
 from pyprolog.runtime.logic_interpreter import LogicInterpreter
 from pyprolog.runtime.math_interpreter import MathInterpreter
+from pyprolog.runtime.runtime_config import RuntimeConfig
+from pyprolog.runtime.tracer import Tracer
 from pyprolog.util.functor_mapper import FunctorMapper  # Added FunctorMapper
 from pyprolog.util.variable_mapper import VariableMapper  # Added
-
-from .io_manager import IOManager
-from .tracer import Tracer
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +65,8 @@ class Runtime:
         variable_mapper: VariableMapper | None = None,
         functor_mapper: FunctorMapper | None = None,
         occurs_check_enabled: bool = True,
+        runtime_config: RuntimeConfig | None = None,
+        unsafe_mode: bool | None = None,
     ):
         self.rules: list[Rule | Fact] = rules if rules is not None else []
         self.variable_mapper = (
@@ -82,6 +89,14 @@ class Runtime:
         self.io_manager = IOManager()  # Initialize IOManager
         self.tracer = Tracer()  # Initialize Tracer
         self.occurs_check_enabled = occurs_check_enabled
+        self.runtime_config = runtime_config or RuntimeConfig()
+        if unsafe_mode is not None:
+            self.runtime_config.unsafe_mode = unsafe_mode
+        self.python_script_registry = PythonScriptRegistry()
+        self.external_python_executor = ExternalPythonExecutor(
+            python_executable=self.runtime_config.python_executable,
+            timeout_seconds=self.runtime_config.exec_timeout_seconds,
+        )
         self.use_iterative_execution = True  # Feature flag for iterative execution
         self.logic_interpreter = LogicInterpreter(
             self.rules, self
@@ -92,6 +107,32 @@ class Runtime:
             len(self.rules),
             len(self._operator_evaluators),
         )
+
+    @property
+    def unsafe_mode(self) -> bool:
+        return self.runtime_config.unsafe_mode
+
+    def ensure_unsafe_mode(self) -> None:
+        if not self.unsafe_mode:
+            raise UnsafeModeError("unsafe mode disabled")
+
+    def register_python_script(self, name: str, raw_path: str) -> None:
+        self.ensure_unsafe_mode()
+        validated_path = validate_absolute_python_path(raw_path)
+        self.python_script_registry.register(name, validated_path)
+
+    def unregister_python_script(self, name: str) -> None:
+        self.ensure_unsafe_mode()
+        self.python_script_registry.unregister(name)
+
+    def iter_registered_python_scripts(self) -> list[tuple[str, str]]:
+        self.ensure_unsafe_mode()
+        return self.python_script_registry.items()
+
+    def execute_python_script(self, name: str, args: list[str]) -> ExecutionResult:
+        self.ensure_unsafe_mode()
+        script_path = self.python_script_registry.resolve(name)
+        return self.external_python_executor.execute(script_path, args)
 
     def _extract_existing_functors(self) -> set:
         """既存ルールからファンクター名を抽出"""
@@ -292,16 +333,14 @@ class Runtime:
                     raise PrologError("Disjunction ;/2 requires exactly 2 arguments")
                 left_goal, right_goal = args[0], args[1]
                 try:
-                    for left_env in self.execute(left_goal, env):
-                        yield left_env
+                    yield from self.execute(left_goal, env)
                 except CutException:
                     logger.debug(
                         "CutException from left part of disjunction ';'. Re-raising."
                     )
                     raise
                 else:
-                    for right_env_solution in self.execute(right_goal, env):
-                        yield right_env_solution
+                    yield from self.execute(right_goal, env)
             elif op_info.symbol == "\\+":  # Negation as failure
                 if len(args) != 1:
                     raise PrologError("Negation \\+/1 requires exactly 1 argument")
@@ -394,8 +433,7 @@ class Runtime:
                     for cond_env in self.execute(condition, env):
                         solution_found_for_condition = True
                         try:
-                            for then_env_solution in self.execute(then_part, cond_env):
-                                yield then_env_solution
+                            yield from self.execute(then_part, cond_env)
                         except CutException:
                             logger.debug(
                                 "CutException from then_part of '->', re-raising to cut '->' and parent choices."
@@ -862,6 +900,40 @@ class Runtime:
             for item in export_pred.execute(self, env):
                 yield item
             return
+        elif functor_name == "py_register" and len(processed_goal.args) == 2:
+            _record_builtin_call(functor_name)
+            register_pred = PyRegisterPredicate(
+                processed_goal.args[0], processed_goal.args[1]
+            )
+            for item in register_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "py_unregister" and len(processed_goal.args) == 1:
+            _record_builtin_call(functor_name)
+            unregister_pred = PyUnregisterPredicate(processed_goal.args[0])
+            for item in unregister_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "py_registered" and len(processed_goal.args) == 2:
+            _record_builtin_call(functor_name)
+            registered_pred = PyRegisteredPredicate(
+                processed_goal.args[0], processed_goal.args[1]
+            )
+            for item in registered_pred.execute(self, env):
+                yield item
+            return
+        elif functor_name == "py_call" and len(processed_goal.args) == 5:
+            _record_builtin_call(functor_name)
+            call_pred = PyCallPredicate(
+                processed_goal.args[0],
+                processed_goal.args[1],
+                processed_goal.args[2],
+                processed_goal.args[3],
+                processed_goal.args[4],
+            )
+            for item in call_pred.execute(self, env):
+                yield item
+            return
 
         # === Fallback: User-defined predicates via solve_goal_direct ===
         logger.debug(
@@ -1238,6 +1310,14 @@ class Runtime:
                     self.logic_interpreter.apply_dynamic(pred_name, arity)
                     logger.info(
                         "Applied dynamic directive: %s/%d from %s",
+                        pred_name,
+                        arity,
+                        filename,
+                    )
+                elif directive_type == "py_register":
+                    self.register_python_script(pred_name, str(arity))
+                    logger.info(
+                        "Applied py_register directive: %s -> %s from %s",
                         pred_name,
                         arity,
                         filename,

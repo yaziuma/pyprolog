@@ -76,8 +76,8 @@ class Scanner:
             self._identifier()
         elif char.isdigit():
             self._number()
-        elif char == "'":
-            self._string()
+        elif char in {"'", '"'}:
+            self._string(char)
         elif char == "(":
             self._add_token(TokenType.LEFTPAREN)
         elif char == ")":
@@ -188,9 +188,9 @@ class Scanner:
         value = float(self._source[self._start : self._current])
         self._add_token(TokenType.NUMBER, value)
 
-    def _string(self):
+    def _string(self, quote_char: str):
         """文字列のスキャン"""
-        while self._peek() != "'" and (not self._is_at_end()):
+        while self._peek() != quote_char and (not self._is_at_end()):
             if self._peek() == "\n":
                 self._line += 1
             self._advance()

@@ -5,7 +5,17 @@ from typing import TYPE_CHECKING
 
 from pyprolog.core.binding_environment import BindingEnvironment
 from pyprolog.core.errors import CutException, PrologError
-from pyprolog.core.types import Atom, Fact, Number, PrologType, Rule, Term, Variable
+from pyprolog.core.types import (
+    Atom,
+    Fact,
+    Number,
+    PrologType,
+    Rule,
+    String,
+    Term,
+    Variable,
+)
+from pyprolog.runtime.external.arg_policy import normalize_cli_args
 from pyprolog.runtime.unified_input_system import StreamInputHandler
 
 logger = logging.getLogger(__name__)
@@ -1171,6 +1181,109 @@ class ExportFactsPredicate(BuiltinPredicate):
             return functor_name
         else:
             return str(functor)
+
+
+def _require_atom_name(
+    term: PrologType, runtime: "Runtime", env: BindingEnvironment, label: str
+) -> str:
+    value = runtime.logic_interpreter.dereference(term, env)
+    if not isinstance(value, Atom):
+        raise PrologError(f"{label} must be an atom")
+    return value.name
+
+
+def _require_text_value(
+    term: PrologType, runtime: "Runtime", env: BindingEnvironment, label: str
+) -> str:
+    value = runtime.logic_interpreter.dereference(term, env)
+    if isinstance(value, Atom):
+        return value.name
+    if isinstance(value, String):
+        return value.value
+    raise PrologError(f"{label} must be an atom or string")
+
+
+class PyRegisterPredicate(BuiltinPredicate):
+    def __init__(self, name_arg: PrologType, path_arg: PrologType):
+        super().__init__(name_arg, path_arg)
+
+    def execute(
+        self, runtime: "Runtime", env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        name = _require_atom_name(self.args[0], runtime, env, "py_register/2 name")
+        path = _require_text_value(self.args[1], runtime, env, "py_register/2 path")
+        runtime.register_python_script(name, path)
+        yield env
+
+
+class PyUnregisterPredicate(BuiltinPredicate):
+    def __init__(self, name_arg: PrologType):
+        super().__init__(name_arg)
+
+    def execute(
+        self, runtime: "Runtime", env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        name = _require_atom_name(self.args[0], runtime, env, "py_unregister/1 name")
+        runtime.unregister_python_script(name)
+        yield env
+
+
+class PyRegisteredPredicate(BuiltinPredicate):
+    def __init__(self, name_arg: PrologType, path_arg: PrologType):
+        super().__init__(name_arg, path_arg)
+
+    def execute(
+        self, runtime: "Runtime", env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        for name, path in runtime.iter_registered_python_scripts():
+            unified_name, env_after_name = runtime.logic_interpreter.unify(
+                self.args[0], Atom(name), env
+            )
+            if not unified_name:
+                continue
+            unified_path, final_env = runtime.logic_interpreter.unify(
+                self.args[1], Atom(path), env_after_name
+            )
+            if unified_path:
+                yield final_env
+
+
+class PyCallPredicate(BuiltinPredicate):
+    def __init__(
+        self,
+        name_arg: PrologType,
+        args_arg: PrologType,
+        exit_arg: PrologType,
+        stdout_arg: PrologType,
+        stderr_arg: PrologType,
+    ):
+        super().__init__(name_arg, args_arg, exit_arg, stdout_arg, stderr_arg)
+
+    def execute(
+        self, runtime: "Runtime", env: BindingEnvironment
+    ) -> Iterator[BindingEnvironment]:
+        name = _require_atom_name(self.args[0], runtime, env, "py_call/5 name")
+        resolved_args = runtime.logic_interpreter.deep_dereference_term(
+            self.args[1], env
+        )
+        cli_args = normalize_cli_args(resolved_args)
+        result = runtime.execute_python_script(name, cli_args)
+
+        unified_exit, env_after_exit = runtime.logic_interpreter.unify(
+            self.args[2], Number(result.exit_code), env
+        )
+        if not unified_exit:
+            return
+        unified_stdout, env_after_stdout = runtime.logic_interpreter.unify(
+            self.args[3], Atom(result.stdout), env_after_exit
+        )
+        if not unified_stdout:
+            return
+        unified_stderr, final_env = runtime.logic_interpreter.unify(
+            self.args[4], Atom(result.stderr), env_after_stdout
+        )
+        if unified_stderr:
+            yield final_env
 
 
 def create_get_char_predicate(arg: PrologType) -> BuiltinPredicate:

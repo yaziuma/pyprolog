@@ -1,11 +1,11 @@
 # PyProlog - Advanced Prolog Interpreter in Python
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/Tests-351%20Passing-green.svg)](#testing)
+[![Tests](https://img.shields.io/badge/Tests-639%20Passing-green.svg)](#testing)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Unified Input](https://img.shields.io/badge/Unified%20Input%20System-Active-brightgreen.svg)](#unified-input-system)
 
-PyPrologは、Pythonで実装された拡張性の高いPrologインタープリタです。**統一入力システム**、**日本語変数名サポート**、および**高度な開発ツール**を備え、`uv` を利用した効率的な開発環境を提供します。
+PyPrologは、Pythonで実装された拡張性の高いPrologインタープリタです。**統一入力システム**、**日本語変数名サポート**、**高度な開発ツール**、および **unsafeモード限定の外部Pythonスクリプト実行機能** を備え、`uv` を利用した効率的な開発環境を提供します。
 
 **2025年9月更新**: 統一入力システム（Unified Input System）の実装が完了しました。継続実行機能により、対話的プログラムの応答性が向上しています。
 
@@ -26,6 +26,7 @@ PyPrologは、Pythonで実装された拡張性の高いPrologインタープリ
 - **継続実行**: 中断・再開可能な処理フローの実現
 - **スレッドセーフI/O**: 複数同時対話セッションのサポート
 - **標準的な組み込み述語**: 40種類以上の標準述語（`listing/0`, `listing/1`, `export_facts/2` 等）を実装
+- **unsafe外部実行**: `py_register/2`, `py_unregister/1`, `py_registered/2`, `py_call/5` による絶対パス `.py` スクリプトの同期実行
 - **知識ベース管理**: 述語一覧表示、データのエクスポート機能
 - **自動型変換**: 数値文字列の自動判定および変換機能
 - **CLIインターフェース**: インタラクティブREPLおよびバッチ処理に対応
@@ -78,6 +79,26 @@ solutions = r.query('患者診断([発熱, 咳], 30, [], [], Result).')
 print(f'診断結果: {solutions}')
 "
 ```
+
+### unsafeモードで外部Pythonスクリプトを実行
+
+```prolog
+:- py_register(run_task, "/absolute/path/to/run_task.py").
+
+run(Exit, Out, Err) :-
+    py_call(run_task, ["--task-id", "task-001"], Exit, Out, Err).
+```
+
+```bash
+uv run python -m pyprolog.cli.prolog --unsafe workflow.pl
+```
+
+unsafeモードでは以下の制約があります。
+
+- 登録パスは絶対パスのみ
+- 対象は `.py` ファイルのみ
+- `py_call/5` の `Args` は atom / string / number の proper list のみ
+- 外部実行は `shell=False`、`stdin` 無効、同期実行
 
 ### インタラクティブREPLの使用
 
@@ -209,6 +230,7 @@ uvx python -m pyprolog.cli.prolog tests/data/puzzle1.prolog
 - **型チェック**: `var/1`, `atom/1`, `number/1` 等
 - **リスト操作**: `member/2`, `append/3` 等
 - **メタ述語**: `findall/3`, `asserta/1` 等
+- **unsafe外部実行**: `py_register/2`, `py_unregister/1`, `py_registered/2`, `py_call/5`
 - **演算子**: 算術、比較、論理演算子をサポート
 
 ### 日本語サポート

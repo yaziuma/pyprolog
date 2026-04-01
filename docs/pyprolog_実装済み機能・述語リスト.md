@@ -9,6 +9,13 @@ Python ライブラリとしての API やクラス構造については、[Pyth
 
 ## 最新の更新情報
 
+**2026年4月1日** - unsafe外部Python実行:
+* 新しい組み込み述語 `py_register/2`, `py_unregister/1`, `py_registered/2`, `py_call/5` を追加
+* `py_register/2` を directive としてもサポート
+* 絶対パス `.py` ファイル限定で外部 Python スクリプトを同期実行
+* `Args` はコマンドライン引数のみ許可し、stdin や対話入力は不許可
+* 機能は unsafe モード時のみ有効
+
 **2025年8月27日** - 知識ベース管理機能:
 * 新しい組み込み述語 `listing/0`, `listing/1` を追加（読み込み済み述語の表示）
 * 新しい組み込み述語 `export_facts/2` を追加（事実データの外部エクスポート）
@@ -125,6 +132,24 @@ Python ライブラリとしての API やクラス構造については、[Pyth
 | `listing/1` | 1 | **NEW** 指定述語のみを整形表示 |
 | `export_facts/2` | 2 | **NEW** 事実データを外部形式でエクスポート |
 
+### unsafe外部実行述語
+
+| 述語 | アリティ | 説明 |
+| --- | --- | --- |
+| `py_register/2` | 2 | 名前と絶対パスの `.py` スクリプトを登録 |
+| `py_unregister/1` | 1 | 登録済みスクリプト名を削除 |
+| `py_registered/2` | 2 | 登録済みスクリプト名と絶対パスを列挙 |
+| `py_call/5` | 5 | 登録済み Python スクリプトを同期実行し、終了コード・標準出力・標準エラーを返す |
+
+#### unsafe外部実行の制約
+
+* `--unsafe` または `Runtime(unsafe_mode=True)` のときのみ利用可能
+* 登録パスは絶対パスのみ
+* 対象は `.py` ファイルのみ
+* `Args` は atom / string / number の proper list のみ
+* 実行は `shell=False`、stdin 無効、同期実行
+* `py_register/2` は directive `:- py_register(Name, "/abs/path/script.py").` としても使用可能
+
 ## 演算子
 
 ### 算術演算子
@@ -200,6 +225,7 @@ Python ライブラリとしての API やクラス構造については、[Pyth
 * **リスト**: `[element1, element2, ...]`, `[Head|Tail]`
 * **演算子**: 中置、前置、後置演算子
 * **コメント**: `%`行コメント、`/* */`ブロックコメント
+* **directive**: `:- dynamic(p/1).`, `:- py_register(name, "/abs/path/script.py").`
 
 ## 制限事項と今後の拡張予定
 
@@ -209,6 +235,8 @@ Python ライブラリとしての API やクラス構造については、[Pyth
 * モジュールシステム未実装
 * 一部の標準述語未実装（`bagof/3`, `setof/3`など）
 * 制約論理プログラミング（CLP）未サポート
+* 外部Python実行は unsafe モード限定
+* 外部Python実行の入力はコマンドライン引数のみで、stdin や対話入力は未サポート
 
 ### 運用方針
 

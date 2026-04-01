@@ -33,7 +33,7 @@ class Parser:
             variable_mapper if variable_mapper is not None else VariableMapper()
         )  # Initialize variable_mapper
         self._functor_mapper = functor_mapper  # Store functor_mapper
-        self.directives: list[tuple[str, str, int]] = []  # Store parsed directives
+        self.directives: list[tuple[str, str, int | str]] = []
         logger.debug("Parser initialized with %d tokens", len(tokens))
 
     def parse(self) -> list[Rule | Fact]:
@@ -116,7 +116,7 @@ class Parser:
             return Fact(head_term)
 
     def _parse_directive(self) -> None:
-        """Parse directive: :- dynamic(p/1)."""
+        """Parse supported directives."""
         directive_term = self._parse_term()
 
         # Validate: must be a term
@@ -124,18 +124,25 @@ class Parser:
             self._error(self._previous(), "Directive must be a term")
             return None
 
-        # Check functor is "dynamic"
-        if (
-            not isinstance(directive_term.functor, Atom)
-            or directive_term.functor.name != "dynamic"
-        ):
-            self._error(
-                self._previous(),
-                f"Unsupported directive: {directive_term.functor}. Only 'dynamic' is supported.",
-            )
+        if not isinstance(directive_term.functor, Atom):
+            self._error(self._previous(), "Directive functor must be an atom")
             return None
 
-        # Validate arity (should be 1 argument)
+        if directive_term.functor.name == "dynamic":
+            self._parse_dynamic_directive(directive_term)
+            return None
+
+        if directive_term.functor.name == "py_register":
+            self._parse_py_register_directive(directive_term)
+            return None
+
+        self._error(
+            self._previous(),
+            f"Unsupported directive: {directive_term.functor}.",
+        )
+        return None
+
+    def _parse_dynamic_directive(self, directive_term: Term) -> None:
         if len(directive_term.args) != 1:
             self._error(
                 self._previous(),
@@ -143,16 +150,40 @@ class Parser:
             )
             return None
 
-        # Parse predicate indicator: p/1 format
         indicator = directive_term.args[0]
         pred_name, arity = self._parse_predicate_indicator(indicator)
-
         if pred_name is None or arity is None:
             return None
 
-        # Store directive
         self.directives.append(("dynamic", pred_name, arity))
         logger.info("Parsed dynamic directive: %s/%d", pred_name, arity)
+        return None
+
+    def _parse_py_register_directive(self, directive_term: Term) -> None:
+        if len(directive_term.args) != 2:
+            self._error(
+                self._previous(),
+                f"py_register directive expects 2 arguments, got {len(directive_term.args)}",
+            )
+            return None
+
+        raw_name = directive_term.args[0]
+        raw_path = directive_term.args[1]
+
+        if not isinstance(raw_name, Atom):
+            self._error(self._previous(), "py_register name must be an atom")
+            return None
+
+        if isinstance(raw_path, Atom):
+            path_value = raw_path.name
+        elif isinstance(raw_path, String):
+            path_value = raw_path.value
+        else:
+            self._error(self._previous(), "py_register path must be an atom or string")
+            return None
+
+        self.directives.append(("py_register", raw_name.name, path_value))
+        logger.info("Parsed py_register directive: %s -> %s", raw_name.name, path_value)
         return None
 
     def _parse_predicate_indicator(self, indicator) -> tuple[str | None, int | None]:

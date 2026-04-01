@@ -24,6 +24,12 @@ uv run python -m pyprolog.cli.repl
 uv run python -m pyprolog.cli.prolog sample_usage/family.pl
 ```
 
+### unsafeモードでワークフローを実行
+
+```bash
+uv run python -m pyprolog.cli.prolog --unsafe workflow/main.pl
+```
+
 ## 📋 主な機能
 
 ### ✨ リアルタイムクエリ実行
@@ -43,6 +49,24 @@ uv run python -m pyprolog.cli.prolog sample_usage/family.pl
 | `:show_rules`      | 読み込み済みルール表示   |
 | `:clear`           | ルールクリア             |
 | `:status`          | システム状態表示         |
+
+### 🔌 外部Pythonスクリプト実行
+
+unsafeモードでは、Prologファイル内から登録済み Python スクリプトを起動できます。
+
+```prolog
+:- py_register(run_task, "/absolute/path/to/run_task.py").
+
+run(Exit, Out, Err) :-
+    py_call(run_task, ["--mode", "fast"], Exit, Out, Err).
+```
+
+注意点:
+
+- `pyprolog.cli.prolog` を `--unsafe` 付きで起動する必要があります
+- 登録パスは絶対パスのみです
+- `Args` はコマンドライン引数として渡されます
+- 標準入力や対話入力は渡されません
 
 ### 🎨 視覚的表示
 
@@ -195,6 +219,7 @@ Prolog> :status
 - 構文エラー（不正な Prolog 構文）
 - ファイルエラー（存在しないファイル）
 - 実行時エラー（クエリ実行中の問題）
+- unsafe モード未有効時の外部実行エラー
 
 ## 🔧 トラブルシューティング
 

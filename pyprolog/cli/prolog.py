@@ -3,25 +3,13 @@
 import argparse
 import sys
 
-from pyprolog.parser.parser import Parser
-from pyprolog.parser.scanner import Scanner
 from pyprolog.runtime.interpreter import Runtime
 
-from .repl import run_repl
 
-
-def start(input_path):
-    rules_text = ""
-    runtime = None
+def start(input_path: str, unsafe_mode: bool = False) -> Runtime:
     try:
-        with open(input_path) as reader:
-            line = reader.readline()
-            while line != "":
-                rules_text += line
-                line = reader.readline()
-
-        rules = Parser(Scanner(rules_text).tokenize())._parse_rule()
-        runtime = Runtime(rules)
+        runtime = Runtime(unsafe_mode=unsafe_mode)
+        runtime.consult(input_path)
     except Exception as e:
         print(f"Error loading rules: {e}")
         sys.exit()
@@ -33,6 +21,8 @@ def start(input_path):
 
 
 def main():
+    from .repl import run_repl
+
     ap = argparse.ArgumentParser(
         prog="prolog",
         usage="%(prog)s [options] path",
@@ -49,14 +39,19 @@ def main():
         default="text",
         help="Trace output format",
     )
+    ap.add_argument(
+        "--unsafe",
+        action="store_true",
+        help="Enable unsafe external Python execution predicates",
+    )
     args = ap.parse_args()
     input_path = args.Path
 
     # Pass args to repl for explain functionality
     if args.explain:
-        run_repl(start(input_path), explain_mode=True, args=args)
+        run_repl(start(input_path, unsafe_mode=args.unsafe), explain_mode=True, args=args)
     else:
-        run_repl(start(input_path))
+        run_repl(start(input_path, unsafe_mode=args.unsafe))
 
 
 if __name__ == "__main__":

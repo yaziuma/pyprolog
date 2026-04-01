@@ -21,6 +21,11 @@ Prolog 言語としての機能や述語については、[実装済み機能・
 * **[`ScannerError`](../pyprolog/core/errors.py)** - 字句解析エラー
 * **[`ParserError`](../pyprolog/core/errors.py)** - 構文解析エラー
 * **[`CutException`](../pyprolog/core/errors.py)** - カット例外
+* **[`UnsafeModeError`](../pyprolog/core/errors.py)** - unsafe モード未有効で外部実行機能を使用した場合の例外
+* **[`ScriptRegistrationError`](../pyprolog/core/errors.py)** - スクリプト登録時の検証エラー
+* **[`InvalidCliArgsError`](../pyprolog/core/errors.py)** - `py_call/5` の引数列が不正な場合の例外
+* **[`ScriptNotRegisteredError`](../pyprolog/core/errors.py)** - 未登録スクリプト参照時の例外
+* **[`ExternalExecutionError`](../pyprolog/core/errors.py)** - 外部Python実行時の環境エラー
 
 ## データ型 (Python クラス)
 
@@ -48,6 +53,28 @@ PyProlog の内部データ構造を表すクラス群です。AST 操作や結�
 | [`Runtime.consult(filename)`](../pyprolog/runtime/interpreter.py) | Prolog ファイルを読み込む |
 | [`Runtime.execute(goal, env)`](../pyprolog/runtime/interpreter.py) | ゴールを環境で実行し、解を生成 |
 
+### Runtime 初期化オプション
+
+```python
+from pyprolog import Runtime
+
+runtime = Runtime(
+    unsafe_mode=True,
+)
+```
+
+現在の主要オプション:
+
+| 引数 | 説明 |
+| --- | --- |
+| `rules` | 初期ルールのリスト |
+| `variable_mapper` | 日本語変数名マッパー |
+| `functor_mapper` | 非ASCIIファンクタ名マッパー |
+| `occurs_check_enabled` | occurs check の有効/無効 |
+| `unsafe_mode` | unsafe 外部Python実行機能を有効化 |
+
+`unsafe_mode=True` のときのみ、`py_register/2`, `py_unregister/1`, `py_registered/2`, `py_call/5` が利用できます。
+
 ### 単一化アルゴリズム
 
 [`LogicInterpreter`](../pyprolog/runtime/logic_interpreter.py)クラスで実装された単一化機能：
@@ -61,6 +88,24 @@ PyProlog の内部データ構造を表すクラス群です。AST 操作や結�
 * 標準入力/出力
 * ファイル入出力
 * ストリーム管理
+
+### unsafe 外部Python実行
+
+unsafe モードでは、Prolog から登録済み Python スクリプトを同期実行できます。
+
+対象述語:
+
+* `py_register/2`
+* `py_unregister/1`
+* `py_registered/2`
+* `py_call/5`
+
+制約:
+
+* 登録パスは絶対パスのみ
+* 対象は `.py` ファイルのみ
+* `Args` は atom / string / number の proper list のみ
+* 実行は `shell=False`、stdin 無効、同期実行
 
 ## 使用例
 
@@ -82,7 +127,40 @@ runtime.add_rule("happy(X) :- likes(X, wine).")
 # クエリ実行
 results = runtime.query("happy(X)")
 for result in results:
-    print(f"X = {result['X']}")
+    print(result)
+```
+
+### unsafe モードで外部Pythonスクリプトを実行
+
+```python
+from pyprolog import Runtime
+
+runtime = Runtime(unsafe_mode=True)
+
+runtime.query('py_register(run_task, "/absolute/path/to/run_task.py").')
+results = runtime.query(
+    'py_call(run_task, ["--task-id", "task-001"], Exit, Out, Err).'
+)
+
+for result in results:
+    print(result)
+```
+
+`consult()` で読み込む Prolog ファイル内でも directive として登録できます。
+
+```python
+from pyprolog import Runtime
+
+runtime = Runtime(unsafe_mode=True)
+runtime.consult("workflow.pl")
+results = runtime.query("run(Exit, Out, Err).")
+```
+
+```prolog
+:- py_register(run_task, "/absolute/path/to/run_task.py").
+
+run(Exit, Out, Err) :-
+    py_call(run_task, ["--mode", "fast"], Exit, Out, Err).
 ```
 
 ### 入出力操作とストリーム
