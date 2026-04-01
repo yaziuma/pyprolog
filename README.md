@@ -7,6 +7,10 @@
 
 PyPrologは、Pythonで実装された拡張性の高いPrologインタープリタです。**統一入力システム**、**日本語変数名サポート**、**高度な開発ツール**、および **unsafeモード限定の外部Pythonスクリプト実行機能** を備え、`uv` を利用した効率的な開発環境を提供します。
 
+> 本プロジェクトは [robjsliwa/pyprolog](https://github.com/robjsliwa/pyprolog) のフォーク版です。  
+> 元実装をベースに、日本語変数名・ファンクター名対応、統一入力システム、知識ベース管理機能、
+> 検索・検証ツール、および unsafe モードでの外部 Python 実行機能などを追加しています。
+
 **2025年9月更新**: 統一入力システム（Unified Input System）の実装が完了しました。継続実行機能により、対話的プログラムの応答性が向上しています。
 
 ## 主な特徴
@@ -34,6 +38,12 @@ PyPrologは、Pythonで実装された拡張性の高いPrologインタープリ
 - **メタ述語**: `findall/3`、動的述語操作をサポート
 
 ## プロジェクト状況
+
+- 開発は継続中です
+- コアの Prolog 実行、統一入力システム、知識ベース管理、検索・検証ツールは利用可能です
+- `py_register/2` などの外部 Python 実行機能は unsafe モード限定機能です
+
+## 更新履歴
 
 **2025年9月14日 - 統一入力システム完全実装 (v0.7.0)**
 
@@ -315,4 +325,6 @@ MIT License - 詳細は [LICENSE](LICENSE) ファイルを参照してくださ�
 
 ## 作者・保守者
 
-本プロジェクトは Claude Code の協力により開発・保守されています。
+- 元リポジトリ: [robjsliwa/pyprolog](https://github.com/robjsliwa/pyprolog)
+- フォーク版オーナー・保守者: [yaziuma](https://github.com/yaziuma)
+- このフォークは Claude Code の協力のもとで拡張・保守されています。
