@@ -148,10 +148,11 @@ uv.lock
 
 # Claude Code generated files
 CLAUDE.md
-/.claude/hooks/*
-/.claude/tmp/*
 /*.sqlite3
 /.serena
 *.Identifier
 
-.claude/logs/
+# AI assistant tooling configs (local, not for public repo)
+/.claude/
+/.codex/
+/.gemini/
