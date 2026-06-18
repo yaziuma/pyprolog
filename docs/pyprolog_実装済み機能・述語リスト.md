@@ -235,6 +235,7 @@ Python ライブラリとしての API やクラス構造については、[Pyth
 * モジュールシステム未実装
 * 一部の標準述語未実装（`bagof/3`, `setof/3`など）
 * 制約論理プログラミング（CLP）未サポート
+* 一部のディレクティブ・述語は認識されるが未実装（呼び出すと `NotImplementedError`）：`discontiguous`, `clause_property`, `abolish/1`, `multifile`, `thread_local`
 * 外部Python実行は unsafe モード限定
 * 外部Python実行の入力はコマンドライン引数のみで、stdin や対話入力は未サポート
 

@@ -1,5 +1,17 @@
 # Dynamic Directive & Existence Semantics
 
+> **実装ステータス: 実装済み（コードで確認済み）**
+>
+> 本仕様は実装が完了しています。主な実装箇所:
+> - Parser の strict match と directive 保持（`("dynamic", name, arity)`）: `pyprolog/parser/parser.py:131-159`
+> - consult 経路で directive を rules より先に適用: `pyprolog/runtime/interpreter.py:1306-1310`
+> - `predicate_registry` / `apply_dynamic()`: `pyprolog/runtime/logic_interpreter.py:54`
+> - `add_rule()` への registry 更新一元化: `pyprolog/runtime/logic_interpreter.py:203`
+> - existence semantics（`existence_error(procedure, _)`）: `pyprolog/runtime/logic_interpreter.py:636, 894, 1279`
+>
+> Guardrail テストはローカルに `tests/runtime/test_dynamic_directive.py` として存在します
+> （本コミット時点では未追跡。コミットは別途判断）。`tests/runtime/test_dynamic_predicates.py` は追跡済み。
+
 ## Fixed Spec + Implementation Plan（最終確定版）
 
 ## 1. Goals / Non-Goals
@@ -255,15 +267,15 @@ p(X).            % fail
 
 ## 7. Implementation Checklist（安全順）
 
-* [ ] Parser：`:- dynamic p/1.` だけを strict match で捕捉できている
-* [ ] Parser：dynamic以外directiveは必ず parse error
-* [ ] Parser：directives形式は `("dynamic", name, arity)`
-* [ ] consult/load：directives → rules の順で処理（必ず先適用）
-* [ ] LogicInterpreter：registry導入、`apply_dynamic` が addするだけ
-* [ ] add_rule：全ルール挿入がここを通る、registry更新がここで完結
-* [ ] solve_goal：4段階順序が固定されている
-* [ ] Builtins：assert* は add_rule 経由、retract* は registry不干渉
-* [ ] Guardrails：3本のみで意味論を守る
+* [x] Parser：`:- dynamic p/1.` だけを strict match で捕捉できている（`parser.py:131-159`）
+* [x] Parser：dynamic以外directiveは必ず parse error
+* [x] Parser：directives形式は `("dynamic", name, arity)`（`parser.py:158`）
+* [x] consult/load：directives → rules の順で処理（必ず先適用）（`interpreter.py:1306-1310`）
+* [x] LogicInterpreter：registry導入、`apply_dynamic` が addするだけ（`logic_interpreter.py:54`）
+* [x] add_rule：全ルール挿入がここを通る、registry更新がここで完結（`logic_interpreter.py:203`）
+* [x] solve_goal：4段階順序が固定されている（existence_error: `logic_interpreter.py:636, 894, 1279`）
+* [x] Builtins：assert* は add_rule 経由、retract* は registry不干渉
+* [x] Guardrails：意味論テストはローカルに存在（`tests/runtime/test_dynamic_directive.py`、未追跡）
 
 ### 失敗時の切り分け
 
